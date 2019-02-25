@@ -17,7 +17,7 @@ extra-source-files:
 cabal-version:       >=1.10
 
 library
-  exposed-modules:     Syntax,Parse
+  exposed-modules:     Syntax,Parse,Desugar,InterpreterSyntax
   build-depends:       base >= 4 && < 5,
                        megaparsec >= 7.0 && < 7.1,
                        -- parser-combinators >= 1.0 && < 1.1,
@@ -43,7 +43,7 @@ library
 Test-Suite RunTests
   type:                exitcode-stdio-1.0
   main-is:             RunTests.lhs
-  other-modules:       Syntax,Parse,ParseTests
+  other-modules:       Syntax,Parse,ParseTests,Desugar,InterpreterSyntax,DesugarTests
   hs-source-dirs:      .,src
   build-depends:       base >= 4 && < 5,
                        megaparsec >= 7.0 && < 7.1,

@@ -7,7 +7,7 @@
 >                        ,(<|>)
 >                        ,parse
 >                        ,eof
->                        ,some
+>                        --,some
 >                        ,choice
 >                        ,option
 >                        ,(<?>)
@@ -40,23 +40,23 @@
 >                             )
 
 
-> import Data.Char ({-isAlphaNum,isDigit,-}isSpace)
-> import Data.Scientific
+> --import Data.Char ({-isAlphaNum,isDigit,-}isSpace)
+> --import Data.Scientific
 
-> import qualified Text.Megaparsec as Parser
+> --import qualified Text.Megaparsec as Parser
 > --import qualified Data.Set as Set
 
-> import Data.Void (Void)
+> --import Data.Void (Void)
 > import Control.Applicative ((<**>))
-> import Control.Monad (guard)
+> --import Control.Monad (guard)
 
 > import Text.Megaparsec (satisfy, anySingle)
 
-> import Text.Megaparsec.Char (space
->                             ,letterChar
->                             ,char
+> import Text.Megaparsec.Char (--space
+>                              letterChar
+>                             --,char
 >                             --,digitChar
->                             ,string
+>                             --,string
 >                             --,satisfy
 >                             --,anyChar
 >                             )
@@ -247,11 +247,11 @@ end
 
 > ask :: Parser Expr
 > ask = Ask <$> (keyword_ "ask" *> symbol_ ":" *> many branch)
->           <*> (optional otherwise <* keyword_ "end")
+>           <*> (optional ow <* keyword_ "end")
 >   where
 >       branch = (,) <$> try (symbol_ "|" *> expr <* keyword "then" <* symbol_ ":")
 >                    <*> expr
->       otherwise = symbol_ "|" *> keyword_ "otherwise" *> symbol_ ":" *> expr
+>       ow = symbol_ "|" *> keyword_ "otherwise" *> symbol_ ":" *> expr
 > 
 
 

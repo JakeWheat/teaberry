@@ -14,8 +14,8 @@ The high level syntax which the parser produces
 
 >           | Parens Expr
 
->           | TupleCtor [Expr]
->           | TupleGet Expr Integer
+>           --  | TupleCtor [Expr]
+>           --  | TupleGet Expr Integer
 > 
 >           | If [(Expr,Expr)] (Maybe Expr)
 >           | Ask [(Expr,Expr)] (Maybe Expr)
@@ -25,6 +25,6 @@ The high level syntax which the parser produces
 >           | BinOp Expr String Expr
 >
 >           | Lam [String] Expr
->           | Fun [String] Expr
+>           --  | Fun [String] Expr
 >           | Let [(String,Expr)] Expr
 >           deriving (Eq,Show) 
