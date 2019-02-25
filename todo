@@ -1,0 +1,79 @@
+
+how to make it more like an actual language?
+
+parse a script: which is a series of top level stuff
+ability to parse and run blocks/lists of statements
+
+check the thing with blocks and multiple expressions
+
+command line front end to run a simple script
+
+add print command
+  -> put the interpreter in a monad stack
+
+
+do fun
+
+
+implement recursive functions
+do rec also, make fun recursive
+
+
+
+implement not, and, or, sugar for if
+
+implement a basic library of functions
+
+blocks
+when
+unless?
+
+
+think about the minimum needed to reproduce the pyret lang
+ implemention in this language:
+  algebraic data types
+  proper pattern binding (at least for constructors)
+  list type
+  can use the haskell s exp parser as a ffi function
+
+think about if this is implemented in haskell, is it lazy in places?
+how to make sure it's completely strict
+
+what about representing closure values using a haskell function
+  instead of an exprc, so the syntax doesn't leak into the values data
+  type
+
+see if can make a repl with this
+
+add some contracts, especially the simple type ones
+
+add algebraic data types, case
+recursive data types
+add fuller case + stuff
+will this cover tuples, records?
+
+add parametric polymorphism
+
+
+add types
+
+
+
+small todos:
+figure out all the required whitespace or no whitespace
+multiline comments and non multiline comments
+string escaping
+multiline and non mutliline strings
+identifiers business
+reserved keywords
+review a full set of binary operators
+tuple stuff
+currying stuff
+lambda shorthand
+chain expressions
+template
+check handling of precedence and requiring of ()
+
+do a pretty printer for syntax?
+maybe do parser and pretty printer for the intepreter syntax?
+
