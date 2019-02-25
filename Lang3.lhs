@@ -1,15 +1,19 @@
 
 TODO:
 
-do all the tests from the pyret code
+
+do the new pyret style syntax
+implement recursive functions
+implement a basic library of functions
 
 implement ask
 implement not, and, or
   these are all sugar for if
 
-add recursive functions
 
-then think about a better concrete syntax, and making it more pyret-y
+blocks
+when
+unless?
 
 
 Other things to improve:
@@ -29,6 +33,8 @@ what about representing closure values using a haskell function
   type
 
 see if can make a repl with this
+
+add some contracts, especially the simple type ones
 
 add algebraic data types, case
 recursive data types
@@ -128,10 +134,24 @@ else:
   expr
 end
 
+if expr:
+  expr
+else if expr:
+  expr
+else:
+  expr
+end
+
+else is optional
+
+-> ask and if are really similar in abstract syntax
+
 -> need to start adding reserved keywords
 
 a op b -> works for a symbol, work out what this can be
 stick with no precedence: must always use ()
+
+‹binop-expr›: ‹expr› (BINOP ‹expr›)*
 
 ask is
 
@@ -155,6 +175,7 @@ f(a,b) usual style
 
 lam(x, y): x - y end
 
+
 fun is-even(n):
   num-modulo(n, 2) == 0
 end
@@ -167,8 +188,32 @@ binding * (incuding functions shorthand)
 a single expression
 see what can get out of this
 
+‹tuple-expr›: { ‹tuple-fields› }
+‹tuple-fields›: ‹binop-expr› (; ‹binop-expr›)* [;]
+-> add a tuple type for now
+‹tuple-get›: ‹expr› . { NUMBER }#
+
+this can help with a bunch of things, especially returning multiple values
 
 
+sugar to add:
+
+call-f-with-123 = f(1, 2, 3, _, _)
+-> call-f-with-123 = lam(y, z): f(1, 2, 3, y, z) end
+
+bin op shorthand:
+[list: 1, 2, 3, 4].foldl(_ + _, 0)
+(but don't have lists yet)
+
+lambda shorthand
+{(y): x + y}
+
+chain expressions:
+e1 ^ e2 is equivalent to e2(e1)
+
+template ... -> no type checker yet, but can add this for parsing help
+
+‹multi-let-expr›: let ‹let-or-var› (, ‹let-or-var›)* [block] : ‹block› end
 
 
 ------------------------------------------------------------------------------
