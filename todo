@@ -1,4 +1,32 @@
 
+understand the apis properly
+where to do stmt, [stmt] and expr
+
+multiple _
+using _
+
+do desugaring for statements
+do interp for statements
+write some simple demo scripts
+
+recursive functions
+fun
+mutually recursive functions
+  do a let* in the interpreter?
+
+implement not, and, or, sugar for if
+print function
+
+language demo prerequisites:
+
+  algebraic data typesx
+  pattern binding
+  parametric polymorphism
+
+
+
+
+
 how to make it more like an actual language?
 
 parse a script: which is a series of top level stuff
@@ -17,16 +45,15 @@ do fun
 
 implement recursive functions
 do rec also, make fun recursive
+try to do mutually recursive functions
 
+
+do variables
 
 
 implement not, and, or, sugar for if
 
 implement a basic library of functions
-
-blocks
-when
-unless?
 
 
 think about the minimum needed to reproduce the pyret lang
@@ -54,6 +81,8 @@ will this cover tuples, records?
 
 add parametric polymorphism
 
+try to do pattern binding and build a combined cases + ask
+
 
 add types
 
@@ -73,7 +102,26 @@ lambda shorthand
 chain expressions
 template
 check handling of precedence and requiring of ()
+decide on ast annotations for source positions for error messages
+  -> read about the racket stuff
 
 do a pretty printer for syntax?
 maybe do parser and pretty printer for the intepreter syntax?
 
+work on error messages
+
+
+what is a full set of types?
+number types
+bool
+string
+binary
+struct
+tuple
+algebraic data type (can this implement struct and tuple?)
+array?
+how do extensible records work?
+dates and times
+support annotations
+support controls
+add type assertion expression operator

@@ -53,10 +53,47 @@
 >                ,("ask:\n\
 >                 \end"
 >                 ,(App (Iden "raise") (Str "no branches matched")))
->                 ]
+>
+>                ,("letrec f = lam(a): f(a) end:\n\
+>                 \  f('stuff')\n\
+>                 \end"
+>                 ,p2d "let fXXX = lam(f,a): f(f,a) end,\n\
+>                      \    f = lam(a): fXXX(fXXX,a) end:\n\
+>                      \f('stuff')\n\
+>                      \end")
 
+
+
+let f' = lam(f,a): f(f,a) end,
+    f = lam(a): f'(f',a) end:
+  f('stuff')
+end"
+
+
+test two expressions in a block
+
+>                ,("block: a + b\n\
+>                  \  c + d\n\
+>                  \end"
+>                 ,Block [binop (Iden "a") "+" (Iden "b")
+>                        ,binop (Iden "c") "+" (Iden "d")])
+
+test a let then a statement
+
+>                ,("block:\n\
+>                 \    a = 5\n\
+>                 \    a + 5\n\
+>                  \end"
+>                 --,Block [App (Lam "a" (Block [(binop (Iden "a") "+" (Num 5))) (Num 5)]))
+>                 ,Block [App (Lam "a" (Block [App (App (Iden "+") (Iden "a")) (Num 5)])) (Num 5)])
+
+
+>                 ]
+>   where
+>       p2d s = either error id (desugar =<< parseStmt "" s)
+>       binop a op b = App (App (Iden op) a) b
 
 > testDesugar :: (String,Expr) -> TestTree
-> testDesugar (src, ex) = testCase ("parse " ++ src) $
+> testDesugar (src, ex) = testCase ("desugar " ++ src) $
 >     either error (assertEqual "" ex) $
->       desugar =<< parseExpr "" src
+>       desugar =<< parseStmt "" src

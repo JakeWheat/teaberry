@@ -1,5 +1,7 @@
 
-> module Parse (parseExpr) where
+> module Parse (parseExpr
+>              ,parseStmt
+>              ,parseStmts) where
 
 
 > import Text.Megaparsec (Parsec
@@ -7,7 +9,7 @@
 >                        ,(<|>)
 >                        ,parse
 >                        ,eof
->                        --,some
+>                        ,some
 >                        ,choice
 >                        ,option
 >                        ,(<?>)
@@ -20,62 +22,56 @@
 >                        ,notFollowedBy
 >                        )
 
-> --import qualified Text.Megaparsec as Parser
 > import Data.Void (Void)
-> --import Control.Applicative ((<**>))
-> --import Control.Monad (guard)
 
 > import Text.Read (readMaybe)
 
-> --import Text.Megaparsec (satisfy, anySingle)
 
 > import Text.Megaparsec (errorBundlePretty)
 > import Text.Megaparsec.Char (space
->                             --,letterChar
 >                             ,char
->                             --,digitChar
 >                             ,string
->                             --,satisfy
->                             --,anyChar
 >                             )
 
-
-> --import Data.Char ({-isAlphaNum,isDigit,-}isSpace)
-> --import Data.Scientific
-
-> --import qualified Text.Megaparsec as Parser
-> --import qualified Data.Set as Set
-
-> --import Data.Void (Void)
 > import Control.Applicative ((<**>))
-> --import Control.Monad (guard)
+> import Control.Monad (guard)
 
 > import Text.Megaparsec (satisfy, anySingle)
 
-> import Text.Megaparsec.Char (--space
->                              letterChar
->                             --,char
->                             --,digitChar
->                             --,string
->                             --,satisfy
->                             --,anyChar
->                             )
+> import Text.Megaparsec.Char (letterChar)
 
 > import Data.Char (isAlphaNum,isDigit)
 
-> --import Control.Monad.Combinators.Expr (makeExprParser)
-
-> --import qualified Control.Monad.Combinators.Expr as ME
-
 
 > import Syntax
+
+------------------------------------------------------------------------------
+
+= api
 
 > parseExpr :: String -> String -> Either String Expr
 > parseExpr fn src = either (Left . errorBundlePretty) Right $
 >                    parse (whiteSpace *> expr <* eof) fn src
 
+> parseStmt :: String -> String -> Either String Stmt
+> parseStmt fn src = either (Left . errorBundlePretty) Right $
+>                    parse (whiteSpace *> stmt <* eof) fn src
+
+
+> parseStmts :: String -> String -> Either String [Stmt]
+> parseStmts fn src = either (Left . errorBundlePretty) Right $
+>                     parse (whiteSpace *> many stmt <* eof) fn src
+
+
+------------------------------------------------------------------------------
+
+= boilerplate
 
 > type Parser = Parsec Void String
+
+------------------------------------------------------------------------------
+
+= token parsing
 
 > whiteSpace :: Parser ()
 > whiteSpace = space *> choice [blockComment *> whiteSpace
@@ -90,7 +86,6 @@ make it parse nested block comments correctly
 
 > blockComment :: Parser ()
 > blockComment = () <$ try (string "#|" <?> "") <* manyTill anySingle (try (string "|#"))
-
 
 > lexeme :: Parser a -> Parser a
 > lexeme f = f <* whiteSpace
@@ -124,16 +119,47 @@ make it parse nested block comments correctly
 > keyword_ :: String -> Parser ()
 > keyword_ n = lexeme_ (try $ string n)
 
+> symbol :: String -> Parser String
+> symbol x = lexeme (string x)
+
+> symbol_ :: String -> Parser ()
+> symbol_ x = lexeme_ (string x)
+
+
+> parensE :: Parser Expr
+> parensE = Parens <$> parens expr
+
 
 todo: make an identifier only end on a alphanum or underscore
 add : to the identifierS?
 
-> identifier :: Parser String
-> identifier =
+todo: don't parse reserved keywords with this function
+
+here's an idea: push reserved keywords distinction into the lexer
+the can get rid of more trys
+
+> reservedKeywords :: [String]
+> reservedKeywords = ["end"]
+
+> identifierX :: Parser String
+> identifierX =
 >     lexeme ((:)
 >     <$> (letterChar <|> char '_' <|> char '-')
 >     <*> takeWhileP Nothing (\a -> (isAlphaNum a || a `elem` "?-+_")))
 >     <?> "identifier"
+
+> identifier :: Parser String
+> identifier = try $ do
+>     i <- identifierX
+>     guard (i `notElem` reservedKeywords)
+>     pure i
+
+
+TODO: add support for all the pyret numbers
+parse them properly
+
+consider what other numbers to support, e.g. integer, positive
+ integer, 64 bit integer, different precision roughnums
 
 > num :: Parser String
 > num = lexeme (
@@ -160,6 +186,10 @@ add : to the identifierS?
 >     -- not sure if this def pays its way
 >     append = flip (++)
 
+------------------------------------------------------------------------------
+
+= expressions
+
 > numE :: Parser Expr
 > numE = do
 >     x <- num
@@ -174,13 +204,9 @@ and make sure it doesn't parse newlines when it shouldn't
 >                          ,char_ '"' *> takeWhileP Nothing (/='"') <* lexeme_ (char_ '"')]
 >             <?> "string literal"
 
-
- > startsWithIden :: Parser Expr
- > startsWithIden = identifier <**> option Iden (
- >     choice [appSuffix])
-
 > appSuffix :: Parser (Expr -> Expr)
 > appSuffix = flip App <$> parens (commaSep1 expr)
+
 
 > expr :: Parser Expr
 > expr = term <**> option id binOpSuffix
@@ -193,25 +219,19 @@ and make sure it doesn't parse newlines when it shouldn't
 >   where
 >     bo op b a = BinOp a op b
 
-> symbol :: String -> Parser String
-> symbol x = lexeme (string x)
 
-> symbol_ :: String -> Parser ()
-> symbol_ x = lexeme_ (string x)
-
-
-> parensE :: Parser Expr
-> parensE = Parens <$> parens expr
+todo: remove the trys by implementing a proper lexer or a lexer style
+ approach
 
 > binOpSym :: Parser String
 > binOpSym = choice [symbol "+"
 >                   ,symbol "*"
->                   ,symbol "=="
->                   ,symbol "<>"
+>                   ,try $ symbol "<="
+>                   ,try $ symbol "=="
+>                   ,try $ symbol ">="
+>                   ,try $ symbol "<>"
 >                   ,symbol "<"
->                   ,symbol "<="
 >                   ,symbol ">"
->                   ,symbol ">="
 >                   ,symbol "-"
 >                   ,symbol "/"
 >                   ]
@@ -226,11 +246,18 @@ and make sure it doesn't parse newlines when it shouldn't
 >            
 
 > explicitLet :: Parser Expr
-> explicitLet = Let <$> (keyword_ "let" *> commaSep1 bind)
->                   <*> (symbol_ ":" *> expr <* keyword_ "end")
+> explicitLet = keyword_ "let" *> letBody Let
+>
+> letBody :: ([(String, Expr)] -> Expr -> Expr) -> Parser Expr
+> letBody ctor = ctor <$> commaSep1 bind
+>                    <*> (symbol_ ":" *> expr <* keyword_ "end")
 >     where
 >         bind = (,) <$> identifier
 >                    <*> (symbol_ "=" *> expr)
+
+> explicitLetRec :: Parser Expr
+> explicitLetRec = keyword_ "letrec" *> letBody LetRec
+
 
 > ifE :: Parser Expr
 > ifE = If <$> (keyword_ "if" *> ((:) <$> cond <*> many elseif))
@@ -239,11 +266,6 @@ and make sure it doesn't parse newlines when it shouldn't
 >         cond = (,) <$> expr <*> (symbol_ ":" *> expr)
 >         elseif = (try (keyword_ "else" *> keyword_ "if") *> cond)
 >         elseE = keyword_ "else" *> symbol ":" *> expr
-
-ask:
-  { | expr then: expr } *
-  [ | otherwise: expr ]
-end
 
 > ask :: Parser Expr
 > ask = Ask <$> (keyword_ "ask" *> symbol_ ":" *> many branch)
@@ -254,18 +276,79 @@ end
 >       ow = symbol_ "|" *> keyword_ "otherwise" *> symbol_ ":" *> expr
 > 
 
+> block :: Parser Expr
+> block = Block <$>
+>     (keyword_ "block" *> symbol_ ":" *>
+>     some stmt
+>     <* keyword_ "end")
+>     
 
+put all the parsers which start with a keyword first
 
 > term :: Parser Expr
 > term = choice [unaryMinus
 >               ,lamE
+>               ,explicitLetRec
 >               ,explicitLet
 >               ,ifE
 >               ,ask
+>               ,block
 >               ,Iden <$> identifier
 >               ,numE
 >               ,stringE
 >               ,parensE
 >               ] <**> option id appSuffix
->                 -- <**> option id letConversion
 
+------------------------------------------------------------------------------
+
+= statements
+
+how to parse expressions and let bindings in the same place?
+options:
+1. represent pattern bindings using expr
+2. represent pattern bindings differently, and use try to parse them
+3. represent pattern bindings differently, and convert them in the parser
+   when you see a binding
+
+> stmt :: Parser Stmt
+> stmt = choice
+>     [whenStmt
+>     ,expr <**> option StExpr letStmt
+>     ]
+
+> whenStmt :: Parser Stmt
+> whenStmt = When <$> (keyword_ "when" *> expr)
+>            <*> (symbol_ ":" *> expr <* keyword_ "end")
+
+> letStmt :: Parser (Expr -> Stmt)
+> letStmt = f <$> (symbol_ "=" *> expr)
+>    where
+>        f y (Iden x) = LetStmt x y
+>        --f _ x = fail ("bad pattern: " ++ show x)
+
+statements:
+expression
+let binding
+fun binding
+when
+
+
+executing:
+[statement] -> represents a block
+  does one statement at a time
+  returns the last value
+
+at the top level, should be able to do stuff out of order, but come
+  back to that when have recursive functions,
+
+bindings add to the current env
+
+
+f
+  ...
+  calls f
+
+-> f' r
+   calls r
+
+g -> f' f'

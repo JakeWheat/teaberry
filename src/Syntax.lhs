@@ -2,13 +2,14 @@
 
 The high level syntax which the parser produces
 
+> {-# LANGUAGE DeriveDataTypeable,DeriveGeneric #-}
 > module Syntax where
 
 > import Data.Scientific (Scientific)
+> import Data.Data (Data,Typeable)
+> import GHC.Generics (Generic)
 
-> data Expr = True
->           | False
->           | Num Scientific
+> data Expr = Num Scientific
 >           | Str String
 >           | Iden String
 
@@ -27,4 +28,24 @@ The high level syntax which the parser produces
 >           | Lam [String] Expr
 >           --  | Fun [String] Expr
 >           | Let [(String,Expr)] Expr
->           deriving (Eq,Show) 
+>           | LetRec [(String,Expr)] Expr
+>           | Block [Stmt]
+>           deriving (Eq,Show,Data,Typeable,Generic) 
+
+where to add blocks:
+if?
+ask?
+let?
+lam?
+
+could make blocks implicit in this syntax?
+
+review where explicit and implicit blocks can go
+
+ > data Block = Block [Stmt]
+ >           deriving (Eq,Show) 
+
+> data Stmt = StExpr Expr
+>           | When Expr Expr
+>           | LetStmt String Expr
+>           deriving (Eq,Show,Data,Typeable,Generic) 

@@ -1,5 +1,10 @@
 
-> module ParseTests (parseExamples, testParse) where
+> module ParseTests (parseExprExamples
+>                   ,testParseExpr
+>                   ,parseStmtExamples
+>                   ,testParseStmt
+>                   ,parseStmtsExamples
+>                   ,testParseStmts) where
 >
 > import Syntax
 > import Parse
@@ -7,8 +12,8 @@
 > import Test.Tasty
 > import Test.Tasty.HUnit
 
-> parseExamples :: [(String, Expr)]
-> parseExamples = [("a", Iden "a")
+> parseExprExamples :: [(String, Expr)]
+> parseExprExamples = [("a", Iden "a")
 >                 ,(" a", Iden "a")
 >                 ,("a ", Iden "a")
 >                 ,(" a # comment", Iden "a")
@@ -92,12 +97,41 @@ todo: tuples
 >                      ,(BinOp (Iden "c") "==" (Iden "d"), Iden "e")
 >                      ] Nothing)
 
+>               ,("block: a + 3 end"
+>                ,Block [StExpr (BinOp (Iden "a") "+" (Num 3))])
+
+>               ,("block:\n\
+>                 \a = 5\n\
+>                 \a + 3 end"
+>                ,Block [LetStmt "a" (Num 5.0)
+>                       ,StExpr (BinOp (Iden "a") "+" (Num 3))])
 
 >                 ]
 
 
-> testParse :: (String,Expr) -> TestTree
-> testParse (src, ex) = testCase ("parse " ++ src) $ do
+> parseStmtExamples :: [(String, Stmt)]
+> parseStmtExamples =
+>     [("when x == 3: 4 end"
+>      ,When (BinOp (Iden "x") "==" (Num 3)) (Num 4))]
+
+> parseStmtsExamples :: [(String, [Stmt])]
+> parseStmtsExamples = [("", [])]
+
+
+> testParseExpr :: (String,Expr) -> TestTree
+> testParseExpr (src, ex) = testCase ("parseexpr " ++ src) $ do
 >     case parseExpr "" src of
+>         Left er -> error er
+>         Right x -> assertEqual "" ex x
+
+> testParseStmt :: (String,Stmt) -> TestTree
+> testParseStmt (src, ex) = testCase ("parsestmt " ++ src) $ do
+>     case parseStmt "" src of
+>         Left er -> error er
+>         Right x -> assertEqual "" ex x
+
+> testParseStmts :: (String,[Stmt]) -> TestTree
+> testParseStmts (src, ex) = testCase ("parsestmts " ++ src) $ do
+>     case parseStmts "" src of
 >         Left er -> error er
 >         Right x -> assertEqual "" ex x
