@@ -9,12 +9,10 @@ The high level syntax which the parser produces
 > import Data.Data (Data,Typeable)
 > import GHC.Generics (Generic)
 
-> data Expr = Num Scientific
->           | Str String
+> data Expr = Sel Selector
+
 >           | Iden String
-
 >           | Parens Expr
-
 >           --  | TupleCtor [Expr]
 >           --  | TupleGet Expr Integer
 > 
@@ -30,6 +28,10 @@ The high level syntax which the parser produces
 >           | Let [(String,Expr)] Expr
 >           | LetRec [(String,Expr)] Expr
 >           | Block [Stmt]
+>           deriving (Eq,Show,Data,Typeable,Generic) 
+
+> data Selector = Num Scientific
+>               | Str String
 >           deriving (Eq,Show,Data,Typeable,Generic) 
 
 where to add blocks:

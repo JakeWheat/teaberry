@@ -1,127 +1,124 @@
 
-understand the apis properly
-where to do stmt, [stmt] and expr
+quick pass on the laziness: make all the main data types strict
+add strictness stuff to the interpreter
 
-multiple _
-using _
+milestones:
 
-do desugaring for statements
-do interp for statements
-write some simple demo scripts
+values and variables branch:
+implement variables
+if adding a store - does this require a garbage collector which can't
+  cheat and magically reuse the ghc one?
+switch to a monad stack using reader for env
+algebraic data types
+  -> simple variants, use the dynamic . only?
+  then add simple case statements
+  then add the case sugar for:
+       nested ctor
+       literals
+       guards
+  desugar if to case?
+  implement some more data types - maybe do a pyret review at this point
+for algebraic data types and parametric polymorphism, try to do some
+  design on what kind of datatype mismatches will be caught at runtime
+  and when - this will determine what needs to sit with the values and
+  be passed around as context
+try for loops and the direct fold example
+parametric polymorphism
+extended lvalues
+implement the simple language demo
 
-recursive functions
-fun
-mutually recursive functions
-  do a let* in the interpreter?
+try to write a is_free function
+and a get all free variables function
+and a safe variable rename function
 
-implement not, and, or, sugar for if
-print function
+syntax review branch: to get a substantial amount of pyret syntax supported
+check all the optional blocks
+check the implicit blocks
+curly brace lambda shorthand
+curried application
+chaining application
+call function with parametric signature - just ignore for now
+fuller set of binary operators
+tuples
+dot expressions
+extend expression - needs records
+for expressions
+template expressions
+check that _ works as a wild card, can't look it up, doesn't add to
+  the env
+mutable fields?
+construction expressions
+expression forms of bindings: make sure these are all covered
+make notes on what is and isn't supported
+eventually go through papl to see what also works here
 
-language demo prerequisites:
-
-  algebraic data typesx
-  pattern binding
-  parametric polymorphism
-
-
-
-
-
-how to make it more like an actual language?
-
-parse a script: which is a series of top level stuff
-ability to parse and run blocks/lists of statements
-
-check the thing with blocks and multiple expressions
-
-command line front end to run a simple script
-
-add print command
-  -> put the interpreter in a monad stack
-
-
-do fun
-
-
-implement recursive functions
-do rec also, make fun recursive
-try to do mutually recursive functions
-
-
-do variables
-
-
-implement not, and, or, sugar for if
-
-implement a basic library of functions
-
-
-think about the minimum needed to reproduce the pyret lang
- implemention in this language:
-  algebraic data types
-  proper pattern binding (at least for constructors)
-  list type
-  can use the haskell s exp parser as a ffi function
-
-think about if this is implemented in haskell, is it lazy in places?
-how to make sure it's completely strict
-
-what about representing closure values using a haskell function
-  instead of an exprc, so the syntax doesn't leak into the values data
-  type
-
-see if can make a repl with this
-
-add some contracts, especially the simple type ones
-
-add algebraic data types, case
-recursive data types
-add fuller case + stuff
-will this cover tuples, records?
-
-add parametric polymorphism
-
-try to do pattern binding and build a combined cases + ask
+files/letrec branch:
+do the variable based letrec for now
+check and where
+lots more tests for desugaring files and blocks
+get to running whole single files from command line
+see if can do a repl and an embedded api sketch
+--dump-parse
+--dump-desugar + pretty printed versions
+extend to multiple files, import, export
 
 
-add types
+rough next steps:
+
+control flow (exceptions at least, plus maybe early return,
+continue/break)
+
+types
+
+standard lib: start with the review of pyret's and python's
+
+lots more testing
+  benchmarking to monitor performance improvements and regressions
+  try to find some good benchmark programs to run
+  anomaly testing
+  get code coverage working
+  
+lots of example scripts
+
+documentation
+
+contracts, annotations
+
+extensible records
+
+extensibility ffi
+
+create a client driver, embedded and ffi story for haskell, c and
+python
+
+distributed api, multiprocess/concurrency sketch (base on erlang or e
+or cloud haskell?)
+
+want a where like in haskell:
+  maybe rename the pyret where: to examples:
+
+goto?
+
+error messages linked to source positions
+
+gradual typing design
+
+syntax and parsing review:
+  whitespace handling
+  multiline and non multiline strings, comments
+  string escaping
+  a full set of binary operators. will this be fixed or extensible?
 
 
+ci
+anomaly testing
+start thinking about benchmarking:
+  what to benchmark
+    compilation times
+    building this product
+    running the tests
+    other infrastructure activities
+    running scripts
+  how to do it
+documentation, for the implementation and for users
 
-small todos:
-figure out all the required whitespace or no whitespace
-multiline comments and non multiline comments
-string escaping
-multiline and non mutliline strings
-identifiers business
-reserved keywords
-review a full set of binary operators
-tuple stuff
-currying stuff
-lambda shorthand
-chain expressions
-template
-check handling of precedence and requiring of ()
-decide on ast annotations for source positions for error messages
-  -> read about the racket stuff
-
-do a pretty printer for syntax?
-maybe do parser and pretty printer for the intepreter syntax?
-
-work on error messages
-
-
-what is a full set of types?
-number types
-bool
-string
-binary
-struct
-tuple
-algebraic data type (can this implement struct and tuple?)
-array?
-how do extensible records work?
-dates and times
-support annotations
-support controls
-add type assertion expression operator

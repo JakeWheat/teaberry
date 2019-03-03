@@ -194,13 +194,13 @@ consider what other numbers to support, e.g. integer, positive
 > numE = do
 >     x <- num
 >     maybe (fail $ "parsing number failed: " ++ x)
->           (pure . Num) (readMaybe x)
+>           (pure . Sel . Num) (readMaybe x)
 
 todo: escape quotes
 and make sure it doesn't parse newlines when it shouldn't
 
 > stringE :: Parser Expr
-> stringE = Str <$> choice [char_ '\'' *> takeWhileP Nothing (/='\'') <* lexeme_ (char_ '\'')
+> stringE = (Sel . Str) <$> choice [char_ '\'' *> takeWhileP Nothing (/='\'') <* lexeme_ (char_ '\'')
 >                          ,char_ '"' *> takeWhileP Nothing (/='"') <* lexeme_ (char_ '"')]
 >             <?> "string literal"
 

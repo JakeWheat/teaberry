@@ -14,27 +14,30 @@
 >                 --,("a + b",  BinOp (Iden "a") "+" (Iden "b"))
 >                 ,("true", Iden "true")
 >                 ,("false", Iden "false")
->                 ,("3", Num 3)
->                 ,("3.3", Num 3.3)
->                 ,("\"String\"", Str "String")
->                ,("a(3)", App (Iden "a") (Num 3))
->                ,("a(3,4)", App (App (Iden "a") (Num 3)) (Num 4))
->                ,("- a", App (App (Iden "*") (Num (-1))) (Iden "a"))
+>                 ,("3", num 3)
+>                 ,("3.3", num 3.3)
+>                 ,("\"String\"", Sel $ Str "String")
+>                ,("a(3)", App (Iden "a") (num 3))
+>                ,("a(3,4)", App (App (Iden "a") (num 3)) (num 4))
+>                ,("- a", App (App (Iden "*") (num (-1))) (Iden "a"))
 >                ,("(a)", Iden "a")
 >                ,("a + b", App (App (Iden "+") (Iden "a")) (Iden "b"))
->                ,("lam(x): x + 1 end", Lam "x" (App (App (Iden "+") (Iden "x")) (Num 1)))
+>                ,("lam(x): x + 1 end", Lam "x" (App (App (Iden "+") (Iden "x")) (num 1)))
 >                ,("lam(x, y): x - y end"
 >                 ,Lam "x" (Lam "y" (App (App (Iden "-") (Iden "x")) (Iden "y"))))
 >                ,("lam(x, y): x - y end(1,2)"
->                 ,App (App (Lam "x" (Lam "y" (App (App (Iden "-") (Iden "x")) (Iden "y")))) (Num 1)) (Num 2))
+>                 ,App (App (Lam "x" (Lam "y" (App (App (Iden "-") (Iden "x")) (Iden "y")))) (num 1)) (num 2))
 >                ,("let x=3,y=4: x + y end"
->                 ,App (Lam "x"
+>                 ,Let "x" (num 3) (Let "y" (num 4)
+>                                   (App (App (Iden "+") (Iden "x")) (Iden "y"))))
+>                 {-,App (Lam "x"
 >                       (App (Lam "y"
 >                             (App (App (Iden "+") (Iden "x")) (Iden "y")))
->                        (Num 4))) (Num 3))
+>                        (num 4))) (num 3))-}
 >                ,("let x=3: x + 4 end"
->                 ,App (Lam "x" (App (App (Iden "+") (Iden "x")) (Num 4))) (Num 3))
->                ,("if a: b end", If (Iden "a") (Iden "b") (App (Iden "raise") (Str "no branches matched")))
+>                 ,Let "x" (num 3) (App (App (Iden "+") (Iden "x")) (num 4)))
+>                 {-,App (Lam "x" (App (App (Iden "+") (Iden "x")) (num 4))) (num 3))-}
+>                ,("if a: b end", If (Iden "a") (Iden "b") (App (Iden "raise") (Sel $ Str "no branches matched")))
 >                ,("if a: b else: c end"
 >                 ,If (Iden "a") (Iden "b") (Iden "c"))
 >                ,("if a: b else if c: d else: e end"
@@ -52,7 +55,7 @@
 >                 ,Iden "f")
 >                ,("ask:\n\
 >                 \end"
->                 ,(App (Iden "raise") (Str "no branches matched")))
+>                 ,(App (Iden "raise") (Sel $ Str "no branches matched")))
 >
 >                ,("letrec f = lam(a): f(a) end:\n\
 >                 \  f('stuff')\n\
@@ -85,13 +88,14 @@ test a let then a statement
 >                 \    a + 5\n\
 >                  \end"
 >                 --,Block [App (Lam "a" (Block [(binop (Iden "a") "+" (Num 5))) (Num 5)]))
->                 ,Block [App (Lam "a" (Block [App (App (Iden "+") (Iden "a")) (Num 5)])) (Num 5)])
+>                 ,Block [Let "a" (num 5) (Block [App (App (Iden "+") (Iden "a")) (num 5)])])
 
 
 >                 ]
 >   where
 >       p2d s = either error id (desugar =<< parseStmt "" s)
 >       binop a op b = App (App (Iden op) a) b
+>       num = Sel . Num
 
 > testDesugar :: (String,Expr) -> TestTree
 > testDesugar (src, ex) = testCase ("desugar " ++ src) $

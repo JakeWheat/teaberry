@@ -5,12 +5,17 @@ The syntax which the interpreter uses
 
 > import Data.Scientific (Scientific)
 
-> data Expr = Num Scientific
->           | Str String
+> data Expr = Sel Selector
 >           | Iden String
 >           | If Expr Expr Expr
 >           | App Expr Expr
 >           | Lam String Expr
+>           | Let String Expr Expr
+>           | Fix Expr
 >           | AppHaskell String [Expr]
 >           | Block [Expr]
->           deriving (Eq,Show) 
+>           deriving (Eq,Show)
+
+> data Selector = Num Scientific
+>               | Str String
+>               deriving (Eq,Show)

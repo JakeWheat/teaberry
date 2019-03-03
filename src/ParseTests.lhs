@@ -8,6 +8,7 @@
 >
 > import Syntax
 > import Parse
+> import Pretty
 
 > import Test.Tasty
 > import Test.Tasty.HUnit
@@ -25,46 +26,46 @@
 
 >                 ,("true", Iden "true")
 >                 ,("false", Iden "false")
->                 ,("3", Num 3)
->                 ,("3.3", Num 3.3)
->                 ,("\"String\"", Str "String")
+>                 ,("3", num 3)
+>                 ,("3.3", num 3.3)
+>                 ,("\"String\"", Sel $ Str "String")
 >                 --,("\"St\\\"ri\\\"ng\"", Str "St\"ri\"ng")
 >                 --,("'Str\"ing'", Str "Str\"ing")
 >                 --,("```multiline\nstring```", Str "multiline\nstring")
 
->                ,("a(3)", App (Iden "a") [Num 3])
+>                ,("a(3)", App (Iden "a") [num 3])
 
->                ,("a(3,4)", App (Iden "a") [Num 3, Num 4])
+>                ,("a(3,4)", App (Iden "a") [num 3, num 4])
 
 >                ,("- a", UnaryMinus (Iden "a"))
 
 >                ,("(a)", Parens (Iden "a"))
 
->                ,("lam(x): x + 1 end", Lam ["x"] (BinOp (Iden "x") "+" (Num 1)))
+>                ,("lam(x): x + 1 end", Lam ["x"] (BinOp (Iden "x") "+" (num 1)))
 
 >                ,("lam(x, y): x - y end"
 >                 ,Lam ["x","y"] (BinOp (Iden "x") "-" (Iden "y")))
 
 >                ,("lam(x, y): x - y end(1,2)"
 >                 ,App (Lam ["x","y"] (BinOp (Iden "x") "-" (Iden "y")))
->                  [Num 1, Num 2])
+>                  [num 1, num 2])
 
 todo: review all the whitespace rules that are being ignored
 
 >               {-,("x = 3\n\
->                 \x + 4", Let [("x", Num 3)] (BinOp (Iden "x") "+" (Num 4)))
+>                 \x + 4", Let [("x", num 3)] (BinOp (Iden "x") "+" (num 4)))
 
 >               ,("x = 3\n\
 >                 \y = 4\n\
->                 \x + y", Let [("x", Num 3)
->                              ,("y", Num 4)]
+>                 \x + y", Let [("x", num 3)
+>                              ,("y", num 4)]
 >                          (BinOp (Iden "x") "+" (Iden "y")))-}
 
->               ,("let x=3,y=4: x + y end", Let [("x", Num 3)
->                                               ,("y", Num 4)]
+>               ,("let x=3,y=4: x + y end", Let [("x", num 3)
+>                                               ,("y", num 4)]
 >                                           (BinOp (Iden "x") "+" (Iden "y")))
->               ,("let x=3: x + 4 end", Let [("x", Num 3)]
->                          (BinOp (Iden "x") "+" (Num 4)))
+>               ,("let x=3: x + 4 end", Let [("x", num 3)]
+>                          (BinOp (Iden "x") "+" (num 4)))
 
 lam
 todo: fun
@@ -98,21 +99,22 @@ todo: tuples
 >                      ] Nothing)
 
 >               ,("block: a + 3 end"
->                ,Block [StExpr (BinOp (Iden "a") "+" (Num 3))])
+>                ,Block [StExpr (BinOp (Iden "a") "+" (num 3))])
 
 >               ,("block:\n\
 >                 \a = 5\n\
 >                 \a + 3 end"
->                ,Block [LetStmt "a" (Num 5.0)
->                       ,StExpr (BinOp (Iden "a") "+" (Num 3))])
+>                ,Block [LetStmt "a" (num 5.0)
+>                       ,StExpr (BinOp (Iden "a") "+" (num 3))])
 
 >                 ]
-
+>  where
+>      num = Sel . Num
 
 > parseStmtExamples :: [(String, Stmt)]
 > parseStmtExamples =
 >     [("when x == 3: 4 end"
->      ,When (BinOp (Iden "x") "==" (Num 3)) (Num 4))]
+>      ,When (BinOp (Iden "x") "==" (Sel $ Num 3)) (Sel $ Num 4))]
 
 > parseStmtsExamples :: [(String, [Stmt])]
 > parseStmtsExamples = [("", [])]
@@ -122,7 +124,12 @@ todo: tuples
 > testParseExpr (src, ex) = testCase ("parseexpr " ++ src) $ do
 >     case parseExpr "" src of
 >         Left er -> error er
->         Right x -> assertEqual "" ex x
+>         Right x -> do
+>             assertEqual "" ex x
+>             let src1 = prettyExpr x
+>             case parseExpr "" src1 of
+>                 Left er -> error er
+>                 Right x1 -> assertEqual "ppp" ex x
 
 > testParseStmt :: (String,Stmt) -> TestTree
 > testParseStmt (src, ex) = testCase ("parsestmt " ++ src) $ do
