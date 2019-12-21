@@ -5,7 +5,7 @@
 > import Parse
 > import Desugar
 > import Interpreter
-> import qualified InterpreterSyntax as I
+> --import qualified InterpreterSyntax as I
 >
 > import Test.Tasty
 > import Test.Tasty.HUnit

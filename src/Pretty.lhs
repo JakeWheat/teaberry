@@ -9,10 +9,10 @@
 
 > import Prelude hiding ((<>))
 
-> import Text.PrettyPrint (render, text, (<>), (<+>), empty, parens,
->                          nest, Doc, punctuate, comma, sep, quotes,
+> import Text.PrettyPrint (render, text, (<>), (<+>), {-empty,-} parens,
+>                          nest, Doc, punctuate, comma, sep, {-quotes,-}
 >                          doubleQuotes,
->                          braces, ($$), ($+$),vcat)
+>                          {-braces, ($$), ($+$),-} vcat)
 
 > prettyExpr :: Expr -> String
 > prettyExpr = render . expr

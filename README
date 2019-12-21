@@ -1,0 +1,26 @@
+
+A learning project to implement a dialect of Pyret.
+
+Goal is to implement a dialect of Pyret in Haskell, with a high level
+interpreter, to learn how to implement functional programming + a
+basic type system.
+
+sketch
+
+mostly pyret concrete syntax
+strict/eager
+basic functional programming: functions as values + closures
+algebraic data types + pattern binding
+parametric polymorphism
+type classes
+non whitespace significant
+typed only, with inference
+no purity tracking in the type system
+exceptions
+garbage collection
+resource management
+control flow: break, continue, goto ?
+no implicit casting
+no pragmas, javadoc in comment syntax
+good error messages
+extensible records

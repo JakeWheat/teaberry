@@ -11,11 +11,11 @@
 > import Data.Scientific (Scientific)
 > import Control.Monad (foldM)
 > --import Debug.Trace
-> import Desugar (sugar)
-> import qualified Pretty as P
+> --import Desugar (sugar)
+> --import qualified Pretty as P
 > import Control.Monad.Trans.Except
 > --import Control.Monad.Trans.Class
-> import Control.Monad.IO.Class
+> --import Control.Monad.IO.Class
 > import Text.Show.Pretty (ppShow)
 
 ------------------------------------------------------------------------------
@@ -103,7 +103,7 @@ but definitely want IO
 > --interp' _ I.False = Right $ BoolV False
 > interp' env (I.Iden e) = maybe (throwE $ "Identifier not found: " ++ e)
 >                         return $ lookupEnv e env
-> interp' env x@(I.If c t e) = do
+> interp' env _x@(I.If c t e) = do
 >    c' <- interp' env c
 >    --liftIO $ putStrLn $ P.prettyExpr $ sugar x
 >    case c' of

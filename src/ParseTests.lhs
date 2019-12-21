@@ -129,7 +129,7 @@ todo: tuples
 >             let src1 = prettyExpr x
 >             case parseExpr "" src1 of
 >                 Left er -> error er
->                 Right x1 -> assertEqual "ppp" ex x
+>                 Right x1 -> assertEqual "ppp" ex x1
 
 > testParseStmt :: (String,Stmt) -> TestTree
 > testParseStmt (src, ex) = testCase ("parsestmt " ++ src) $ do
