@@ -9,14 +9,16 @@
 
 > import qualified InterpreterSyntax as I
 > import Data.Scientific (Scientific)
-> import Control.Monad (foldM)
+> --import Control.Monad (foldM)
 > --import Debug.Trace
 > --import Desugar (sugar)
 > --import qualified Pretty as P
-> import Control.Monad.Trans.Except
+> --import Control.Monad.Trans.Except
+> import Control.Monad.Trans.RWS
 > --import Control.Monad.Trans.Class
 > --import Control.Monad.IO.Class
 > import Text.Show.Pretty (ppShow)
+> import Control.Exception.Safe
 
 ------------------------------------------------------------------------------
 
@@ -47,9 +49,9 @@ todo: make this better: do better wrapping + error messages when the
 >                   ,("-", \[NumV a, NumV b] -> return $ NumV (a - b))
 >                   ,("*", \x -> case x of
 >                                    [NumV a, NumV b] -> return $ NumV (a * b)
->                                    _ -> throwE $ "* needs two num args, got " ++ ppShow x)
+>                                    _ -> throwM $ MyException $ "* needs two num args, got " ++ ppShow x)
 >                   ,("==", \[a, b] -> return $ BoolV (a == b))
->                   ,("raise", \[StrV s] -> throwE s)
+>                   ,("raise", \[StrV s] -> throwM $ MyException s)
 >                   ]
 
 > defaultHaskellFFIEnv :: Env
@@ -76,58 +78,71 @@ todo: make this better: do better wrapping + error messages when the
 
 = interpreter function
 
-TODO: turn this into a monad stack
-not sure how to handle env
-not sure how to handle vars
-but definitely want IO
+> -- placeholder
+> data Store = Store ()
 
+> emptyStore :: Store
+> emptyStore = Store ()
 
-> type Interpreter a = ExceptT String IO a
+no planned use for the writer at the moment
+
+> type Interpreter a = RWST Env () Store IO a
+>
+
+> data MyException = MyException String
+>     deriving Show
+
+> instance Exception MyException
 
 > --liftEither :: Either String a -> Interpreter a
 > --liftEither = ExceptT . return
 
-> interp :: Env -> [(String,I.Expr)] -> I.Expr -> IO (Either String Value)
-> interp env defs e = runExceptT $ do
->     --liftIO $ putStrLn ("****\n" ++ ppShow e ++ "\n\n" ++ P.prettyExpr (sugar e) ++ "\n****")
->     env2 <- foldM (\env' (n,ne) -> do
->                           nv <- interp' env' ne
->                           return $ extendEnv n nv env'
->                   ) env defs
->     interp' env2 e
 
-> interp' :: Env -> I.Expr -> Interpreter Value
-> interp' _ (I.Sel (I.Num n)) = return $ NumV n
-> interp' _ (I.Sel (I.Str s)) = return $ StrV s
+> interp :: Env -> [(String,I.Expr)] -> I.Expr -> IO (Either String Value)
+> interp env defs e = do
+>     -- temp: convert the defs into nested lets
+>     let desugarDefs [] x = x
+>         desugarDefs ((nm,expr):ds) x = I.Let nm expr (desugarDefs ds x)
+>     (result, _store, _log) <-
+>         runRWST (interp' (desugarDefs defs e)) env emptyStore
+>     pure $ pure result
+
+> interp' :: I.Expr -> Interpreter Value
+> interp' (I.Sel (I.Num n)) = return $ NumV n
+> interp' (I.Sel (I.Str s)) = return $ StrV s
 > --interp' _ I.True = Right $ BoolV True
 > --interp' _ I.False = Right $ BoolV False
-> interp' env (I.Iden e) = maybe (throwE $ "Identifier not found: " ++ e)
->                         return $ lookupEnv e env
-> interp' env _x@(I.If c t e) = do
->    c' <- interp' env c
+> interp' (I.Iden e) = do
+>     env <- ask
+>     maybe (throwM $ MyException $ "Identifier not found: " ++ e)
+>         return $ lookupEnv e env
+> interp' _x@(I.If c t e) = do
+>    c' <- interp' c
 >    --liftIO $ putStrLn $ P.prettyExpr $ sugar x
 >    case c' of
->        BoolV True -> {-liftIO (putStrLn "if") >> -} interp' env t
->        BoolV False -> {-liftIO (putStrLn "else") >> -} interp' env e
->        _ -> throwE $ "expected bool in if test, got " ++ show c'
+>        BoolV True -> {-liftIO (putStrLn "if") >> -} interp' t
+>        BoolV False -> {-liftIO (putStrLn "else") >> -} interp' e
+>        _ -> throwM $ MyException $ "expected bool in if test, got " ++ show c'
 
-> interp' env (I.AppHaskell nm exps) = do
->     f <- maybe (throwE $ "ffi fn not found: " ++ nm) return $ lookup nm haskellFunImpls
->     vs <- mapM (interp' env) exps
+> interp' (I.AppHaskell nm exps) = do
+>     f <- maybe (throwM $ MyException $ "ffi fn not found: " ++ nm) return $ lookup nm haskellFunImpls
+>     vs <- mapM interp' exps
 >     f vs
 
-> interp' env e@(I.Lam {}) = return $ ClosV e env
-> interp' env (I.App f a) = do
->     x <- interp' env f
+> interp' e@(I.Lam {}) = do
+>     env <- ask
+>     return $ ClosV e env
+> interp' (I.App f a) = do
+>     x <- interp' f
 >     case x of
 >         ClosV (I.Lam n bdy) env' -> do
->              argVal <- interp' env a
->              interp' (extendEnv n argVal env') bdy
->         ClosV ee _ -> throwE $ "non lambda in closure expression: " ++ show ee
->         _ -> throwE $ "non function in app position: " ++ show x
+>              argVal <- interp' a
+>              local (const $ extendEnv n argVal env') $ interp' bdy
+>         ClosV ee _ -> throwM $ MyException $ "non lambda in closure expression: " ++ show ee
+>         _ -> throwM $ MyException $ "non function in app position: " ++ show x
 
-> interp' env (I.Fix f) = do
->    interp' env (I.App f (I.Fix f))
+> interp' (I.Fix f) = do
+>    interp' (I.App f (I.Fix f))
 >    --iftIO (putStrLn (P.prettyExpr $ sugar f))
 >    --interp' env (I.App (I.Lam n bdy) (I.Fix f))
 
@@ -136,12 +151,10 @@ eval (Fix f) = (eval f) (eval (Fix f))
 EFix e -> eval env (EApp e (EFix e))
 
 
-> interp' env (I.Let nm v bdy) = do
->     v' <- interp' env v
->     interp' (extendEnv nm v' env) bdy
+> interp' (I.Let nm v bdy) = do
+>     v' <- interp' v
+>     local (extendEnv nm v') $ interp' bdy
 
-> interp' _env (I.Block []) = throwE $ "empty block"
-> interp' env (I.Block [s]) = interp' env s
-> interp' env (I.Block (s:ss)) = interp' env s >> interp' env (I.Block ss)
-> 
-> --interp _ e = error $ show e
+> interp' (I.Block []) = throwM $ MyException $ "empty block"
+> interp' (I.Block [s]) = interp' s
+> interp' (I.Block (s:ss)) = interp' s >> interp' (I.Block ss)
