@@ -11,7 +11,6 @@ The syntax which the interpreter uses
 >           | App Expr Expr
 >           | Lam String Expr
 >           | Let String Expr Expr
->           | Fix Expr
 >           | AppHaskell String [Expr]
 >           | Block [Expr]
 >           deriving (Eq,Show)

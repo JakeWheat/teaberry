@@ -176,7 +176,6 @@ regular syntax
 > sugar (I.App f e) = S.App (sugar f) [sugar e]
 > sugar (I.Lam a e) = S.Lam [a] (sugar e)
 > sugar (I.Let n v e) = S.Let [(n, sugar v)] (sugar e)
-> sugar (I.Fix e) = S.App (S.Iden "fix") [sugar e]
 > sugar (I.AppHaskell s es) = S.App (S.Iden ("haskell-" ++ s)) (map sugar es)
 > sugar (I.Block es) = S.Block (map (S.StExpr . sugar) es)
 
