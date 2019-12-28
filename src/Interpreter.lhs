@@ -121,6 +121,9 @@ no planned use for the writer at the moment
 > interp' e@(I.Lam {}) = do
 >     env <- ask
 >     pure $ ClosV e env
+> interp' e@(I.LamVoid {}) = do
+>     env <- ask
+>     pure $ ClosV e env
 > interp' (I.App f a) = do
 >     x <- interp' f
 >     case x of
@@ -129,6 +132,16 @@ no planned use for the writer at the moment
 >              local (const $ extendEnv n argVal env') $ interp' bdy
 >         ClosV ee _ -> throwM $ MyException $ "non lambda in closure expression: " ++ show ee
 >         _ -> throwM $ MyException $ "non function in app position: " ++ show x
+
+> interp' (I.AppVoid f) = do
+>     x <- interp' f
+>     case x of
+>         ClosV (I.LamVoid bdy) env' -> do
+>              local (const env') $ interp' bdy
+>         ClosV ee _ -> throwM $ MyException $ "non lambda in closure expression: " ++ show ee
+>         _ -> throwM $ MyException $ "non function in app position: " ++ show x
+
+
 
 > interp' (I.Let nm v bdy) = do
 >     v' <- interp' v

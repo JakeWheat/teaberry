@@ -37,6 +37,9 @@
 >       \    if n == 1: 1 else: n * fact(n - 1) end\n\
 >       \end: fact(5) end", defaultHaskellFFIEnv, defs, NumV 120)
 
+>     ,("lam(): 7 end()", defaultHaskellFFIEnv, defs, NumV 7)
+
+
 >     ,("block:\n\
 >       \  a = 4\n\
 >       \  a + 3\n\

@@ -38,7 +38,7 @@ todo: special case for fix which looks like normal App in the regular syntax
 > desugarExpr (S.App f xs) = do
 >     f' <- desugarExpr f
 >     xs' <- mapM desugarExpr xs
->     let r _ [] = Left "internal error app with no args"
+>     let r g [] = Right $ I.AppVoid g
 >         r g [y] = Right $ I.App g y
 >         r g (y:ys) = r (I.App g y) ys
 >     r f' xs'
@@ -47,7 +47,7 @@ todo: special case for fix which looks like normal App in the regular syntax
 
 > desugarExpr (S.BinOp a op b) = desugarExpr (S.App (S.Iden op) [a,b])
 
-> desugarExpr (S.Lam [] _) = Left $ "lambda with no args"
+> desugarExpr (S.Lam [] bdy) = I.LamVoid <$> desugarExpr bdy
 > desugarExpr (S.Lam [x] bdy) = I.Lam x <$> desugarExpr bdy
 > desugarExpr (S.Lam (x:xs) bdy) = I.Lam x <$> desugarExpr (S.Lam xs bdy)
 

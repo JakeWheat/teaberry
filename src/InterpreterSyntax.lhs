@@ -9,7 +9,9 @@ The syntax which the interpreter uses
 >           | Iden String
 >           | If Expr Expr Expr
 >           | App Expr Expr
+>           | AppVoid Expr
 >           | Lam String Expr
+>           | LamVoid Expr
 >           | Let String Expr Expr
 >           | AppHaskell String [Expr]
 >           | Seq Stmt Stmt
