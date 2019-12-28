@@ -67,9 +67,26 @@ todo: review all the whitespace rules that are being ignored
 >               ,("let x=3: x + 4 end", Let [("x", num 3)]
 >                          (BinOp (Iden "x") "+" (num 4)))
 
-lam
-todo: fun
-todo: let simple variation
+
+>               ,("f()", App (Iden "f") [])
+
+
+>               ,("let x = f(): x end", Let [("x", App (Iden "f") [])]
+>                          (Iden "x"))
+
+>               ,("block:\n\
+>                 \  fun f(a): a + 1 end\n\
+>                 \end", Block[FunDecl "f" ["a"] (BinOp (Iden "a") "+" (num 1))])
+
+
+>               ,("block:\n\
+>                 \fun f(a):\n\
+>                 \  a = 1\n\
+>                 \  a + 1\n\
+>                 \end\n\
+>                 \end", Block[FunDecl "f" ["a"] (Block [LetDecl "a" (num 1)
+>                                                       ,StExpr $ BinOp (Iden "a") "+" (num 1)])])
+
 
 todo: tuples
 
@@ -104,8 +121,27 @@ todo: tuples
 >               ,("block:\n\
 >                 \a = 5\n\
 >                 \a + 3 end"
->                ,Block [LetStmt "a" (num 5.0)
+>                ,Block [LetDecl "a" (num 5.0)
 >                       ,StExpr (BinOp (Iden "a") "+" (num 3))])
+
+>               ,("lam() : 1 end", Lam [] (num 1))
+
+
+>               ,("block:\n\
+>                 \  rec fact = lam(x):\n\
+>                 \    if x == 0: 1\n\
+>                 \    else: x * fact(x - 1)\n\
+>                 \    end\n\
+>                 \  end\n\
+>                 \  fact(5)\n\
+>                 \end"
+
+>                ,Block [RecDecl "fact"
+>                       $ Lam ["x"] $
+>                               If [(BinOp (Iden "x") "==" (num 0), num 1)]
+>                               (Just (BinOp (Iden "x") "*" (App (Iden "fact") [BinOp (Iden "x") "-" (num 1)])))
+>                       ,StExpr (App (Iden "fact") [num 5])])
+
 
 >                 ]
 >  where
@@ -114,7 +150,11 @@ todo: tuples
 > parseStmtExamples :: [(String, Stmt)]
 > parseStmtExamples =
 >     [("when x == 3: 4 end"
->      ,When (BinOp (Iden "x") "==" (Sel $ Num 3)) (Sel $ Num 4))]
+>      ,When (BinOp (Iden "x") "==" (Sel $ Num 3)) (Sel $ Num 4))
+>     ,("var a = 5", VarDecl "a" (num 5))
+>     ,("a := 6", SetVar "a" (num 6))]
+>  where
+>      num = Sel . Num
 
 > parseStmtsExamples :: [(String, [Stmt])]
 > parseStmtsExamples = [("", [])]

@@ -205,7 +205,7 @@ and make sure it doesn't parse newlines when it shouldn't
 >             <?> "string literal"
 
 > appSuffix :: Parser (Expr -> Expr)
-> appSuffix = flip App <$> parens (commaSep1 expr)
+> appSuffix = flip App <$> parens (commaSep expr)
 
 
 > expr :: Parser Expr
@@ -313,17 +313,46 @@ options:
 > stmt :: Parser Stmt
 > stmt = choice
 >     [whenStmt
->     ,expr <**> option StExpr letStmt
+>     ,recDecl
+>     ,funDecl
+>     ,varDecl
+>     ,setVarStmt
+>     ,expr <**> option StExpr letDecl
 >     ]
 
 > whenStmt :: Parser Stmt
 > whenStmt = When <$> (keyword_ "when" *> expr)
 >            <*> (symbol_ ":" *> expr <* keyword_ "end")
 
-> letStmt :: Parser (Expr -> Stmt)
-> letStmt = f <$> (symbol_ "=" *> expr)
+> varDecl :: Parser Stmt
+> varDecl = VarDecl <$> (keyword_ "var" *> identifier)
+>            <*> (symbol_ "=" *> expr)
+
+> setVarStmt :: Parser Stmt
+> setVarStmt = try (SetVar <$> identifier
+>            <*> (symbol_ ":=" *> expr))
+
+
+> funDecl :: Parser Stmt
+> funDecl = FunDecl
+>     <$> (keyword "fun" *> identifier)
+>     <*> parens (commaSep identifier)
+>     <*> (symbol_ ":" *> (unwrapSingle <$>
+>          (Block <$> (some stmt <* keyword_ "end"))))
+>   where
+>       unwrapSingle (Block [StExpr (a)]) = a
+>       unwrapSingle x = x
+
+> recDecl :: Parser Stmt
+> recDecl = RecDecl
+>     <$> (keyword_ "rec" *> identifier)
+>     <*> (symbol_ "=" *> expr)
+
+
+> letDecl :: Parser (Expr -> Stmt)
+> letDecl = f <$> (symbol_ "=" *> expr)
 >    where
->        f y (Iden x) = LetStmt x y
+>        f y (Iden x) = LetDecl x y
 >        --f _ x = fail ("bad pattern: " ++ show x)
 
 statements:

@@ -24,7 +24,6 @@ The high level syntax which the parser produces
 >           | BinOp Expr String Expr
 >
 >           | Lam [String] Expr
->           --  | Fun [String] Expr
 >           | Let [(String,Expr)] Expr
 >           | LetRec [(String,Expr)] Expr
 >           | Block [Stmt]
@@ -34,20 +33,11 @@ The high level syntax which the parser produces
 >               | Str String
 >           deriving (Eq,Show,Data,Typeable,Generic) 
 
-where to add blocks:
-if?
-ask?
-let?
-lam?
-
-could make blocks implicit in this syntax?
-
-review where explicit and implicit blocks can go
-
- > data Block = Block [Stmt]
- >           deriving (Eq,Show) 
-
 > data Stmt = StExpr Expr
 >           | When Expr Expr
->           | LetStmt String Expr
+>           | LetDecl String Expr
+>           | RecDecl String Expr
+>           | FunDecl String [String] Expr
+>           | VarDecl String Expr
+>           | SetVar String Expr
 >           deriving (Eq,Show,Data,Typeable,Generic) 

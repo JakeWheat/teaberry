@@ -30,8 +30,8 @@ so it will do a let* for all the bindings (todo)
 >       desugarStatements' [] [] = Right $ I.Iden "nothing"
 >       desugarStatements' [x@(I.Block{})] [] = Right x
 >       desugarStatements' acc [] = Right $ I.Block $ reverse acc
->       desugarStatements' _acc [S.LetStmt {}] = Left "Let can't be last statement in block" --desugar (S.Let [(s,e)] $ Iden "nothing")
->       desugarStatements' acc (S.LetStmt s e : ss) = do
+>       desugarStatements' _acc [S.LetDecl {}] = Left "Let can't be last statement in block" --desugar (S.Let [(s,e)] $ Iden "nothing")
+>       desugarStatements' acc (S.LetDecl s e : ss) = do
 >           x <- desugarStatements [S.StExpr (S.Let [(s,e)] (S.Block ss))]
 >           desugarStatements' (x:acc) []
 >       desugarStatements' acc (s:ss) = do
@@ -52,7 +52,7 @@ is this worth it?
 >     desugarExpr (S.If [(c, S.Block [S.StExpr t
 >                                    ,S.StExpr $ S.Iden "nothing"])]
 >                  (Just (S.Iden "nothing")))
-> desugar (S.LetStmt {}) = Left "block ending with let" -- S.Let s <$> desugarExpr e
+> desugar (S.LetDecl {}) = Left "block ending with let" -- S.Let s <$> desugarExpr e
 
  > desugar' [S.LetStmt s e] = Left "block ending with let"
  > desugar' (S.LetStmt s e:ss) = desugar (S.StExpr (S.Let [(s, e)] (S.Block ss)))

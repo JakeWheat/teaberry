@@ -65,7 +65,14 @@
 > stmt (StExpr e) = expr e
 > stmt (When c t) = text "when" <+> expr c <> text ":" <+> nest 2 (expr t) <+> text "end"
 
-> stmt (LetStmt n e) = text n <+> text "=" <+> nest 2 (expr e)
+> stmt (LetDecl n e) = text n <+> text "=" <+> nest 2 (expr e)
+
+> stmt (VarDecl n e) = text "var" <+> text n <+> text "=" <+> nest 2 (expr e)
+> stmt (SetVar n e) = text n <+> text ":=" <+> nest 2 (expr e)
+
+> stmt (RecDecl n e) = text "rec" <+> text n <+> text "=" <+> nest 2 (expr e)
+> stmt (FunDecl n as e) = text "fun" <+> text n <+> parens (commaSep $ map text as)
+>                         <+> text ":" <+> nest 2 (expr e) <+> text "end"
 
 
 > stmts :: [Stmt] -> Doc
