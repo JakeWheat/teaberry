@@ -65,19 +65,35 @@ todo: make this better: do better wrapping + error messages when the
 >            | StrV String
 >            | ClosV I.Expr Env
 >            | Variant String [(String,Value)]
+>            | BoxV Int
 >            deriving (Eq,Show)
 
 ------------------------------------------------------------------------------
 
-= interpreter function
+= store
 
-> -- placeholder
-> data Store = Store ()
+> data Store = Store [(Int, Value)]
 
 > emptyStore :: Store
-> emptyStore = Store ()
+> emptyStore = Store []
 
-no planned use for the writer at the moment
+> newStoreLoc :: Store -> Int
+> newStoreLoc (Store xs) = 
+>     let is = map fst xs
+>     in case is of
+>            [] -> 0
+>            _ -> maximum is + 1
+
+> extendStore :: Int -> Value -> Store -> Store
+> extendStore i v (Store xs) = Store ((i,v):xs)
+
+> fetchStore :: Int -> Store -> Interpreter Value
+> fetchStore i (Store xs) = maybe (throwM $ MyException $ "invalid fetch on store: " ++ show i) pure
+>                           $ lookup i xs
+
+------------------------------------------------------------------------------
+
+= interpreter function
 
 > type Interpreter a = RWST Env () Store IO a
 >
@@ -98,14 +114,21 @@ no planned use for the writer at the moment
 > interpStmt' (I.LetDecl {}) = throwM $ MyException $ "unattached let decl"
 > interpStmt' (I.StExpr e) = interp' e
 
+--------------------------------------
 
 > interp' :: I.Expr -> Interpreter Value
 > interp' (I.Sel (I.Num n)) = pure $ NumV n
 > interp' (I.Sel (I.Str s)) = pure $ StrV s
 > interp' (I.Iden e) = do
 >     env <- ask
->     maybe (throwM $ MyException $ "Identifier not found: " ++ e)
+>     v <- maybe (throwM $ MyException $ "Identifier not found: " ++ e)
 >         pure $ lookupEnv e env
+>     case v of
+>         BoxV i -> do
+>                   store <- get
+>                   fetchStore i store
+>         _ -> pure v
+>   
 > interp' _x@(I.If c t e) = do
 >    c' <- interp' c
 >    case c' of
@@ -152,3 +175,21 @@ no planned use for the writer at the moment
 >     local (extendEnv nm v) $ interpStmt' b
 > interp' (I.Seq a@(I.StExpr {}) b) = interpStmt' a >> interpStmt' b
 
+> interp' (I.Box e) = do
+>     v <- interp' e
+>     store <- get
+>     let i = newStoreLoc store
+>     put $ extendStore i v store
+>     pure $ BoxV i
+
+> interp' (I.SetBox b v) = do
+>     b' <- do
+>           env <- ask
+>           maybe (throwM $ MyException $ "Identifier not found: " ++ b)
+>               pure $ lookupEnv b env
+>     v' <- interp' v
+>     store <- get
+>     case b' of
+>         BoxV i -> put $ extendStore i v' store
+>         _ -> throwM $ MyException $ "attemped to setbox non box value: " ++ show v
+>     pure v'

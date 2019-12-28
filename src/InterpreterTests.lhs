@@ -61,7 +61,71 @@
 >       \  #fact(0)\n\
 >       \end", defaultHaskellFFIEnv, [], NumV 1)
 
+>     ,("block:\n\
+>       \  var a = 5\n\
+>       \  a\n\
+>       \end", defaultHaskellFFIEnv, [], NumV 5)
 
+>     ,("block:\n\
+>       \  var a = 5\n\
+>       \  a := 6\n\
+>       \  a\n\
+>       \end", defaultHaskellFFIEnv, [], NumV 6)
+
+>     ,("block:\n\
+>       \  var a = 5\n\
+>       \  a := a + 1\n\
+>       \  a\n\
+>       \end", defaultHaskellFFIEnv, [], NumV 6)
+
+
+>     ,("block:\n\
+>       \  mk-counter = lam(a): block:\n\
+>       \      var ctr = 0\n\
+>       \      lam(a): block:\n\
+>       \          ctr := ctr + 1\n\
+>       \          ctr\n\
+>       \        end\n\
+>       \      end\n\
+>       \    end\n\
+>       \  end\n\
+>       \  x = mk-counter(0)\n\
+>       \  x(1)\n\
+>       \  x(1)\n\
+>       \end", defaultHaskellFFIEnv, [], NumV 2)
+
+>     ,("block:\n\
+>       \  mk-counter = lam(a): block:\n\
+>       \      var ctr = 0\n\
+>       \      lam(a): block:\n\
+>       \          ctr := ctr + 1\n\
+>       \          ctr\n\
+>       \        end\n\
+>       \      end\n\
+>       \    end\n\
+>       \  end\n\
+>       \  x = mk-counter(0)\n\
+>       \  y = mk-counter(0)\n\
+>       \  y(1)\n\
+>       \  y(1)\n\
+>       \  x(1)\n\
+>       \end", defaultHaskellFFIEnv, [], NumV 1)
+
+>     ,("block:\n\
+>       \  fun mk-counter():\n\
+>       \    var ctr = 0\n\
+>       \    lam(): block:\n\
+>       \        ctr := ctr + 1\n\
+>       \        ctr\n\
+>       \      end\n\
+>       \    end\n\
+>       \  end\n\
+>       \  x = mk-counter()\n\
+>       \  y = mk-counter()\n\
+>       \  y()\n\
+>       \  y()\n\
+>       \  x()\n\
+>       \end", defaultHaskellFFIEnv, [], NumV 1)
 
 >     ,("block:\n\
 >       \  fun fact(x):\n\

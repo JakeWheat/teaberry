@@ -19,9 +19,11 @@
 >                                    ,S.StExpr $ S.Iden "nothing"])]
 >                     (Just (S.Iden "nothing")))
 > desugarStmt (S.LetDecl nm e) = (:[]) <$> I.LetDecl nm <$> desugarExpr e
+> desugarStmt (S.SetVar n e) = (:[]) <$> I.StExpr <$> I.SetBox n <$> desugarExpr e
 
 > desugarStmt (S.FunDecl nm as bdy) =
 >     desugarStmt (S.RecDecl nm (S.Lam as bdy))
+> desugarStmt (S.VarDecl n e) = (:[]) <$> (I.LetDecl n . I.Box) <$> desugarExpr e
 
 todo: how do mutually recursive statements find each other?
 

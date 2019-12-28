@@ -15,6 +15,9 @@ The syntax which the interpreter uses
 >           | Let String Expr Expr
 >           | AppHaskell String [Expr]
 >           | Seq Stmt Stmt
+>           | Box Expr
+>           | SetBox String Expr
+>           --  | SetVar String Expr
 >           deriving (Eq,Show)
 
 > data Stmt = StExpr Expr
