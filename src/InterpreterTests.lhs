@@ -63,8 +63,24 @@
 
 
 
->     --,("let f = lam(x) block:\n
->     -- \
+>     ,("block:\n\
+>       \  fun fact(x):\n\
+>       \    if x == 0: 1\n\
+>       \    else: x * fact(x - 1)\n\
+>       \    end\n\
+>       \  end\n\
+>       \  fact(5)\n\
+>       \end", defaultHaskellFFIEnv, [], NumV 120)
+
+>     ,("block:\n\
+>       \  rec fact = lam (x):\n\
+>       \    if x == 0: 1\n\
+>       \    else: x * fact(x - 1)\n\
+>       \    end\n\
+>       \  end\n\
+>       \  fact(5)\n\
+>       \end", defaultHaskellFFIEnv, [], NumV 120)
+
 >     ]
 >  where
 >    defs = "double = lam (x): x + x end\n\

@@ -1,5 +1,5 @@
 
-> module Desugar (desugarStmts,desugarStmt,desugarExpr) where
+> module Desugar (desugarStmts,desugarExpr) where
 
 > import qualified Syntax as S
 > import qualified InterpreterSyntax as I
@@ -19,6 +19,19 @@
 >                                    ,S.StExpr $ S.Iden "nothing"])]
 >                     (Just (S.Iden "nothing")))
 > desugarStmt (S.LetDecl nm e) = (:[]) <$> I.LetDecl nm <$> desugarExpr e
+
+> desugarStmt (S.FunDecl nm as bdy) =
+>     desugarStmt (S.RecDecl nm (S.Lam as bdy))
+
+todo: how do mutually recursive statements find each other?
+
+> desugarStmt (S.RecDecl nm (S.Lam as bdy)) = do
+>    defs <- desugarRec (nm,(as,bdy))
+>    desugarStmts $ map (uncurry S.LetDecl) defs
+
+
+
+--------------------------------------
 
 
 > desugarExpr :: S.Expr -> Either String I.Expr
