@@ -87,14 +87,17 @@ no planned use for the writer at the moment
 
 > instance Exception MyException
 
-> interp :: Env -> [(String,I.Expr)] -> I.Expr -> IO (Either String Value)
-> interp env defs e = do
->     -- temp: convert the defs into nested lets
->     let desugarDefs [] x = x
->         desugarDefs ((nm,expr):ds) x = I.Let nm expr (desugarDefs ds x)
->     (result, _store, _log) <-
->         runRWST (interp' (desugarDefs defs e)) env emptyStore
+> interp :: Env -> I.Stmt -> IO (Either String Value)
+> interp env st = do
+>     (result, _store, _log) <- runRWST (interpStmt' st) env emptyStore
 >     pure $ pure result
+
+--------------------------------------
+
+> interpStmt' :: I.Stmt -> Interpreter Value
+> interpStmt' (I.LetDecl {}) = throwM $ MyException $ "unattached let decl"
+> interpStmt' (I.StExpr e) = interp' e
+
 
 > interp' :: I.Expr -> Interpreter Value
 > interp' (I.Sel (I.Num n)) = pure $ NumV n
@@ -131,6 +134,8 @@ no planned use for the writer at the moment
 >     v' <- interp' v
 >     local (extendEnv nm v') $ interp' bdy
 
-> interp' (I.Block []) = throwM $ MyException $ "empty block"
-> interp' (I.Block [s]) = interp' s
-> interp' (I.Block (s:ss)) = interp' s >> interp' (I.Block ss)
+> interp' (I.Seq (I.LetDecl nm e) b) = do
+>     v <- interp' e
+>     local (extendEnv nm v) $ interpStmt' b
+> interp' (I.Seq a@(I.StExpr {}) b) = interpStmt' a >> interpStmt' b
+

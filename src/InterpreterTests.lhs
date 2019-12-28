@@ -5,12 +5,12 @@
 > import Parse
 > import Desugar
 > import Interpreter
-> --import qualified InterpreterSyntax as I
+> import qualified InterpreterSyntax as I
 >
 > import Test.Tasty
 > import Test.Tasty.HUnit
 
-> interpreterExamples :: [(String, Env, [(String,String)], Value)]
+> interpreterExamples :: [(String, Env, String, Value)]
 > interpreterExamples =
 >     [("2", defaultHaskellFFIEnv, [], NumV 2)
 >     ,("myVar", defaultHaskellFFIEnv, defs, NumV 1)
@@ -58,43 +58,30 @@
 >       \  #fact(0)\n\
 >       \end", defaultHaskellFFIEnv, [], NumV 1)
 
-Fix (Lam (\f -> Lam (\y -> Lift ( if eval y == 0 then 1 else eval y * (eval f) (eval y - 1)))))
-let rec x = e1 in e2    =    let x = fix (\x. e1) in e2
 
 
 >     --,("let f = lam(x) block:\n
 >     -- \
 >     ]
 >  where
->    defs = [("double", "lam (x): x + x end")
->           ,("quad", "lam (x): double (double (x)) end")
->           ,("const5", "lam (_): 5 end")
->           ,("f4", "lam (x): if x: 1 else: 0 end end")
->           ,("add2", "lam (a): a + 2 end")
->           ,("myVar", "1")]
-
-> --s2p2d :: String -> Either String I.Expr
-> --s2p2d s = desugar =<< parseStmt "" s
-
-> 
-
-> {-addFn :: String -> String -> Env -> IO Env
-> addFn nm src env = do
->     let ast = either error id $ s2p2d src
->     x <- interp env ast
->     case x of
->         ClosV {} -> either error id $ extendEnv nm x env
->         _ -> error "expected closure in addFn, got " ++ show x-}
->         
->         
+>    defs = "double = lam (x): x + x end\n\
+>           \quad = lam (x): double (double (x)) end\n\
+>           \const5 = lam (_): 5 end\n\
+>           \f4 = lam (x): if x: 1 else: 0 end end\n\
+>           \add2 = lam (a): a + 2 end\n\
+>           \myVar = 1"
 
 
-> testInterpreter :: (String,Env,[(String,String)],Value) -> TestTree
+
+
+
+> testInterpreter :: (String,Env,String,Value) -> TestTree
 > testInterpreter (src, env, defs, ex) = testCase ("interp " ++ src) $ do
->     --x <- case desugar =<< parseStmt "" src of
->     --    Left e -> return $ Left e
->     let defsP = map (\(n,s) -> (n,s2p2de s)) defs
->     x <- interp env defsP (s2p2de src)
+>     let s = "block:\n" ++ defs ++ "\n" ++ src ++ "\nend"
+>         ast = either error id $ parseStmts "" s
+>         iast = either error id $ desugarStmts ast
+>     x <- interp env (extract iast)
 >     either error (assertEqual "" ex) x
 >  where
->    s2p2de s = either error id (desugar =<< parseStmt "" s)
+>    extract [a@(I.StExpr {})] = a
+>    extract x = error $ show x

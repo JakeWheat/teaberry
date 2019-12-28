@@ -1,5 +1,5 @@
 
-> module Desugar (desugar,sugar) where
+> module Desugar (desugarStmts,desugarStmt,desugarExpr) where
 
 > import qualified Syntax as S
 > import qualified InterpreterSyntax as I
@@ -7,61 +7,21 @@
 > --import Data.Data (Data)
 > --import Debug.Trace
 
-approach:
-when you get a [s.stmt], wrap it in a block - implicit block
-but don't add more blocks as you go
 
-what does
-a = 5
-when a = b: ccc end
-desugar to?
-let a = 5: block: when a = b: ccc end end
+> desugarStmts :: [S.Stmt] -> Either String [I.Stmt]
+> desugarStmts (s:ss) = (:) <$> desugarStmt s <*> desugarStmts ss
+> desugarStmts [] = pure []
 
-desugar takes a single statement
-
-desugarStatements takes a list of statements and makes them into a
-single expression using a block. designed to desugar a top level
-so it will do a let* for all the bindings (todo)
-
-> desugarStatements :: [S.Stmt] -> Either String I.Expr
-> desugarStatements [] = Right $ I.Iden "nothing"
-> desugarStatements z = desugarStatements' [] z
->   where
->       desugarStatements' [] [] = Right $ I.Iden "nothing"
->       desugarStatements' [x@(I.Block{})] [] = Right x
->       desugarStatements' acc [] = Right $ I.Block $ reverse acc
->       desugarStatements' _acc [S.LetDecl {}] = Left "Let can't be last statement in block" --desugar (S.Let [(s,e)] $ Iden "nothing")
->       desugarStatements' acc (S.LetDecl s e : ss) = do
->           x <- desugarStatements [S.StExpr (S.Let [(s,e)] (S.Block ss))]
->           desugarStatements' (x:acc) []
->       desugarStatements' acc (s:ss) = do
->           x <- desugar s
->           desugarStatements' (x:acc) ss
-
-todo:
-check the errors
-adjacent lets should be combined
-don't create a block if there is only one statement left
-is this worth it?
-
-
-
-> desugar :: S.Stmt -> Either String I.Expr
-> desugar (S.StExpr e) = desugarExpr e
-> desugar (S.When c t) =
+> desugarStmt :: S.Stmt -> Either String I.Stmt
+> desugarStmt (S.StExpr e) = I.StExpr <$> desugarExpr e
+> desugarStmt (S.When c t) = I.StExpr <$> 
 >     desugarExpr (S.If [(c, S.Block [S.StExpr t
 >                                    ,S.StExpr $ S.Iden "nothing"])]
->                  (Just (S.Iden "nothing")))
-> desugar (S.LetDecl {}) = Left "block ending with let" -- S.Let s <$> desugarExpr e
-
- > desugar' [S.LetStmt s e] = Left "block ending with let"
- > desugar' (S.LetStmt s e:ss) = desugar (S.StExpr (S.Let [(s, e)] (S.Block ss)))
-
+>                     (Just (S.Iden "nothing")))
+> desugarStmt (S.LetDecl nm e) = I.LetDecl nm <$> desugarExpr e
 
 
 > desugarExpr :: S.Expr -> Either String I.Expr
-> --desugarExpr S.True = Right $ I.True
-> --desugarExpr S.False = Right $ I.False
 > desugarExpr (S.Sel (S.Num n)) = Right $ I.Sel (I.Num n)
 > desugarExpr (S.Sel (S.Str s)) = Right $ I.Sel (I.Str s)
 > desugarExpr (S.Iden i) = Right $ I.Iden i
@@ -95,39 +55,8 @@ todo: special case for fix which looks like normal App in the regular syntax
 > desugarExpr (S.Let ((n,lbdy):ls) bdy) = do
 >     bdy' <- desugarExpr (S.Let ls bdy)
 >     lbdy' <- desugarExpr lbdy
->     Right $ I.Let n lbdy' bdy' -- I.App (I.Lam n bdy') lbdy'
+>     Right $ I.Let n lbdy' bdy'
 
-> {-desugarExpr (S.LetRec [(f,bdy)] ex) = do
->     bdy' <- desugarExpr bdy
->     ex' <- desugarExpr ex
->     return $ I.Let f (I.Fix (I.Lam f bdy')) ex'-}
-
-
-letrec fact = \x -> bdy(x)
-let fact = fix (\fact x -> bdy(x))
-
-figure out why fix isn't working
-  start by doing pretty printer
-  and doing some trivial calls
-  maybe it's evaluating something too early
-
-letrec* in scheme:
-
-(define (Y* . l)
-   ((lambda (u) (u u))
-    (lambda (p)
-       (map (lambda (li) (lambda x (apply (apply li (p p)) x))) l))))
-
-can this be typed easily?
-
-just do the variable one for now, and see if can find a way to type it
-
-- can easily write a desugar in haskell which passes the bindings in
-   as variables, like the first version of letrec below
-
-but one way to type check this is to build on a fix operator which is
-   treated specially in the type checking. not sure how to do type
-   checking without this
 
 > desugarExpr (S.LetRec [(f,(S.Lam as bdy))] ex) =
 >    let f' = f ++ "XXX" -- todo: find a better way to generate a unique name
@@ -144,6 +73,17 @@ but one way to type check this is to build on a fix operator which is
 
 > desugarExpr (S.LetRec {}) = Left "only trivial letrec supported"
 
+> desugarExpr (S.Block ss) = do
+>     ss' <- mapM desugarStmt ss
+>     let f :: [I.Stmt] -> Either String I.Expr
+>         f [] = Left "empty block"
+>         f [I.StExpr e] = pure e
+>         f [I.LetDecl {}] = Left "block ends with decl"
+>         f [a,b] = pure $ I.Seq a b
+>         f (a:as) = I.Seq a <$> I.StExpr <$> f as
+>     f ss'
+
+
 
 letrec f(a) = ...
 ->
@@ -156,26 +96,5 @@ let fz = lam (f,a): bdy' end
     f = lam(a): f'(f',a) end
 
 
-> desugarExpr (S.Block ss) = desugarStatements ss -- I.Block <$> mapM desugar ss
 
-
-TODO: make sure all of these will parse with the parser after being prettied
-
-can also test that desugar . sugar . desugar === desugar
-
-> sugar :: I.Expr -> S.Expr
-> sugar (I.Sel (I.Num n)) = S.Sel (S.Num n)
-> sugar (I.Sel (I.Str s)) = S.Sel (S.Str s)
-> sugar (I.Iden i) = S.Iden i
-> sugar (I.If c t e) = S.If [(sugar c, sugar t)] (Just (sugar e))
-
-todo: do special cases for unary - and for binops which all look like
-apps in the interpreter syntax, but have different syntax in the
-regular syntax
-
-> sugar (I.App f e) = S.App (sugar f) [sugar e]
-> sugar (I.Lam a e) = S.Lam [a] (sugar e)
-> sugar (I.Let n v e) = S.Let [(n, sugar v)] (sugar e)
-> sugar (I.AppHaskell s es) = S.App (S.Iden ("haskell-" ++ s)) (map sugar es)
-> sugar (I.Block es) = S.Block (map (S.StExpr . sugar) es)
 

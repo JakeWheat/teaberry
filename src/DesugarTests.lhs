@@ -78,8 +78,8 @@ test two expressions in a block
 >                ,("block: a + b\n\
 >                  \  c + d\n\
 >                  \end"
->                 ,Block [binop (Iden "a") "+" (Iden "b")
->                        ,binop (Iden "c") "+" (Iden "d")])
+>                 ,Seq (StExpr $ binop (Iden "a") "+" (Iden "b"))
+>                        (StExpr $ binop (Iden "c") "+" (Iden "d")))
 
 test a let then a statement
 
@@ -88,16 +88,17 @@ test a let then a statement
 >                 \    a + 5\n\
 >                  \end"
 >                 --,Block [App (Lam "a" (Block [(binop (Iden "a") "+" (Num 5))) (Num 5)]))
->                 ,Block [Let "a" (num 5) (Block [App (App (Iden "+") (Iden "a")) (num 5)])])
+>                 ,Seq (LetDecl "a" (num 5))
+>                      (StExpr $ App (App (Iden "+") (Iden "a")) (num 5)))
 
 
 >                 ]
 >   where
->       p2d s = either error id (desugar =<< parseStmt "" s)
+>       p2d s = either error id (desugarExpr =<< parseExpr "" s)
 >       binop a op b = App (App (Iden op) a) b
 >       num = Sel . Num
 
 > testDesugar :: (String,Expr) -> TestTree
 > testDesugar (src, ex) = testCase ("desugar " ++ src) $
 >     either error (assertEqual "" ex) $
->       desugar =<< parseStmt "" src
+>       desugarExpr =<< parseExpr "" src

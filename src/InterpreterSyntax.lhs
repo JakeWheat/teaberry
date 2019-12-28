@@ -12,9 +12,15 @@ The syntax which the interpreter uses
 >           | Lam String Expr
 >           | Let String Expr Expr
 >           | AppHaskell String [Expr]
->           | Block [Expr]
+>           | Seq Stmt Stmt
 >           deriving (Eq,Show)
+
+> data Stmt = StExpr Expr
+>           | LetDecl String Expr
+>           deriving (Eq,Show)
+
 
 > data Selector = Num Scientific
 >               | Str String
 >               deriving (Eq,Show)
+
