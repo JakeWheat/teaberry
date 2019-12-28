@@ -58,18 +58,10 @@ todo: special case for fix which looks like normal App in the regular syntax
 >     Right $ I.Let n lbdy' bdy'
 
 
-> desugarExpr (S.LetRec [(f,(S.Lam as bdy))] ex) =
->    let f' = f ++ "XXX" -- todo: find a better way to generate a unique name
->                        -- need proper machinery to do this
->        newBdy = patchCalls bdy -- replace calls to f(xxx) with calls to f(f,xxx)
->        newe =  (S.Let [(f', S.Lam (f:as) newBdy)]
->                    (S.Let [(f, S.Lam as (S.App (S.Iden f') (map S.Iden (f':as))))] ex))
->   in desugarExpr newe
->  where
->      -- todo: this will replace too much - how to fix it?
->      patchCalls = transformBi $ \x -> case x of
->          S.App (S.Iden fx) args -> S.App (S.Iden fx) (S.Iden fx : args)
->          _ -> x
+
+> desugarExpr (S.LetRec [(f,(S.Lam as bdy))] ex) = do
+>    defs <- desugarRec (f,(as,bdy))
+>    desugarExpr (S.Let defs ex)
 
 > desugarExpr (S.LetRec {}) = Left "only trivial letrec supported"
 
@@ -83,7 +75,11 @@ todo: special case for fix which looks like normal App in the regular syntax
 >         f (a:as) = I.Seq a <$> I.StExpr <$> f as
 >     f ss'
 
-
+todo for letrec:
+  generate unique names
+  replace only the correct calls when fixing the bodies:
+    match the name, don't descend when shadowed
+  do the n arg version
 
 letrec f(a) = ...
 ->
@@ -96,5 +92,28 @@ let fz = lam (f,a): bdy' end
     f = lam(a): f'(f',a) end
 
 
+letrec f0 = lam (as0): bdy0
+       ...
+       fn = lam (asn): bdyn
+in ex ->
+  [bdyn' = bdyn replace(fn(x) with fn'(f0,...,fn,x)]
+  let [fn' = lam(f0,...,fn,asn) bdyn']
+      [fn = lam (asn) : fn'(f0',...,fn',asn)]
+  in ex
 
+> desugarRec :: (String,([String],S.Expr)) -> Either String [(String,S.Expr)]
+> desugarRec (f,(as,bdy)) =
+>     let f' = f ++ "XXX" -- todo: find a better way to generate a unique name
+>                        -- need proper machinery to do this
+>         newBdy = patchCalls bdy -- replace calls to f(xxx) with calls to f(f,xxx)
+>     in pure [(f',S.Lam (f:as) newBdy)
+>             ,(f, S.Lam as (S.App (S.Iden f') (map S.Iden (f':as))))]
+>  where
+>      -- todo: this will replace too much - how to fix it?
+>      -- only replace the same named function
+>      -- figure out how to avoid descending, when this variable
+>      -- is shadowed
+>      patchCalls = transformBi $ \x -> case x of
+>          S.App (S.Iden fx) args -> S.App (S.Iden fx) (S.Iden fx : args)
+>          _ -> x
 
