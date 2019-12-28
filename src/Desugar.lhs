@@ -9,16 +9,16 @@
 
 
 > desugarStmts :: [S.Stmt] -> Either String [I.Stmt]
-> desugarStmts (s:ss) = (:) <$> desugarStmt s <*> desugarStmts ss
+> desugarStmts (s:ss) = (++) <$> desugarStmt s <*> desugarStmts ss
 > desugarStmts [] = pure []
 
-> desugarStmt :: S.Stmt -> Either String I.Stmt
-> desugarStmt (S.StExpr e) = I.StExpr <$> desugarExpr e
-> desugarStmt (S.When c t) = I.StExpr <$> 
+> desugarStmt :: S.Stmt -> Either String [I.Stmt]
+> desugarStmt (S.StExpr e) = (:[]) <$> I.StExpr <$> desugarExpr e
+> desugarStmt (S.When c t) = (:[]) <$> I.StExpr <$> 
 >     desugarExpr (S.If [(c, S.Block [S.StExpr t
 >                                    ,S.StExpr $ S.Iden "nothing"])]
 >                     (Just (S.Iden "nothing")))
-> desugarStmt (S.LetDecl nm e) = I.LetDecl nm <$> desugarExpr e
+> desugarStmt (S.LetDecl nm e) = (:[]) <$> I.LetDecl nm <$> desugarExpr e
 
 
 > desugarExpr :: S.Expr -> Either String I.Expr
@@ -66,7 +66,7 @@ todo: special case for fix which looks like normal App in the regular syntax
 > desugarExpr (S.LetRec {}) = Left "only trivial letrec supported"
 
 > desugarExpr (S.Block ss) = do
->     ss' <- mapM desugarStmt ss
+>     ss' <- concat <$> mapM desugarStmt ss
 >     let f :: [I.Stmt] -> Either String I.Expr
 >         f [] = Left "empty block"
 >         f [I.StExpr e] = pure e
