@@ -12,6 +12,7 @@
 > import Control.Monad.Trans.RWS
 > import Text.Show.Pretty (ppShow)
 > import Control.Exception.Safe
+> import Control.Monad.IO.Class (liftIO)
 
 ------------------------------------------------------------------------------
 
@@ -45,6 +46,7 @@ todo: make this better: do better wrapping + error messages when the
 >                                    _ -> throwM $ MyException $ "* needs two num args, got " ++ ppShow x)
 >                   ,("==", \[a, b] -> pure $ BoolV (a == b))
 >                   ,("raise", \[StrV s] -> throwM $ MyException s)
+>                   ,("print", \[x] -> liftIO (putStrLn (show x)) >> pure x)
 >                   ]
 
 > defaultHaskellFFIEnv :: Env
@@ -54,6 +56,7 @@ todo: make this better: do better wrapping + error messages when the
 >                ,liftBinOp "-"
 >                ,liftBinOp "=="
 >                ,liftUnop "raise"
+>                ,liftUnop "print"
 >                ] emptyEnv
 >   where
 >      liftUnop f = (f, ClosV (I.Lam "a" (I.AppHaskell f [I.Iden "a"])) emptyEnv)

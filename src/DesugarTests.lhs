@@ -11,7 +11,6 @@
 
 > desugarExamples :: [(String, Expr)]
 > desugarExamples = [("a", Iden "a")
->                 --,("a + b",  BinOp (Iden "a") "+" (Iden "b"))
 >                 ,("true", Iden "true")
 >                 ,("false", Iden "false")
 >                 ,("3", num 3)
@@ -30,13 +29,8 @@
 >                ,("let x=3,y=4: x + y end"
 >                 ,Let "x" (num 3) (Let "y" (num 4)
 >                                   (App (App (Iden "+") (Iden "x")) (Iden "y"))))
->                 {-,App (Lam "x"
->                       (App (Lam "y"
->                             (App (App (Iden "+") (Iden "x")) (Iden "y")))
->                        (num 4))) (num 3))-}
 >                ,("let x=3: x + 4 end"
 >                 ,Let "x" (num 3) (App (App (Iden "+") (Iden "x")) (num 4)))
->                 {-,App (Lam "x" (App (App (Iden "+") (Iden "x")) (num 4))) (num 3))-}
 >                ,("if a: b end", If (Iden "a") (Iden "b") (App (Iden "raise") (Sel $ Str "no branches matched")))
 >                ,("if a: b else: c end"
 >                 ,If (Iden "a") (Iden "b") (Iden "c"))
@@ -64,30 +58,15 @@
 >                      \    f = lam(a): fXXX(fXXX,a) end:\n\
 >                      \f('stuff')\n\
 >                      \end")
-
-
-
-let f' = lam(f,a): f(f,a) end,
-    f = lam(a): f'(f',a) end:
-  f('stuff')
-end"
-
-
-test two expressions in a block
-
 >                ,("block: a + b\n\
 >                  \  c + d\n\
 >                  \end"
 >                 ,Seq (StExpr $ binop (Iden "a") "+" (Iden "b"))
 >                        (StExpr $ binop (Iden "c") "+" (Iden "d")))
-
-test a let then a statement
-
 >                ,("block:\n\
 >                 \    a = 5\n\
 >                 \    a + 5\n\
 >                  \end"
->                 --,Block [App (Lam "a" (Block [(binop (Iden "a") "+" (Num 5))) (Num 5)]))
 >                 ,Seq (LetDecl "a" (num 5))
 >                      (StExpr $ App (App (Iden "+") (Iden "a")) (num 5)))
 

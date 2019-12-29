@@ -69,9 +69,6 @@ when a fun or rec is seen, it will collect subsequent funs and recs
 > desugarExpr (S.If [] (Just e)) = desugarExpr e
 > desugarExpr (S.If ((c,t):xs) els) = I.If <$> desugarExpr c <*> desugarExpr t <*> desugarExpr (S.If xs els)
 
-
-todo: special case for fix which looks like normal App in the regular syntax
-
 > desugarExpr (S.App f xs) = do
 >     f' <- desugarExpr f
 >     xs' <- mapM desugarExpr xs

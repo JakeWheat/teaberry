@@ -303,13 +303,6 @@ put all the parsers which start with a keyword first
 
 = statements
 
-how to parse expressions and let bindings in the same place?
-options:
-1. represent pattern bindings using expr
-2. represent pattern bindings differently, and use try to parse them
-3. represent pattern bindings differently, and convert them in the parser
-   when you see a binding
-
 > stmt :: Parser Stmt
 > stmt = choice
 >     [whenStmt
@@ -354,30 +347,3 @@ options:
 >    where
 >        f y (Iden x) = LetDecl x y
 >        --f _ x = fail ("bad pattern: " ++ show x)
-
-statements:
-expression
-let binding
-fun binding
-when
-
-
-executing:
-[statement] -> represents a block
-  does one statement at a time
-  returns the last value
-
-at the top level, should be able to do stuff out of order, but come
-  back to that when have recursive functions,
-
-bindings add to the current env
-
-
-f
-  ...
-  calls f
-
--> f' r
-   calls r
-
-g -> f' f'
