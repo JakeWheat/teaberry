@@ -6,6 +6,7 @@ The high level syntax which the parser produces
 > module Syntax (Stmt(..)
 >               ,Expr(..)
 >               ,Selector(..)
+>               ,VariantDecl(..)
 >               )where
 
 > import Data.Data (Data,Typeable)
@@ -43,4 +44,8 @@ The high level syntax which the parser produces
 >           | FunDecl String [String] Expr
 >           | VarDecl String Expr
 >           | SetVar String Expr
+>           | DataDecl String [VariantDecl]
+>           deriving (Eq,Show,Data,Typeable,Generic) 
+
+> data VariantDecl = VariantDecl String [String]
 >           deriving (Eq,Show,Data,Typeable,Generic) 

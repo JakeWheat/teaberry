@@ -5,7 +5,7 @@
 >               ) where
 
 
-> import Syntax
+> import Syntax (Stmt(..), Expr(..), Selector(..), VariantDecl(..))
 
 > import Prelude hiding ((<>))
 
@@ -74,6 +74,12 @@
 > stmt (FunDecl n as e) = text "fun" <+> text n <+> parens (commaSep $ map text as)
 >                         <+> text ":" <+> nest 2 (expr e) <+> text "end"
 
+> stmt (DataDecl nm vs) =
+>     text "data" <+> text nm <+> text ":"
+>     <+> nest 2 (vcat $ map vf vs)
+>     <+> text "end"
+>   where
+>       vf (VariantDecl vnm fs) = text "|" <+> text vnm <+> parens (commaSep $ map text fs)
 
 > stmts :: [Stmt] -> Doc
 > stmts = vcat . map stmt

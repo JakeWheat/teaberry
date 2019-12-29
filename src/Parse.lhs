@@ -43,7 +43,7 @@
 > import Data.Char (isAlphaNum,isDigit)
 
 
-> import Syntax (Stmt(..), Expr(..), Selector(..))
+> import Syntax (Stmt(..), Expr(..), Selector(..), VariantDecl(..))
 
 ------------------------------------------------------------------------------
 
@@ -309,6 +309,7 @@ put all the parsers which start with a keyword first
 >     ,recDecl
 >     ,funDecl
 >     ,varDecl
+>     ,dataDecl
 >     ,setVarStmt
 >     ,expr <**> option StExpr letDecl
 >     ]
@@ -341,6 +342,16 @@ put all the parsers which start with a keyword first
 >     <$> (keyword_ "rec" *> identifier)
 >     <*> (symbol_ "=" *> expr)
 
+> dataDecl :: Parser Stmt
+> dataDecl = DataDecl
+>     <$> (keyword_ "data" *> identifier <* symbol_ ":")
+>     <*> ((((:[]) <$> singleVariant) <|> some variant) <* keyword_ "end")
+>   where
+>     singleVariant = VariantDecl
+>                     <$> identifier <*> option [] (parens (commaSep identifier))
+>     variant = VariantDecl
+>               <$> (symbol_ "|" *> identifier)
+>               <*> option [] (parens (commaSep identifier))
 
 > letDecl :: Parser (Expr -> Stmt)
 > letDecl = f <$> (symbol_ "=" *> expr)

@@ -9,7 +9,7 @@
 > import qualified Test.Tasty as T
 > import qualified Test.Tasty.HUnit as T
 
-> import Syntax (Stmt(..), Expr(..), Selector(..))
+> import Syntax (Stmt(..), Expr(..), Selector(..), VariantDecl(..))
 > import Parse (parseExpr, parseStmt, parseStmts)
 > import Pretty (prettyExpr, prettyStmts)
 
@@ -143,7 +143,42 @@ todo: tuples
 >     [("when x == 3: 4 end"
 >      ,When (BinOp (Iden "x") "==" (Sel $ Num 3)) (Sel $ Num 4))
 >     ,("var a = 5", VarDecl "a" (num 5))
->     ,("a := 6", SetVar "a" (num 6))]
+>     ,("a := 6", SetVar "a" (num 6))
+>     ,("data BTree:\n\
+>       \  | node(value, left, right)\n\
+>       \  | leaf(value)\n\
+>       \end", DataDecl "BTree" [VariantDecl "node" ["value", "left", "right"]
+>                               ,VariantDecl "leaf" ["value"]])
+
+>     ,("data MyEnum:\n\
+>       \  | node(left, right)\n\
+>       \  | leaf\n\
+>       \end", DataDecl "MyEnum" [VariantDecl "node" ["left", "right"]
+>                               ,VariantDecl "leaf" []])
+
+>     ,("data MyEnum:\n\
+>       \  | node(left, right)\n\
+>       \  | leaf()\n\
+>       \end", DataDecl "MyEnum" [VariantDecl "node" ["left", "right"]
+>                               ,VariantDecl "leaf" []])
+
+>     ,("data Point:\n\
+>       \  | pt(x, y)\n\
+>       \end", DataDecl "Point" [VariantDecl "pt" ["x", "y"]])
+
+>     ,("data Point: pt(x, y) end"
+>      ,DataDecl "Point" [VariantDecl "pt" ["x", "y"]])
+
+>     ,("data Point: pt() end"
+>      ,DataDecl "Point" [VariantDecl "pt" []])
+
+>     ,("data Point: pt end"
+>      ,DataDecl "Point" [VariantDecl "pt" []])
+
+
+
+
+>     ]
 >  where
 >      num = Sel . Num
 
