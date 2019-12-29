@@ -1,13 +1,12 @@
 
 > module DesugarTests (desugarExamples, testDesugar) where
 >
-> --import qualified Syntax as S
-> import Parse
-> import InterpreterSyntax
-> import Desugar
->
-> import Test.Tasty
-> import Test.Tasty.HUnit
+> import qualified Test.Tasty as T
+> import qualified Test.Tasty.HUnit as T
+
+> import Parse (parseExpr)
+> import InterpreterSyntax (Stmt(..), Expr(..), Selector(..))
+> import Desugar (desugarExpr)
 
 > desugarExamples :: [(String, Expr)]
 > desugarExamples = [("a", Iden "a")
@@ -77,7 +76,7 @@
 >       binop a op b = App (App (Iden op) a) b
 >       num = Sel . Num
 
-> testDesugar :: (String,Expr) -> TestTree
-> testDesugar (src, ex) = testCase ("desugar " ++ src) $
->     either error (assertEqual "" ex) $
+> testDesugar :: (String,Expr) -> T.TestTree
+> testDesugar (src, ex) = T.testCase ("desugar " ++ src) $
+>     either error (T.assertEqual "" ex) $
 >       desugarExpr =<< parseExpr "" src

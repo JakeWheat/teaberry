@@ -64,6 +64,7 @@ executable teaberry
                        InterpreterSyntax
                        Interpreter
                        Pretty
+                       Engine
 
               
 Test-Suite RunTests

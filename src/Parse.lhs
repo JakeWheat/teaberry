@@ -43,7 +43,7 @@
 > import Data.Char (isAlphaNum,isDigit)
 
 
-> import Syntax
+> import Syntax (Stmt(..), Expr(..), Selector(..))
 
 ------------------------------------------------------------------------------
 

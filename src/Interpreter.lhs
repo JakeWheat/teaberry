@@ -7,12 +7,13 @@
 >                    ,defaultHaskellFFIEnv
 >                    ,Value(..)) where
 
-> import qualified InterpreterSyntax as I
-> import Data.Scientific (Scientific)
-> import Control.Monad.Trans.RWS
-> import Text.Show.Pretty (ppShow)
-> import Control.Exception.Safe
+> import Control.Exception.Safe (Exception, throwM)
 > import Control.Monad.IO.Class (liftIO)
+> import Control.Monad.Trans.RWS (RWST, runRWST, ask, get, put, local)
+> import Data.Scientific (Scientific)
+> import Text.Show.Pretty (ppShow)
+
+> import qualified InterpreterSyntax as I
 
 ------------------------------------------------------------------------------
 

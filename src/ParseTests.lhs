@@ -6,12 +6,12 @@
 >                   ,parseStmtsExamples
 >                   ,testParseStmts) where
 >
-> import Syntax
-> import Parse
-> import Pretty
+> import qualified Test.Tasty as T
+> import qualified Test.Tasty.HUnit as T
 
-> import Test.Tasty
-> import Test.Tasty.HUnit
+> import Syntax (Stmt(..), Expr(..), Selector(..))
+> import Parse (parseExpr, parseStmt, parseStmts)
+> import Pretty (prettyExpr, prettyStmts)
 
 > parseExprExamples :: [(String, Expr)]
 > parseExprExamples = [("a", Iden "a")
@@ -151,25 +151,35 @@ todo: tuples
 > parseStmtsExamples = [("", [])]
 
 
-> testParseExpr :: (String,Expr) -> TestTree
-> testParseExpr (src, ex) = testCase ("parseexpr " ++ src) $ do
+> testParseExpr :: (String,Expr) -> T.TestTree
+> testParseExpr (src, ex) = T.testCase ("parseexpr " ++ src) $ do
 >     case parseExpr "" src of
 >         Left er -> error er
 >         Right x -> do
->             assertEqual "" ex x
+>             T.assertEqual "" ex x
 >             let src1 = prettyExpr x
 >             case parseExpr "" src1 of
 >                 Left er -> error er
->                 Right x1 -> assertEqual "ppp" ex x1
+>                 Right x1 -> T.assertEqual "ppp" ex x1
 
-> testParseStmt :: (String,Stmt) -> TestTree
-> testParseStmt (src, ex) = testCase ("parsestmt " ++ src) $ do
+> testParseStmt :: (String,Stmt) -> T.TestTree
+> testParseStmt (src, ex) = T.testCase ("parsestmt " ++ src) $ do
 >     case parseStmt "" src of
 >         Left er -> error er
->         Right x -> assertEqual "" ex x
+>         Right x -> do
+>             T.assertEqual "" ex x
+>             let src1 = prettyStmts [x]
+>             case parseStmt "" src1 of
+>                 Left er -> error er
+>                 Right x1 -> T.assertEqual "ppp" ex x1
 
-> testParseStmts :: (String,[Stmt]) -> TestTree
-> testParseStmts (src, ex) = testCase ("parsestmts " ++ src) $ do
+> testParseStmts :: (String,[Stmt]) -> T.TestTree
+> testParseStmts (src, ex) = T.testCase ("parsestmts " ++ src) $ do
 >     case parseStmts "" src of
 >         Left er -> error er
->         Right x -> assertEqual "" ex x
+>         Right x -> do
+>             T.assertEqual "" ex x
+>             let src1 = prettyStmts x
+>             case parseStmts "" src1 of
+>                 Left er -> error er
+>                 Right x1 -> T.assertEqual "ppp" ex x1

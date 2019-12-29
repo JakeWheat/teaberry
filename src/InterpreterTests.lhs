@@ -1,14 +1,17 @@
 
 > {-# LANGUAGE TupleSections #-}
 > module InterpreterTests (interpreterExamples, testInterpreter) where
->
-> import Parse
-> import Desugar
-> import Interpreter
+
+
+> import qualified Test.Tasty as T
+> import qualified Test.Tasty.HUnit as T
+
+> import Parse (parseStmts)
+> import Desugar (desugarStmts)
+> import Interpreter (Value(..))
+> import qualified Interpreter as I
 > import qualified InterpreterSyntax as I
 >
-> import Test.Tasty
-> import Test.Tasty.HUnit
 
 > interpreterExamples :: [(String, String, Value)]
 > interpreterExamples =
@@ -282,13 +285,13 @@
 
 
 
-> testInterpreter :: (String, String, Value) -> TestTree
-> testInterpreter (src, defs, ex) = testCase ("interp " ++ src) $ do
+> testInterpreter :: (String, String, Value) -> T.TestTree
+> testInterpreter (src, defs, ex) = T.testCase ("interp " ++ src) $ do
 >     let s = "block:\n" ++ defs ++ "\n" ++ src ++ "\nend"
 >         ast = either error id $ parseStmts "" s
 >         iast = either error id $ desugarStmts ast
->     x <- interp defaultHaskellFFIEnv (extract iast)
->     either error (assertEqual "" ex) x
+>     x <- I.interp I.defaultHaskellFFIEnv (extract iast)
+>     either error (T.assertEqual "" ex) x
 >  where
 >    extract [a@(I.StExpr {})] = a
 >    extract x = error $ show x

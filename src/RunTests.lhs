@@ -1,19 +1,24 @@
 
 
-> import ParseTests
-> import DesugarTests
-> import InterpreterTests
+> import qualified Test.Tasty as T
 
-> import Test.Tasty
-> --import Test.Tasty.HUnit
+> import ParseTests (testParseExpr
+>                   ,parseExprExamples
+>                   ,testParseStmt
+>                   ,parseStmtExamples
+>                   ,testParseStmts
+>                   ,parseStmtsExamples)
+> import DesugarTests (testDesugar,desugarExamples)
+> import InterpreterTests (testInterpreter,interpreterExamples)
+
 
 > main :: IO ()
 > main = do
->     defaultMain $ testGroup "all"
->         [testGroup "parse"
->             [testGroup "parseExpr" $ map testParseExpr parseExprExamples
->             ,testGroup "parseStmt" $ map testParseStmt parseStmtExamples
->             ,testGroup "parseStmts" $ map testParseStmts parseStmtsExamples]
->         ,testGroup "desugar" $ map testDesugar desugarExamples
->         ,testGroup "interpret" $ map testInterpreter interpreterExamples
+>     T.defaultMain $ T.testGroup "all"
+>         [T.testGroup "parse"
+>             [T.testGroup "parseExpr" $ map testParseExpr parseExprExamples
+>             ,T.testGroup "parseStmt" $ map testParseStmt parseStmtExamples
+>             ,T.testGroup "parseStmts" $ map testParseStmts parseStmtsExamples]
+>         ,T.testGroup "desugar" $ map testDesugar desugarExamples
+>         ,T.testGroup "interpret" $ map testInterpreter interpreterExamples
 >         ]

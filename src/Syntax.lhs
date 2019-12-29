@@ -3,10 +3,13 @@
 The high level syntax which the parser produces
 
 > {-# LANGUAGE DeriveDataTypeable,DeriveGeneric #-}
-> module Syntax where
+> module Syntax (Stmt(..)
+>               ,Expr(..)
+>               ,Selector(..)
+>               )where
 
-> import Data.Scientific (Scientific)
 > import Data.Data (Data,Typeable)
+> import Data.Scientific (Scientific)
 > import GHC.Generics (Generic)
 
 > data Expr = Sel Selector

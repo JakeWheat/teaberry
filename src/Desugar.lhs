@@ -1,15 +1,11 @@
 
 > module Desugar (desugarStmts,desugarExpr) where
 
+> import Data.Generics.Uniplate.Data (transformBi)
+> import Data.Maybe (catMaybes, mapMaybe)
+
 > import qualified Syntax as S
 > import qualified InterpreterSyntax as I
-> import Data.Generics.Uniplate.Data
-> --import Data.Data (Data)
-> --import Debug.Trace
-> --import Text.Show.Pretty
-> --import Pretty
-> --import Data.List (intercalate)
-> import Data.Maybe (catMaybes, mapMaybe)
 
 > desugarStmts :: [S.Stmt] -> Either String [I.Stmt]
 > desugarStmts (s:ss) | isRec s = do
