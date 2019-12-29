@@ -60,14 +60,14 @@
 >       \  abc\n\
 >       \end", defaultHaskellFFIEnv, defs, NumV 120)
 
->     {-"letrec\n\
+>     {-"letrec\n\  BAD: abc is before fact and refers to it
 >       \  one = 1,\n\
 >       \  abc = fact(5),\n\
 >       \  fact = lam(n): if n == one: one else: n * fact(n - one) end end:\n\
 >       \  abc\n\
 >       \end", defaultHaskellFFIEnv, defs, NumV 120)
 
->     ,("letrec\n\
+>     ,("letrec\n\  BAD: abc is before fact and refers to it
 >       \  abc = fact(5),\n\
 >       \  fact = lam(n): if n == one: one else: n * fact(n - one) end end:\n\
 >       \  one = 1,\n\
@@ -75,14 +75,14 @@
 >       \end", defaultHaskellFFIEnv, defs, NumV 120)-}
 
 
->     {-,("letrec\n\
+>     ,("letrec\n\
 >       \  zero = 0,\n\
 >       \  one = zero + 1\n\
 >       \  : one\n\
 >       \end", defaultHaskellFFIEnv, defs, NumV 1)
 
 
->     ,("letrec \n\
+>     {-,("letrec \n\ BAD: needs reordering support for one
 >       \  zero = 0,\n\
 >       \  addeven = lam(x) : if x == 0: 0 else: x + addodd(x - one) end end,\n\
 >       \  addodd = lam(x) : if x == 0: 0 else: x + addeven(x - 1) end end,\n\
@@ -91,9 +91,9 @@
 >       \  a = 1\n\
 >       \  :\n\
 >       \  addeven(6)\n\
->       \end", defaultHaskellFFIEnv, defs, NumV 21)
+>       \end", defaultHaskellFFIEnv, defs, NumV 21)-}
 
->     ,("letrec \n\
+>     {-,("letrec \n\ BAD: needs reordering support for one
 >       \  zero = 0,\n\
 >       \  addodd = lam(x) : if x == 0: 0 else: x + addeven(x - 1) end end,\n\
 >       \  addeven = lam(x) : if x == 0: 0 else: x + addodd(x - one) end end, \n\
@@ -101,19 +101,19 @@
 >       \  a = 1\n\
 >       \  :\n\
 >       \  addeven(6)\n\
->       \end", defaultHaskellFFIEnv, defs, NumV 21)
+>       \end", defaultHaskellFFIEnv, defs, NumV 21)-}
 
 
->     ,("letrec \n\
+>     {-,("letrec \n\ not sure how this is supposed to work - check if it does in pyret
 >       \  addeven = lam(x) : if x == 0: 0 else: x + addodd(x - one) end end,\n\
 >       \  addodd = lam(x) : if x == 0: 0 else: x + addeven(x - 1) end end,\n\
 >       \  one = addeven(0) + addodd(0) + 1,\n\
 >       \  a = 1\n\
 >       \  :\n\
 >       \  addeven(6)\n\
->       \end", defaultHaskellFFIEnv, defs, NumV 21)
+>       \end", defaultHaskellFFIEnv, defs, NumV 21)-}
 
->     ,("letrec \n\
+>     {-,("letrec \n\ #can't find the 0 - reorder?
 >       \  addodd = lam(x) : if x == 0: zero else: x + addeven(x - 1) end end,\n\
 >       \  addeven = lam(x) : if x == 0: 0 else: x + addodd(x - one) end end, \n\
 >       \  zero = 0,\n\

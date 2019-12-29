@@ -13,6 +13,11 @@
 
 > desugarStmts :: [S.Stmt] -> Either String [I.Stmt]
 > desugarStmts (s:ss) | isRec s = do
+
+rules for fun and rec:
+when a fun or rec is seen, it will collect subsequent funs and recs
+(both) and then desugar them all mutually
+
 >     -- get all the immediately following recursive defs
 >     let (adddecls,ss') = span isRec ss
 >     -- desugar them to regular let together
@@ -39,14 +44,6 @@
 >                     (Just (S.Iden "nothing")))
 
 > desugarStmt (S.LetDecl nm e) = (:[]) <$> I.LetDecl nm <$> desugarExpr e
-
-rules for fun and rec:
-when a fun or rec is seen, it will collect subsequent funs and recs
-(both) and then desugar them all mutually
-
-todo: support non lambdas in rec
--> these don't need a wrapper, but do need calls to any recursive
- functions to be desugared correctly
 
 > desugarStmt (S.FunDecl nm as bdy) =
 >     desugarStmt (S.RecDecl nm (S.Lam as bdy))
