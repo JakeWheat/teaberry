@@ -1,14 +1,30 @@
 
+basic untyped pyret dialect
 
-implement a simple store without garbage collection/ implement
-variables
-use these to implement mutual recursion under the covers
-make definitions unordered at the top level
-  an temporary option is to not allow mutual recursion, but
-  reorder the defintions as a desugaring step
-implement scripts in files + import
-add algebraic data types, recursive data types
-start trying to implement some scripts
+finish rec
+top level rec handling
+import and provides
+agdt
+api/ux
+
+table stuff
 
 
-separately: start doing typed language experiments
+types
+
+...
+
+
+better ffi
+calling exes
+standard lib
+docs/website
+
+
+start writing more serious stuff and see what comes up
+
+think about garbage collection
+think about a lower level interpreter (keep the high level one too)
+  1. prep for llvm compilation
+  2. optimisation
+
