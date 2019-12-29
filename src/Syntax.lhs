@@ -7,6 +7,7 @@ The high level syntax which the parser produces
 >               ,Expr(..)
 >               ,Selector(..)
 >               ,VariantDecl(..)
+>               ,Pat(..)
 >               )where
 
 > import Data.Data (Data,Typeable)
@@ -17,11 +18,14 @@ The high level syntax which the parser produces
 
 >           | Iden String
 >           | Parens Expr
->           --  | TupleCtor [Expr]
->           --  | TupleGet Expr Integer
+
+>           | TupleGet Expr Int
+>           | Construct Expr [Expr]
+>           | DotExpr Expr String
 > 
 >           | If [(Expr,Expr)] (Maybe Expr)
 >           | Ask [(Expr,Expr)] (Maybe Expr)
+>           | Cases String Expr [(Pat, Expr)] (Maybe Expr)
 >
 >           | App Expr [Expr]
 >           | UnaryMinus Expr
@@ -33,8 +37,14 @@ The high level syntax which the parser produces
 >           | Block [Stmt]
 >           deriving (Eq,Show,Data,Typeable,Generic) 
 
+> data Pat = IdenP String
+>          | CtorP String [Pat]
+>          | TupleP [Pat]
+>           deriving (Eq,Show,Data,Typeable,Generic) 
+
 > data Selector = Num Scientific
 >               | Str String
+>               | Tuple [Expr]
 >           deriving (Eq,Show,Data,Typeable,Generic) 
 
 > data Stmt = StExpr Expr

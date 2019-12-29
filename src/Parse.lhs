@@ -43,7 +43,7 @@
 > import Data.Char (isAlphaNum,isDigit)
 
 
-> import Syntax (Stmt(..), Expr(..), Selector(..), VariantDecl(..))
+> import Syntax (Stmt(..), Expr(..), Selector(..), VariantDecl(..), Pat(..))
 
 ------------------------------------------------------------------------------
 
@@ -186,6 +186,9 @@ consider what other numbers to support, e.g. integer, positive
 >     -- not sure if this def pays its way
 >     append = flip (++)
 
+> nonNegativeInteger :: Parser Int
+> nonNegativeInteger = lexeme (read <$> takeWhile1P Nothing isDigit)
+
 ------------------------------------------------------------------------------
 
 = expressions
@@ -283,6 +286,45 @@ todo: remove the trys by implementing a proper lexer or a lexer style
 >     <* keyword_ "end")
 >     
 
+> construct :: Parser Expr
+> construct = Construct <$> (symbol_ "[" *> (Iden <$> identifier) <* symbol_ ":")
+>             <*> (commaSep expr <* symbol_ "]")
+>
+> -- optional here doesn't work, need to refactor it
+> tuple :: Parser Expr
+> tuple = (Sel . Tuple) <$> (symbol_ "{" *> xSep ';' expr <* optional (symbol_ ";") <* symbol_ "}")
+
+
+> dotSuffix :: Parser (Expr -> Expr)
+> dotSuffix = symbol_ "." *>
+>     choice [flip TupleGet <$> (symbol_ "{" *> nonNegativeInteger <* symbol_ "}")
+>            ,flip DotExpr <$> identifier]
+
+> cases :: Parser Expr
+> cases = casex <$> (keyword_ "cases" *> parens identifier)
+>               <*> (expr <* symbol_ ":")
+>               <*> (some cas <* keyword_ "end")
+>   where
+>      cas = (,) <$> (symbol_ "|" *> pat)
+>                <*> (symbol_ "=>" *> expr)
+>      splitElse [] = ([],Nothing)
+>      splitElse xs = case last xs of
+>                         (IdenP "else", e) -> (init xs,Just e)
+>                         _ -> (xs, Nothing)
+>      casex ty e cs = let (cs',el) = splitElse cs
+>                      in  Cases ty e cs' el
+
+> pat :: Parser Pat
+> pat = choice
+>       [(IdenP <$> identifier) <**> option id ctorPSuffix
+>       ,TupleP <$> (symbol_ "{" *> xSep ';' pat <* symbol_ "}")]
+
+> ctorPSuffix :: Parser (Pat -> Pat)
+> ctorPSuffix = do
+>     x <- parens (commaSep pat)
+>     pure (\(IdenP y) -> CtorP y x)
+
+
 put all the parsers which start with a keyword first
 
 > term :: Parser Expr
@@ -293,11 +335,14 @@ put all the parsers which start with a keyword first
 >               ,ifE
 >               ,ask
 >               ,block
+>               ,cases
 >               ,Iden <$> identifier
 >               ,numE
 >               ,stringE
 >               ,parensE
->               ] <**> option id appSuffix
+>               ,construct
+>               ,tuple
+>               ] <**> option id (appSuffix <|> dotSuffix)
 
 ------------------------------------------------------------------------------
 

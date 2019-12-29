@@ -5,11 +5,11 @@
 >               ) where
 
 
-> import Syntax (Stmt(..), Expr(..), Selector(..), VariantDecl(..))
+> import Syntax (Stmt(..), Expr(..), Selector(..), VariantDecl(..), Pat(..))
 
 > import Prelude hiding ((<>))
 
-> import Text.PrettyPrint (render, text, (<>), (<+>), {-empty,-} parens,
+> import Text.PrettyPrint (render, text, (<>), (<+>), empty, parens,
 >                          nest, Doc, punctuate, comma, sep, {-quotes,-}
 >                          doubleQuotes,
 >                          {-braces, ($$), ($+$),-} vcat)
@@ -24,6 +24,7 @@
 > expr :: Expr -> Doc
 > expr (Sel (Num n)) = text $ show n
 > expr (Sel (Str s)) = doubleQuotes (text s)
+> expr (Sel (Tuple es)) = text "{" <> nest 2 (xSep ";" (map expr es) <> text "}")
 > expr (Iden n) = text n
 > expr (Parens e) = parens (expr e)
 > expr (If cs el) =
@@ -61,6 +62,24 @@
 >     f (n,ne) = text n <+> text "=" <+> nest 2 (expr ne)
 > expr (Block ss) = vcat [text "block:", nest 2 (stmts ss), text "end"]
 
+> expr (Construct e as) = text "[" <> expr e <> text ":" <+> nest 2 (commaSep $ map expr as) <> text "]"
+
+> expr (TupleGet e n) = expr e <> text ".{" <> text (show n) <> text "}"
+> expr (DotExpr e i) = expr e <> text "." <> text i
+
+> expr (Cases ty e mats els) =
+>     text "cases" <> parens (text ty) <+> expr e <> text ":"
+>     <+> nest 2 (vcat (map mf mats ++
+>                 [maybe empty (\x -> text "|" <+> text "else" <+> text "=>" <+> expr x) els]))
+>     <+> text "end"
+>   where
+>     mf (p, e1) = text "|" <+> pat p <+> text "=>" <+> expr e1
+
+> pat :: Pat -> Doc
+> pat (IdenP p) = text p
+> pat (CtorP c ps) = text c <> parens (commaSep $ map pat ps)
+> pat (TupleP ps) = text "{" <> (xSep ";" $ map pat ps) <> text "}"
+
 > stmt :: Stmt -> Doc
 > stmt (StExpr e) = expr e
 > stmt (When c t) = text "when" <+> expr c <> text ":" <+> nest 2 (expr t) <+> text "end"
@@ -87,3 +106,6 @@
 
 > commaSep :: [Doc] -> Doc
 > commaSep ds = sep $ punctuate comma ds
+
+> xSep :: String -> [Doc] -> Doc
+> xSep x ds = sep $ punctuate (text x) ds

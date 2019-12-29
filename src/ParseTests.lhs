@@ -9,7 +9,7 @@
 > import qualified Test.Tasty as T
 > import qualified Test.Tasty.HUnit as T
 
-> import Syntax (Stmt(..), Expr(..), Selector(..), VariantDecl(..))
+> import Syntax (Stmt(..), Expr(..), Selector(..), VariantDecl(..), Pat(..))
 > import Parse (parseExpr, parseStmt, parseStmts)
 > import Pretty (prettyExpr, prettyStmts)
 
@@ -79,8 +79,6 @@ todo: review all the whitespace rules that are being ignored
 >                                                       ,StExpr $ BinOp (Iden "a") "+" (num 1)])])
 
 
-todo: tuples
-
 >               ,("if a: b end", If [(Iden "a",Iden "b")] Nothing)
 >               ,("if a: b else: c end", If [(Iden "a",Iden "b")] (Just (Iden "c")))
 >               ,("if a: b else if c: d else: e end"
@@ -132,6 +130,55 @@ todo: tuples
 >                               If [(BinOp (Iden "x") "==" (num 0), num 1)]
 >                               (Just (BinOp (Iden "x") "*" (App (Iden "fact") [BinOp (Iden "x") "-" (num 1)])))
 >                       ,StExpr (App (Iden "fact") [num 5])])
+
+
+
+>               ,("[list: 1,2,3]", Construct (Iden "list") [num 1, num 2, num 3])
+>               ,("[list: ]", Construct (Iden "list") [])
+
+>               --,("let {x; y}: {1; 2} in x + y end"
+>               -- ,Let [(TuplePat ["x","y"], Tuple [num 1, num 2])] (BinOp (Iden "x" "+" (Iden "y"))))
+
+>               -- needs some work in the parser
+>               -- ,("{1; 2;}", Sel $ Tuple [num 1, num 2])
+>               ,("{1; 2}", Sel $ Tuple [num 1, num 2])
+
+>               ,("[list: {\"a\"; 1}, {\"b\"; 2}, {\"c\"; 3}]"
+>                ,Construct (Iden "list") [Sel $ Tuple [Sel $ Str "a",num 1]
+>                                         ,Sel $ Tuple [Sel $ Str "b",num 2]
+>                                         ,Sel $ Tuple [Sel $ Str "c",num 3]])
+>               ,("t.{1}", TupleGet (Iden "t") 1)
+
+>               ,("a.x", DotExpr (Iden "a") "x")
+
+>               ,("cases(List) [list: 1,2,3]:\n\
+>                 \  | empty => \"empty\"\n\
+>                 \  | link(f, r) => \"link\"\n\
+>                 \end"
+>                ,Cases "List" (Construct (Iden "list") [num 1, num 2, num 3])
+>                   [(IdenP "empty", Sel $ Str "empty")
+>                   ,(CtorP "link" [IdenP "f", IdenP "r"], Sel $ Str "link")]
+>                   Nothing)
+
+>               ,("cases(List) [list: 1,2,3]:\n\
+>                 \  | empty => \"empty\"\n\
+>                 \  | else => \"else\"\n\
+>                 \end"
+>                ,Cases "List" (Construct (Iden "list") [num 1, num 2, num 3])
+>                   [(IdenP "empty", Sel $ Str "empty")]
+>                   (Just $ Sel $ Str "else"))
+
+>               ,("cases(List) [list: {\"a\"; 1}, {\"b\"; 2}, {\"c\"; 3}]:\n\
+>                 \  | empty => \"empty\"\n\
+>                 \  | link({x;y}, r) => x\n\
+>                 \  | else => \"else\"\n\
+>                 \end"
+>                ,Cases "List" (Construct (Iden "list") [Sel $ Tuple [Sel $ Str "a", num 1]
+>                                                       ,Sel $ Tuple [Sel $ Str "b", num 2]
+>                                                       ,Sel $ Tuple [Sel $ Str "c", num 3]])
+>                   [(IdenP "empty", Sel $ Str "empty")
+>                   ,(CtorP "link" [TupleP [IdenP "x", IdenP "y"], IdenP "r"], Iden "x")]
+>                   (Just $ Sel $ Str "else"))
 
 
 >                 ]
