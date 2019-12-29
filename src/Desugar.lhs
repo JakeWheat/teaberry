@@ -16,7 +16,7 @@
 
 rules for fun and rec:
 when a fun or rec is seen, it will collect subsequent funs and recs
-(both) and then desugar them all mutually
+(both) and then desugar them all together as one letrec
 
 >     -- get all the immediately following recursive defs
 >     let (adddecls,ss') = span isRec ss
@@ -112,24 +112,23 @@ todo: special case for fix which looks like normal App in the regular syntax
 >     f ss'
 
 
-in pyret:
-a non lambda cannot refer to a binding in a letrec
-unless it is before the non lambda: not rec
 
-but a lambda can refer to a binding which comes later even if it's not
- a lambda
+rec in blocks:
+the rule is:
+a non lambda binding doesn't do 'rec', it can only
+  refer to bindings before it in the list
+a lambda binding can refer to later defined bindings, including non
+  lambda ones
 
+how exactly does this work and not work?
+create all the non lambda bindings as vars
+create the lambda bindings using this closure
+update the vars one by one in order
+  -> will get an error if refer to a var not yet initialized
 
-lambdas can be desugared easily like this, because they all get their
- values without having to evaluate anything
-but what happens when you mix non lambdas and lambdas:
+TODO: implement this behaviour
 
-a non lambda binding can refer to a recursive function, so it needs
- this to be defined (pretty easy)
-when it is evaluated, the recursive function might need to refer to a
- non lambda binding
-
-todo for letrec:
+other todo for letrec:
   generate unique names
   replace only the correct calls when fixing the bodies:
     don't descend when shadowed
@@ -176,7 +175,6 @@ letrec
   fact = lam(n): if n == 1: 1 else: n * fact(n - 1) end end:
   abc
 end
-
 ->
 let
   factXXX = lam(fact, n): if n == 1.0: 1.0
@@ -188,7 +186,6 @@ let
 end
 
 
-> --desugarRecs :: [(String,([String],S.Expr))] -> Either String [(String,S.Expr)]
 > desugarRecs :: [(String,S.Expr)] -> Either String [(String,S.Expr)]
 > desugarRecs rs =
 >     let
