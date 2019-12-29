@@ -52,15 +52,6 @@
 
 todo: review all the whitespace rules that are being ignored
 
->               {-,("x = 3\n\
->                 \x + 4", Let [("x", num 3)] (BinOp (Iden "x") "+" (num 4)))
-
->               ,("x = 3\n\
->                 \y = 4\n\
->                 \x + y", Let [("x", num 3)
->                              ,("y", num 4)]
->                          (BinOp (Iden "x") "+" (Iden "y")))-}
-
 >               ,("let x=3,y=4: x + y end", Let [("x", num 3)
 >                                               ,("y", num 4)]
 >                                           (BinOp (Iden "x") "+" (Iden "y")))

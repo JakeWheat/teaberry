@@ -13,6 +13,9 @@
 > interpreterExamples :: [(String, Env, String, Value)]
 > interpreterExamples =
 >     [("2", defaultHaskellFFIEnv, [], NumV 2)
+>
+>     -- todo: don't need to handle the defs part in this weird way anymore
+>     -- think about how the "ffi env" should work as a real user api
 >     ,("myVar", defaultHaskellFFIEnv, defs, NumV 1)
 >     ,("true", defaultHaskellFFIEnv, [], BoolV True) 
 >     ,("false", defaultHaskellFFIEnv, [],  BoolV False)
@@ -144,6 +147,13 @@
 >       \  end\n\
 >       \  fact(5)\n\
 >       \end", defaultHaskellFFIEnv, [], NumV 120)
+
+>     ,("letrec\n\ 
+>       \  addeven = lam(x) : if x == 0: 0 else: x + addodd(x - 1) end end,\n\
+>       \  addodd = lam(x) : if x == 0: 0 else: x + addeven(x - 1) end end:\n\
+>       \  addeven(6)\n\
+>       \end", defaultHaskellFFIEnv, [], NumV 21)
+
 
 >     ]
 >  where

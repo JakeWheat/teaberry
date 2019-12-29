@@ -147,6 +147,11 @@ todo: make this better: do better wrapping + error messages when the
 > interp' e@(I.LamVoid {}) = do
 >     env <- ask
 >     pure $ ClosV e env
+
+
+TODO: add a different error message when it gets lam or lamvoid
+instead of the other one
+ 
 > interp' (I.App f a) = do
 >     x <- interp' f
 >     case x of
