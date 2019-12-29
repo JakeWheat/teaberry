@@ -12,6 +12,21 @@
 > import Data.Maybe (catMaybes, mapMaybe)
 
 > desugarStmts :: [S.Stmt] -> Either String [I.Stmt]
+> desugarStmts (s:ss) | isRec s = do
+>     -- get all the immediately following recursive defs
+>     let (adddecls,ss') = span isRec ss
+>     -- desugar them to regular let together
+>     defs <- desugarRecs =<< mapM splitRec (s:adddecls)
+>     -- desugar to interpreter syntax
+>     idecls <- desugarStmts $ map (uncurry S.LetDecl) defs
+>     (++) idecls <$> desugarStmts ss'
+>   where
+>     isRec (S.FunDecl {}) = True
+>     isRec (S.RecDecl {}) = True
+>     isRec _ = False
+>     splitRec (S.FunDecl nm as bdy) = pure (nm, (S.Lam as bdy))
+>     splitRec (S.RecDecl nm e) = pure (nm, e)
+>     splitRec x = Left $ "unexpected non fun/rec decl: " ++ show x
 > desugarStmts (s:ss) = (++) <$> desugarStmt s <*> desugarStmts ss
 > desugarStmts [] = pure []
 
@@ -90,7 +105,7 @@ todo: special case for fix which looks like normal App in the regular syntax
 >    desugarExpr (S.Let defs ex)
 
 > desugarExpr (S.Block ss) = do
->     ss' <- concat <$> mapM desugarStmt ss
+>     ss' <- desugarStmts ss
 >     let f :: [I.Stmt] -> Either String I.Expr
 >         f [] = Left "empty block"
 >         f [I.StExpr e] = pure e

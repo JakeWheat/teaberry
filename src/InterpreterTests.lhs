@@ -75,54 +75,53 @@
 >       \end", defaultHaskellFFIEnv, defs, NumV 120)-}
 
 
-letrec
-  zero = 0,
-  one = zero + 1
-  : one
-end
+>     {-,("letrec\n\
+>       \  zero = 0,\n\
+>       \  one = zero + 1\n\
+>       \  : one\n\
+>       \end", defaultHaskellFFIEnv, defs, NumV 1)
 
 
-letrec 
-    zero = 0,
+>     ,("letrec \n\
+>       \  zero = 0,\n\
+>       \  addeven = lam(x) : if x == 0: 0 else: x + addodd(x - one) end end,\n\
+>       \  addodd = lam(x) : if x == 0: 0 else: x + addeven(x - 1) end end,\n\
+>       \  one = #|addeven(0) +|# addodd(0) + 1 + zero,\n\
+>       \  #zero = 0,\n\
+>       \  a = 1\n\
+>       \  :\n\
+>       \  addeven(6)\n\
+>       \end", defaultHaskellFFIEnv, defs, NumV 21)
 
-  addeven = lam(x) : if x == 0: 0 else: x + addodd(x - one) end end,
-  addodd = lam(x) : if x == 0: 0 else: x + addeven(x - 1) end end,
-  one = #|addeven(0) +|# addodd(0) + 1 + zero,
-  #zero = 0,
-  a = 1
-  :
-  addeven(6)
-end
-
-letrec 
-  zero = 0,
-  addodd = lam(x) : if x == 0: 0 else: x + addeven(x - 1) end end,
-  addeven = lam(x) : if x == 0: 0 else: x + addodd(x - one) end end, 
-  one = #|addeven(0) +|# addodd(0) + 1 + zero,
-  a = 1
-  :
-  addeven(6)
-end
+>     ,("letrec \n\
+>       \  zero = 0,\n\
+>       \  addodd = lam(x) : if x == 0: 0 else: x + addeven(x - 1) end end,\n\
+>       \  addeven = lam(x) : if x == 0: 0 else: x + addodd(x - one) end end, \n\
+>       \  one = #|addeven(0) +|# addodd(0) + 1 + zero,\n\
+>       \  a = 1\n\
+>       \  :\n\
+>       \  addeven(6)\n\
+>       \end", defaultHaskellFFIEnv, defs, NumV 21)
 
 
-letrec 
-  addeven = lam(x) : if x == 0: 0 else: x + addodd(x - one) end end,
-  addodd = lam(x) : if x == 0: 0 else: x + addeven(x - 1) end end,
-  one = addeven(0) + addodd(0) + 1,
-  a = 1
-  :
-  addeven(6)
-end
+>     ,("letrec \n\
+>       \  addeven = lam(x) : if x == 0: 0 else: x + addodd(x - one) end end,\n\
+>       \  addodd = lam(x) : if x == 0: 0 else: x + addeven(x - 1) end end,\n\
+>       \  one = addeven(0) + addodd(0) + 1,\n\
+>       \  a = 1\n\
+>       \  :\n\
+>       \  addeven(6)\n\
+>       \end", defaultHaskellFFIEnv, defs, NumV 21)
 
-letrec 
-  addodd = lam(x) : if x == 0: zero else: x + addeven(x - 1) end end,
-  addeven = lam(x) : if x == 0: 0 else: x + addodd(x - one) end end, 
-  zero = 0,
-  one = #|addeven(0) +|# addodd(0) + 1 + zero,
-  a = 1
-  :
-  addeven(6)
-end
+>     ,("letrec \n\
+>       \  addodd = lam(x) : if x == 0: zero else: x + addeven(x - 1) end end,\n\
+>       \  addeven = lam(x) : if x == 0: 0 else: x + addodd(x - one) end end, \n\
+>       \  zero = 0,\n\
+>       \  one = #|addeven(0) +|# addodd(0) + 1 + zero,\n\
+>       \  a = 1\n\
+>       \  :\n\
+>       \  addeven(6)\n\
+>       \end", defaultHaskellFFIEnv, defs, NumV 21)-}
 
 
 >     ,("letrec\n\ 
@@ -131,22 +130,34 @@ end
 >       \  addeven(6)\n\
 >       \end", defaultHaskellFFIEnv, defs, NumV 21)
 
+>     ,("block:\n\
+>       \fun addeven1(x): if x == 0: 0 else: x + addodd1(x - 1) end end\n\
+>       \fun addodd1(x): if x == 0: 0 else: x + addeven1(x - 1) end end\n\
+>       \addeven1(6)\n\
+>       \end", defaultHaskellFFIEnv, defs, NumV 21)
 
-fun addeven1(x): if x == 0: 0 else: x + addodd1(x - 1) end end
-fun addodd1(x): if x == 0: 0 else: x + addeven1(x - 1) end end
-addeven1(6)
-
-rec addeven2 = lam(x) : if x == 0: 0 else: x + addodd2(x - 1) end end
-rec addodd2 = lam(x) : if x == 0: 0 else: x + addeven2(x - 1) end end
-addeven2(6)
+>     ,("block:\n\
+>       \rec addeven2 = lam(x) : if x == 0: 0 else: x + addodd2(x - 1) end end\n\
+>       \rec addodd2 = lam(x) : if x == 0: 0 else: x + addeven2(x - 1) end end\n\
+>       \addeven2(6)\n\
+>       \end", defaultHaskellFFIEnv, defs, NumV 21)
 
  #addeven3 = lam(x) : if x == 0: 0 else: x + addodd3(x - 1) end end
  #addodd3 = lam(x) : if x == 0: 0 else: x + addeven3(x - 1) end end
  #addeven3(6)
 
-fun addeven4(x): if x == 0: 0 else: x + addodd4(x - 1) end end
-rec addodd4 = lam(x) : if x == 0: 0 else: x + addeven4(x - 1) end end
-addeven4(6)
+>     ,("block:\n\
+>       \fun addeven4(x): if x == 0: 0 else: x + addodd4(x - 1) end end\n\
+>       \rec addodd4 = lam(x) : if x == 0: 0 else: x + addeven4(x - 1) end end\n\
+>       \addeven4(6)\n\
+>       \end", defaultHaskellFFIEnv, defs, NumV 21)
+
+>     ,("block:\n\
+>       \rec addeven4 = lam(x) : if x == 0: 0 else: x + addodd4(x - 1) end end\n\
+>       \fun addodd4(x): if x == 0: 0 else: x + addeven4(x - 1) end end\n\
+>       \addeven4(6)\n\
+>       \end", defaultHaskellFFIEnv, defs, NumV 21)
+
 
 
 >     ,("block:\n\
