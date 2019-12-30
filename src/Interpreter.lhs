@@ -1,15 +1,17 @@
 
 > module Interpreter (interp
+>                    ,CheckResult(..)
+>                    ,runChecks
 >                    ,emptyEnv
 >                    ,extendEnv
 >                    ,extendsEnv
 >                    ,Env
->                    ,defaultHaskellFFIEnv
 >                    ,Value(..)) where
 
 > import Control.Exception.Safe (Exception, throwM)
 > import Control.Monad.IO.Class (liftIO)
 > import Control.Monad.Trans.RWS (RWST, runRWST, ask, get, put, local, tell)
+> import Data.List (partition)
 > import Data.Scientific (Scientific)
 > import Text.Show.Pretty (ppShow)
 
@@ -69,10 +71,14 @@ temp testing until agdt are implemented
 >                ,liftBinOp "=="
 >                ,liftUnop "raise"
 >                ,liftUnop "print"
+>                ,liftBinOp "log_test_pass"
+>                ,liftTriOp "log_test_fail"
 >                ] emptyEnv
 >   where
 >      liftUnop f = (f, ClosV (I.Lam "a" (I.AppHaskell f [I.Iden "a"])) emptyEnv)
 >      liftBinOp f = (f, ClosV (I.Lam "a" (I.Lam "b" (I.AppHaskell f [I.Iden "a", I.Iden "b"]))) emptyEnv)
+>      liftTriOp f = (f, ClosV (I.Lam "a" (I.Lam "b" (I.Lam "c"
+>                         (I.AppHaskell f [I.Iden "a", I.Iden "b", I.Iden "c"])))) emptyEnv)
 
 
 > data Value = NumV Scientific
@@ -118,10 +124,48 @@ temp testing until agdt are implemented
 
 > instance Exception MyException
 
-> interp :: Env -> I.Stmt -> IO (Either String Value)
-> interp env st = do
->     (result, _store, _log) <- runRWST (interpStmt' st) env emptyStore
->     pure $ pure result
+> interp :: I.Program -> IO (Either String Value)
+> interp (I.Program sts _) = do
+>     (result, _store, _log) <- runRWST (mapM interpStmt' sts) defaultHaskellFFIEnv emptyStore
+>     case result of
+>         [] -> pure $ pure $ BoolV False
+>         _ -> pure $ pure $ last result
+
+> {-interpx :: I.Stmt -> IO (Either String Value)
+> interpx st = do
+>     (result, _store, _log) <- runRWST (interpStmt' st) defaultHaskellFFIEnv emptyStore
+>     pure $ pure result-}
+
+> runChecks :: I.Program -> IO (Either String [CheckResult])
+> runChecks (I.Program _ cbs) = do
+>     let st = concat $ map f cbs
+>     (_result, _store, lg) <- runRWST (mapM interpStmt' st) defaultHaskellFFIEnv emptyStore
+>     let gs = map (\x -> (blockName x, toCheckResult x)) lg
+>         gs' = partitionN gs
+>         ts = map (uncurry CheckResult) gs'
+>     pure $ pure ts
+>   where
+>     f (I.CheckBlock _ s) = s
+>     blockName (TestPass x _) = x
+>     blockName (TestFail x _ _) = x
+>     toCheckResult (TestPass _ x) = (x,Nothing)
+>     toCheckResult (TestFail _ x m) = (x,Just m)
+
+
+> partitionN :: Eq a => [(a,b)] -> [(a,[b])]
+> partitionN [] = []
+> partitionN vs@((k,_):_) =
+>     let (x,y) = partition ((==k) . fst) vs
+>     in (k,map snd x) : partitionN y
+
+
+todo: move this to an in language data type
+
+> data CheckResult = CheckResult String -- the test block name
+>                               [(String, Maybe String)]
+> -- the second is just if it is a fail, it contains the failure
+> -- message
+
 
 --------------------------------------
 

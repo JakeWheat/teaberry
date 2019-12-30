@@ -30,6 +30,9 @@ and to run only the tests
 >         ["-f", fn] -> do
 >             cmd <- readFile fn
 >             runc cmd
+>         ["-g", fn] -> do
+>             cmd <- readFile fn
+>             runt cmd
 >         _ -> help
 >     --let cmd = "a = 5\nprint(a + 4)\na"
 >   where
@@ -38,6 +41,10 @@ and to run only the tests
 >           case v of
 >               Nothing -> pure ()
 >               Just v' -> putStrLn $ show v'
+>       runt cmd = do
+>           v <- runChecks cmd
+>           putStrLn $ renderCheckResults v
+>           -- todo: exit with error code if all tests didn't pass
 >       help = putStrLn "-c to run code in arg, -f to run code in file"
 >       {-runX = putStrLn $ renderCheckResults
 >              [CheckResult "a first block"

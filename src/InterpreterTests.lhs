@@ -298,8 +298,8 @@
 >     let s = "block:\n" ++ defs ++ "\n" ++ src ++ "\nend"
 >         ast = either error id $ parseStmts "" s
 >         iast = either error id $ desugarStmts ast
->     x <- I.interp I.defaultHaskellFFIEnv (extract iast)
+>     x <- I.interp (uncurry I.Program iast)
 >     either error (T.assertEqual "" ex) x
 >  where
->    extract ([a@(I.StExpr {})], _) = a
->    extract (x,_) = error $ show x
+>    {-extract ([a@(I.StExpr {})], _) = a
+>    extract (x,_) = error $ show x-}

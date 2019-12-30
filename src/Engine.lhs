@@ -22,30 +22,27 @@ can also think about doing a prepCode or something
 > import Parse (parseStmts)
 > --import Pretty
 > import Desugar (desugarStmts)
-> import Interpreter (interp, defaultHaskellFFIEnv, Value(..))
+> import Interpreter (interp, Value(..), CheckResult(..))
+> import qualified Interpreter as I
 > import InterpreterSyntax as I
+
+> --import Text.Show.Pretty (ppShow)
+> --import Debug.Trace
 
 > compileProgram :: String -> Either String I.Program
 > compileProgram src = do
->     let s = "block:\n" ++ src ++ "\nend"
->     ast <- parseStmts "" s
->     uncurry Program <$> desugarStmts ast
+>     ast <- parseStmts "" src
+>     p <- desugarStmts ast
+>     pure $ uncurry Program p
 
 > runCode :: String -> IO (Maybe Value)
 > runCode src = do
->     let Program stmts _ = either error id $ compileProgram src
->     x <- interp defaultHaskellFFIEnv (extract stmts)
+>     let p = either error id $ compileProgram src
+>     x <- interp p
 >     either error (pure . Just) x
->  where
+>  {-where
 >    extract [a@(I.StExpr {})] = a
->    extract x = error $ "not an stexpr:" ++ show x
-
-todo: move this to an in language data type
-
-> data CheckResult = CheckResult String -- the test block name
->                               [(String, Maybe String)]
-> -- the second is just if it is a fail, it contains the failure
-> -- message
+>    extract x = error $ "not an stexpr:" ++ show x-}
 
 > renderCheckResults :: [CheckResult] -> String
 > renderCheckResults cs =
@@ -76,7 +73,13 @@ todo: move this to an in language data type
 >            
 
 > runChecks :: String -> IO [CheckResult]
-> runChecks = undefined
+> runChecks src = do
+>     let p = either error id $ compileProgram src
+>     x <- I.runChecks p
+>     either error pure x
+>  -- where
+>    --extract [a@(I.StExpr {})] = a
+>    --extract x = error $ "not an stexpr:" ++ show x
 
 Check block: a first block
   test (5 is 5): ok

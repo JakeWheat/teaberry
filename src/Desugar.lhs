@@ -8,8 +8,23 @@
 > import qualified InterpreterSyntax as I
 > import qualified Pretty as P
 
+
+TODO: change this to return a program
+
+doing this weird create [I.Stmt], then seqify, doesn't seem like a
+good way to do it
+
 > desugarStmts :: [S.Stmt] -> Either String ([I.Stmt], [I.CheckBlock])
-> desugarStmts (s:ss) | isRec s = do
+> desugarStmts st = do
+>     (a,b) <- desugarStmts' st
+>     a' <- case a of
+>             [] -> pure []
+>             _ -> (\x -> [I.StExpr x]) <$> seqify a
+>     pure (a', b)
+
+
+> desugarStmts' :: [S.Stmt] -> Either String ([I.Stmt], [I.CheckBlock])
+> desugarStmts' (s:ss) | isRec s = do
 
 rules for fun and rec:
 when a fun or rec is seen, it will collect subsequent funs and recs
@@ -20,8 +35,8 @@ when a fun or rec is seen, it will collect subsequent funs and recs
 >     -- desugar them to regular let together
 >     defs <- desugarRecs =<< mapM splitRec (s:adddecls)
 >     -- desugar to interpreter syntax
->     idecls <- desugarStmts $ map (uncurry S.LetDecl) defs
->     addStuff idecls <$> desugarStmts ss'
+>     idecls <- desugarStmts' $ map (uncurry S.LetDecl) defs
+>     addStuff idecls <$> desugarStmts' ss'
 >   where
 >     isRec (S.FunDecl {}) = True
 >     isRec (S.RecDecl {}) = True
@@ -29,8 +44,8 @@ when a fun or rec is seen, it will collect subsequent funs and recs
 >     splitRec (S.FunDecl nm as bdy whr) = pure (nm, (S.Lam as bdy))
 >     splitRec (S.RecDecl nm e) = pure (nm, e)
 >     splitRec x = Left $ "unexpected non fun/rec decl: " ++ show x
-> desugarStmts (s:ss) = addStuff <$> desugarStmt s <*> desugarStmts ss
-> desugarStmts [] = pure ([],[])
+> desugarStmts' (s:ss) = addStuff <$> desugarStmt s <*> desugarStmts' ss
+> desugarStmts' [] = pure ([],[])
 
 > addStuff :: ([a],[b]) -> ([a],[b]) -> ([a],[b])
 > addStuff (a,b) (a', b') = (a ++ a', b ++ b')
@@ -52,7 +67,7 @@ when a fun or rec is seen, it will collect subsequent funs and recs
 >     desugarStmt (S.RecDecl nm (S.Lam as bdy))
 > desugarStmt (S.RecDecl nm e) = do
 >    defs <- desugarRecs [(nm,e)]
->    desugarStmts $ map (uncurry S.LetDecl) defs
+>    desugarStmts' $ map (uncurry S.LetDecl) defs
 
 > desugarStmt (S.VarDecl n e) = liftStmt <$> (I.LetDecl n . I.Box) <$> desugarExpr e
 > desugarStmt (S.SetVar n e) = liftStmt <$> I.StExpr <$> I.SetBox n <$> desugarExpr e
@@ -60,7 +75,7 @@ when a fun or rec is seen, it will collect subsequent funs and recs
 > desugarStmt (S.Check nm sts) = do
 >     let nm' = maybe "anonymous check block" id nm
 >     sts' <- desugarTestStmts sts
->     (sts'',x) <- desugarStmts sts'
+>     (sts'',x) <- desugarStmts' sts'
 >     case x of
 >         [] -> pure ()
 >         _ -> Left $ "internal error: test in desugared test"
@@ -70,16 +85,6 @@ when a fun or rec is seen, it will collect subsequent funs and recs
 > desugarTestStmts :: [S.TestStmt] -> Either String [S.Stmt]
 > desugarTestStmts (S.TStmt s : ss) = do
 >     (s :) <$> desugarTestStmts ss
->     {-let (more, next) = spanMaybe getTStmt ss
->     ((s : more) ++ desugarTestStmts next
->     (sts',x) <- desugarStmts (s : more)
->     case x of
->         [] -> pure ()
->         _ -> Left $ "tests not at top level not supported"
->     (sts' ++) <$> desugarTestStmts next
->   where
->     getTStmt (S.TStmt x) = Just x
->     getTStmt _ = Nothing-}
 
 > desugarTestStmts (x@(S.TBinOp e "is" e1) : ss) = do
 >     let str = P.prettyTestStmt x
@@ -111,12 +116,6 @@ block:
   end
   false
 end
-
-
-> spanMaybe _ xs@[] =  ([], xs)
-> spanMaybe p xs@(x:xs') = case p x of
->     Just y  -> let (ys, zs) = spanMaybe p xs' in (y : ys, zs)
->     Nothing -> ([], xs)
 
 
 --------------------------------------
@@ -163,18 +162,18 @@ end
 >    desugarExpr (S.Let defs ex)
 
 > desugarExpr (S.Block ss) = do
->     (ss', x) <- desugarStmts ss
+>     (ss', x) <- desugarStmts' ss
 >     case x of
 >         [] -> pure ()
 >         _ -> Left "tests not at the top level are not supported"
->     let f :: [I.Stmt] -> Either String I.Expr
->         f [] = Left "empty block"
->         f [I.StExpr e] = pure e
->         f [I.LetDecl {}] = Left "block ends with decl"
->         f [a,b] = pure $ I.Seq a b
->         f (a:as) = I.Seq a <$> I.StExpr <$> f as
->     f ss'
+>     seqify ss'
 
+> seqify :: [I.Stmt] -> Either String I.Expr
+> seqify [] = Left "empty block"
+> seqify [I.StExpr e] = pure e
+> seqify [I.LetDecl {}] = Left "block ends with decl"
+> seqify [a,b] = pure $ I.Seq a b
+> seqify (a:as) = I.Seq a <$> I.StExpr <$> seqify as
 
 
 rec in blocks:
