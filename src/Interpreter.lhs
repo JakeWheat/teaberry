@@ -9,7 +9,7 @@
 
 > import Control.Exception.Safe (Exception, throwM)
 > import Control.Monad.IO.Class (liftIO)
-> import Control.Monad.Trans.RWS (RWST, runRWST, ask, get, put, local)
+> import Control.Monad.Trans.RWS (RWST, runRWST, ask, get, put, local, tell)
 > import Data.Scientific (Scientific)
 > import Text.Show.Pretty (ppShow)
 
@@ -48,7 +48,18 @@ type is wrong
 >                   ,("==", \[a, b] -> pure $ BoolV (a == b))
 >                   ,("raise", \[StrV s] -> throwM $ MyException s)
 >                   ,("print", \[x] -> liftIO (putStrLn (show x)) >> pure x)
+>                   ,("log_test_pass", \[StrV c, StrV t] -> do
+>                            tell [TestPass c t]
+>                            pure $ BoolV True)
+>                   ,("log_test_fail", \[StrV c, StrV t, StrV m] -> do
+>                            tell [TestFail c t m]
+>                            pure $ BoolV True)
 >                   ]
+
+temp testing until agdt are implemented
+
+> data TestResultLog = TestPass String String -- check block name, test source
+>                    | TestFail String String String -- check block name, test source, failure message
 
 > defaultHaskellFFIEnv :: Env
 > defaultHaskellFFIEnv = 
@@ -99,7 +110,7 @@ type is wrong
 
 = interpreter function
 
-> type Interpreter a = RWST Env () Store IO a
+> type Interpreter a = RWST Env [TestResultLog] Store IO a
 >
 
 > data MyException = MyException String

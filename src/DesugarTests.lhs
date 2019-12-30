@@ -11,6 +11,7 @@
 > import Parse (parseExpr, parseStmts)
 > import InterpreterSyntax (Stmt(..), Expr(..), Selector(..), CheckBlock(..))
 > import Desugar (desugarExpr, desugarStmts)
+> import qualified Syntax as S
 
 > desugarExprExamples :: [(String, Expr)]
 > desugarExprExamples =
@@ -93,19 +94,49 @@ is-pt = lam(x): I.AppHaskell "DataType" [x] == "Point" && I.AppHaskell "VariantT
 >       binop a op b = App (App (Iden op) a) b
 >       num = Sel . Num
 
+
+5 is 6
+->
+block:
+  tst = "5 is 6"
+  v0 = 5
+  v1 = 6
+  if v0 == v1:
+    log_test_pass(tst)
+  else:
+    log_test_failure(tst, "Values not equal:\n" + torepr(v0) + "\n" + torepr(v1))
+  end
+  false
+end
+
 > desugarStmtsExamples :: [(String, ([Stmt],[CheckBlock]))]
 > desugarStmtsExamples =
 >     [("check \"a first block\":\n\
 >       \  5 is 5\n\
 >       \end"
 >      ,([],[CheckBlock "a first block"
->            [StExpr $ app2 "runtest" (binop (num 5) "==" (num 5)) (str "5 is 5")]]))
+>            $ p2d "block:\n\
+>                 \  bn = \"unknown\"\n\
+>                 \  tst = \"5 is 5\"\n\
+>                 \  v0 = 5\n\
+>                 \  v1 = 5\n\
+>                 \  if v0 == v1:\n\
+>                 \    log_test_pass(bn, tst)\n\
+>                 \  else:\n\
+>                 \    log_test_fail(bn, tst, \"Values not equal\")\n\
+>                 \  end\n\
+>                 \  false\n\
+>                 \end"]))
 >     ]
 >    where
 >      app2 op a b = App (App (Iden op) a) b
 >      binop a op b = app2 op a b
 >      str = Sel . Str
 >      num = Sel . Num
+>      p2d s = either error id $ do
+>          x <- parseStmts "" s
+>          y <- desugarStmts x
+>          pure (fst y)
 
 
 > testDesugarExpr :: (String,Expr) -> T.TestTree

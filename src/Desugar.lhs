@@ -60,12 +60,18 @@ when a fun or rec is seen, it will collect subsequent funs and recs
 > desugarStmt (S.Check nm sts) = do
 >     let nm' = maybe "anonymous check block" id nm
 >     sts' <- desugarTestStmts sts
->     pure ([], [I.CheckBlock nm' sts'])
+>     (sts'',x) <- desugarStmts sts'
+>     case x of
+>         [] -> pure ()
+>         _ -> Left $ "internal error: test in desugared test"
+>     pure ([], [I.CheckBlock nm' sts''])
 >     
 
-> desugarTestStmts :: [S.TestStmt] -> Either String [I.Stmt]
+> desugarTestStmts :: [S.TestStmt] -> Either String [S.Stmt]
 > desugarTestStmts (S.TStmt s : ss) = do
->     let (more, next) = spanMaybe getTStmt ss
+>     (s :) <$> desugarTestStmts ss
+>     {-let (more, next) = spanMaybe getTStmt ss
+>     ((s : more) ++ desugarTestStmts next
 >     (sts',x) <- desugarStmts (s : more)
 >     case x of
 >         [] -> pure ()
@@ -73,18 +79,38 @@ when a fun or rec is seen, it will collect subsequent funs and recs
 >     (sts' ++) <$> desugarTestStmts next
 >   where
 >     getTStmt (S.TStmt x) = Just x
->     getTStmt _ = Nothing
+>     getTStmt _ = Nothing-}
 
 > desugarTestStmts (x@(S.TBinOp e "is" e1) : ss) = do
 >     let str = P.prettyTestStmt x
->     (sts', y) <- desugarStmt (S.StExpr $ S.App (S.Iden "runtest")
->                               [S.BinOp e "==" e1, S.Sel $ S.Str str])
->     case y of
->         [] -> pure ()
->         _ -> Left $ "tests not at top level not supported"
->     (sts' ++) <$> desugarTestStmts ss
+>         blockName = "unknown"
+>         mys = S.StExpr $ S.Block
+>          [S.LetDecl "bn" $ S.Sel $ S.Str blockName
+>          ,S.LetDecl "tst" $ S.Sel $ S.Str str
+>          ,S.LetDecl "v0" e
+>          ,S.LetDecl "v1" e1
+>          ,S.StExpr $ S.If [(S.App (S.Iden "==") [S.Iden "v0", S.Iden "v1"]
+>               ,S.App (S.Iden "log_test_pass") [S.Iden "bn", S.Iden "tst"])]
+>              (Just $ S.App (S.Iden "log_test_fail")
+>              [S.Iden "bn", S.Iden "tst"
+>              ,S.Sel $ S.Str "Values not equal"])
+>          ,S.StExpr $ S.Iden "false"]
+>     (mys :) <$> desugarTestStmts ss
 
 > desugarTestStmts [] = pure []
+
+
+block:
+  tst = "5 is 6"
+  v0 = 5
+  v1 = 6
+  if v0 == v1:
+    log_test_pass(tst)
+  else:
+    log_test_failure(tst, "Values not equal:\n" + torepr(v0) + "\n" + torepr(v1))
+  end
+  false
+end
 
 
 > spanMaybe _ xs@[] =  ([], xs)
