@@ -223,6 +223,68 @@ todo: review all the whitespace rules that are being ignored
 >      ,DataDecl "Point" [VariantDecl "pt" []] Nothing)
 
 
+>               ,("check \"a first block\":\n\
+>                 \  5 is 5\n\
+>                 \  4 is 5\n\
+>                 \end"
+>                ,Check (Just "a first block")
+>                 [TBinOp (num 5) "is" (num 5)
+>                 ,TBinOp (num 4) "is" (num 5)
+>                 ])
+
+>               ,("check:\n\
+>                 \  6 is 7\n\
+>                 \end"
+>                ,Check Nothing
+>                 [TBinOp (num 6) "is" (num 7)
+>                 ])
+
+>               ,("check \"all test syntax\":\n\
+>                 \  expr1 is expr2\n\
+>                 \  expr1 is_not expr2\n\
+>                 \  expr1 is%(pred) expr2\n\
+>                 \  expr1 is_not%(pred) expr2\n\
+>                 \  expr satisfies pred\n\
+>                 \  expr violates pred\n\
+>                 \  expr raises \"exn_string\"\n\
+>                 \  expr raises_other_than \"exn_string\"\n\
+>                 \  expr does_not_raise\n\
+>                 \  expr raises_satisfies pred\n\
+>                 \  expr raises_violates pred\n\
+>                 \end"
+>                ,Check (Just "all test syntax")
+>                 [TBinOp (Iden "expr1") "is" (Iden "expr2")
+>                 ,TBinOp (Iden "expr1") "is_not" (Iden "expr2")
+>                 ,TPred (Iden "expr1") "is%" (Iden "pred") (Iden "expr2")
+>                 ,TPred (Iden "expr1") "is_not%" (Iden "pred") (Iden "expr2")
+>                 ,TBinOp (Iden "expr") "satisfies" (Iden "pred")
+>                 ,TBinOp (Iden "expr") "violates" (Iden "pred")
+>                 ,TBinOp (Iden "expr") "raises" (Sel $ Str "exn_string")
+>                 ,TBinOp (Iden "expr") "raises_other_than" (Sel $ Str "exn_string")
+>                 ,TPostfixOp (Iden "expr") "does_not_raise"
+>                 ,TBinOp (Iden "expr") "raises_satisfies" (Iden "pred")
+>                 ,TBinOp (Iden "expr") "raises_violates" (Iden "pred")
+>                 ])
+
+>               ,("data Point:\n\
+>                 \  | pt(x, y)\n\
+>                 \where:\n\
+>                 \  a_pt = pt(1,2)\n\
+>                 \  is_Point(a_pt) is true\n\
+>                 \end"
+>                ,DataDecl "Point" [VariantDecl "pt" ["x", "y"]]
+>                 (Just [TStmt (LetDecl "a_pt" (App (Iden "pt") [num 1, num 2]))
+>                       ,TBinOp (App (Iden "is_Point") [Iden "a_pt"]) "is" (Iden "true")]))
+>
+>               ,("fun double(n):\n\
+>                 \  n + n\n\
+>                 \where:\n\
+>                 \  double(10) is 20\n\
+>                 \  double(15) is 30\n\
+>                 \end"
+>                ,FunDecl "double" ["n"] (BinOp (Iden "n") "+" (Iden "n"))
+>                 (Just [TBinOp (App (Iden "double") [num 10]) "is" (num 20)
+>                      ,TBinOp (App (Iden "double") [num 15]) "is" (num 30)]))
 
 
 >     ]

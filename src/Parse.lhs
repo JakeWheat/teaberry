@@ -43,7 +43,7 @@
 > import Data.Char (isAlphaNum,isDigit)
 
 
-> import Syntax (Stmt(..), Expr(..), Selector(..), VariantDecl(..), Pat(..))
+> import Syntax (Stmt(..), Expr(..), Selector(..), VariantDecl(..), Pat(..), TestStmt(..))
 
 ------------------------------------------------------------------------------
 
@@ -358,6 +358,7 @@ put all the parsers which start with a keyword first
 >     ,funDecl
 >     ,varDecl
 >     ,dataDecl
+>     ,checkBlock
 >     ,setVarStmt
 >     ,expr <**> option StExpr letDecl
 >     ]
@@ -374,6 +375,12 @@ put all the parsers which start with a keyword first
 > setVarStmt = try (SetVar <$> identifier
 >            <*> (symbol_ ":=" *> expr))
 
+> checkBlock :: Parser Stmt
+> checkBlock = Check <$> (keyword "check" *> optional stringRaw <* symbol_ ":")
+>    <*> (many testStmt <* keyword_ "end")
+
+> whereBlock :: Parser [TestStmt]
+> whereBlock = keyword_ "where" *> symbol_ ":" *> many testStmt
 
 > funDecl :: Parser Stmt
 > funDecl = FunDecl
@@ -381,7 +388,8 @@ put all the parsers which start with a keyword first
 >     <*> parens (commaSep identifier)
 >     <*> (symbol_ ":" *> (unwrapSingle <$>
 >          (Block <$> some stmt)))
->     <*> pure Nothing  <* keyword_ "end"
+>     <*> (optional whereBlock <* keyword_ "end")
+>     
 >   where
 >       unwrapSingle (Block [StExpr (a)]) = a
 >       unwrapSingle x = x
@@ -395,7 +403,7 @@ put all the parsers which start with a keyword first
 > dataDecl = DataDecl
 >     <$> (keyword_ "data" *> identifier <* symbol_ ":")
 >     <*> (((:[]) <$> singleVariant) <|> some variant)
->     <*> pure Nothing  <* keyword_ "end"
+>     <*> (optional whereBlock <* keyword_ "end")
 >   where
 >     singleVariant = VariantDecl
 >                     <$> identifier <*> option [] (parens (commaSep identifier))
@@ -408,3 +416,40 @@ put all the parsers which start with a keyword first
 >    where
 >        f y (Iden x) = LetDecl x y
 >        --f _ x = fail ("bad pattern: " ++ show x)
+
+-----------------------------------------
+
+todo: factor this with the stmt parser
+
+> testStmt :: Parser TestStmt
+> testStmt = choice
+>     [TStmt <$> whenStmt
+>     ,TStmt <$> recDecl
+>     ,TStmt <$> funDecl
+>     ,TStmt <$> varDecl
+>     ,TStmt <$> dataDecl
+>     ,TStmt <$> checkBlock
+>     ,TStmt <$> setVarStmt
+>     ,expr <**> option (TStmt . StExpr) (choice [letDeclw, testPost])
+>     ]
+>   where
+>     letDeclw = (TStmt . ) <$> letDecl 
+
+> testPost :: Parser (Expr -> TestStmt)
+> testPost = choice [isPred, postOp, inf]
+>   where
+>       isPred = do
+>           t <- keyword "is%" <|> keyword "is_not%"
+>           p <- parens expr
+>           e2 <- expr
+>           pure (\x -> TPred x t p e2)
+>       postOp = do
+>           keyword_ "does_not_raise"
+>           pure (flip TPostfixOp "does_not_raise")
+>       inf = do
+>           k <- choice $ map keyword tks
+>           e <- expr
+>           pure (\x -> TBinOp x k e)
+>       tks = ["is_not", "is"
+>             ,"raises_other_than", "raises_satisfies", "raises_violates"
+>             ,"satisfies", "violates", "raises"]

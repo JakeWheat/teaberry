@@ -90,19 +90,41 @@
 > stmt (SetVar n e) = text n <+> text ":=" <+> nest 2 (expr e)
 
 > stmt (RecDecl n e) = text "rec" <+> text n <+> text "=" <+> nest 2 (expr e)
-> stmt (FunDecl n as e w) = text "fun" <+> text n <+> parens (commaSep $ map text as)
->                         <+> text ":" <+> nest 2 (expr e) <+> text "end"
+> stmt (FunDecl n as e w) =
+>      text "fun" <+> text n <+> parens (commaSep $ map text as) <+> text ":"
+>      <+> nest 2 (expr e)
+>      <+> maybe empty whereBlock w
+>      <+> text "end"
 
-> stmt (DataDecl nm vs w) =
+> stmt (DataDecl nm vs w ) =
 >     text "data" <+> text nm <+> text ":"
 >     <+> nest 2 (vcat $ map vf vs)
+>     <+> maybe empty whereBlock w
 >     <+> text "end"
 >   where
 >       vf (VariantDecl vnm fs) = text "|" <+> text vnm <+> parens (commaSep $ map text fs)
 
+> stmt (Check nm ts) =
+>     text "check" <+> maybe empty (doubleQuotes . text) nm <> text ":"
+>     <+> nest 2 (testStmts ts)
+>     <+> text "end"
+
+
 > stmts :: [Stmt] -> Doc
 > stmts = vcat . map stmt
 
+> testStmts :: [TestStmt] -> Doc
+> testStmts = vcat . map testStmt
+
+> testStmt :: TestStmt -> Doc
+> testStmt (TStmt st) = stmt st
+> testStmt (TBinOp e0 op e1) = expr e0 <+> text op <+> expr e1
+> testStmt (TPred e0 t pr e1) = expr e0 <+> text t <> parens (expr pr) <+> expr e1
+> testStmt (TPostfixOp e o) = expr e <+> text o
+
+
+> whereBlock :: [TestStmt] -> Doc
+> whereBlock ts = text "where:" <+> nest 2 (testStmts ts)
 
 > commaSep :: [Doc] -> Doc
 > commaSep ds = sep $ punctuate comma ds
