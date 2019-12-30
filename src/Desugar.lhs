@@ -6,6 +6,7 @@
 
 > import qualified Syntax as S
 > import qualified InterpreterSyntax as I
+> import qualified Pretty as P
 
 > desugarStmts :: [S.Stmt] -> Either String ([I.Stmt], [I.CheckBlock])
 > desugarStmts (s:ss) | isRec s = do
@@ -55,6 +56,41 @@ when a fun or rec is seen, it will collect subsequent funs and recs
 
 > desugarStmt (S.VarDecl n e) = liftStmt <$> (I.LetDecl n . I.Box) <$> desugarExpr e
 > desugarStmt (S.SetVar n e) = liftStmt <$> I.StExpr <$> I.SetBox n <$> desugarExpr e
+
+> desugarStmt (S.Check nm sts) = do
+>     let nm' = maybe "anonymous check block" id nm
+>     sts' <- desugarTestStmts sts
+>     pure ([], [I.CheckBlock nm' sts'])
+>     
+
+> desugarTestStmts :: [S.TestStmt] -> Either String [I.Stmt]
+> desugarTestStmts (S.TStmt s : ss) = do
+>     let (more, next) = spanMaybe getTStmt ss
+>     (sts',x) <- desugarStmts (s : more)
+>     case x of
+>         [] -> pure ()
+>         _ -> Left $ "tests not at top level not supported"
+>     (sts' ++) <$> desugarTestStmts next
+>   where
+>     getTStmt (S.TStmt x) = Just x
+>     getTStmt _ = Nothing
+
+> desugarTestStmts (x@(S.TBinOp e "is" e1) : ss) = do
+>     let str = P.prettyTestStmt x
+>     (sts', y) <- desugarStmt (S.StExpr $ S.App (S.Iden "runtest")
+>                               [S.BinOp e "==" e1, S.Sel $ S.Str str])
+>     case y of
+>         [] -> pure ()
+>         _ -> Left $ "tests not at top level not supported"
+>     (sts' ++) <$> desugarTestStmts ss
+
+> desugarTestStmts [] = pure []
+
+
+> spanMaybe _ xs@[] =  ([], xs)
+> spanMaybe p xs@(x:xs') = case p x of
+>     Just y  -> let (ys, zs) = spanMaybe p xs' in (y : ys, zs)
+>     Nothing -> ([], xs)
 
 
 --------------------------------------

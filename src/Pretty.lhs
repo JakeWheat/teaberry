@@ -1,18 +1,19 @@
 
-
+> {-# LANGUAGE ScopedTypeVariables #-}
 > module Pretty (prettyExpr
 >               ,prettyStmts
+>               ,prettyTestStmt
 >               ) where
 
-
-> import Syntax (Stmt(..), Expr(..), Selector(..), VariantDecl(..), Pat(..), TestStmt(..))
+> import Data.Scientific (floatingOrInteger)
 
 > import Prelude hiding ((<>))
-
 > import Text.PrettyPrint (render, text, (<>), (<+>), empty, parens,
 >                          nest, Doc, punctuate, comma, sep, {-quotes,-}
 >                          doubleQuotes,
 >                          {-braces, ($$), ($+$),-} vcat)
+
+> import Syntax (Stmt(..), Expr(..), Selector(..), VariantDecl(..), Pat(..), TestStmt(..))
 
 > prettyExpr :: Expr -> String
 > prettyExpr = render . expr
@@ -20,9 +21,13 @@
 > prettyStmts :: [Stmt] -> String
 > prettyStmts = render . stmts
 
+> prettyTestStmt :: TestStmt -> String
+> prettyTestStmt = render . testStmt
 
 > expr :: Expr -> Doc
-> expr (Sel (Num n)) = text $ show n
+> expr (Sel (Num n)) = text $ case floatingOrInteger n of
+>                          (Right x :: Either Float Integer) -> show x
+>                          Left _ ->  show n
 > expr (Sel (Str s)) = doubleQuotes (text s)
 > expr (Sel (Tuple es)) = text "{" <> nest 2 (xSep ";" (map expr es) <> text "}")
 > expr (Iden n) = text n

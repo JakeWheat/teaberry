@@ -94,7 +94,18 @@ is-pt = lam(x): I.AppHaskell "DataType" [x] == "Point" && I.AppHaskell "VariantT
 >       num = Sel . Num
 
 > desugarStmtsExamples :: [(String, ([Stmt],[CheckBlock]))]
-> desugarStmtsExamples = []
+> desugarStmtsExamples =
+>     [("check \"a first block\":\n\
+>       \  5 is 5\n\
+>       \end"
+>      ,([],[CheckBlock "a first block"
+>            [StExpr $ app2 "runtest" (binop (num 5) "==" (num 5)) (str "5 is 5")]]))
+>     ]
+>    where
+>      app2 op a b = App (App (Iden op) a) b
+>      binop a op b = app2 op a b
+>      str = Sel . Str
+>      num = Sel . Num
 
 
 > testDesugarExpr :: (String,Expr) -> T.TestTree
