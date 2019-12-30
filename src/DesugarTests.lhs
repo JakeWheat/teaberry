@@ -9,7 +9,7 @@
 > import qualified Test.Tasty.HUnit as T
 
 > import Parse (parseExpr, parseStmts)
-> import InterpreterSyntax (Stmt(..), Expr(..), Selector(..), CheckBlock(..), Program(..))
+> import InterpreterSyntax (Stmt(..), Expr(..), Selector(..), {-CheckBlock(..),-} Program(..))
 > import Desugar (desugarExpr, desugarStmts)
 > --import qualified Syntax as S
 
@@ -111,7 +111,7 @@ end
 
 > desugarStmtsExamples :: [(String, Program)]
 > desugarStmtsExamples =
->     [("check \"a first block\":\n\
+>     [{-("check \"a first block\":\n\
 >       \  5 is 5\n\
 >       \end"
 >      ,Program Nothing [CheckBlock "a first block"
@@ -123,20 +123,20 @@ end
 >                 \  if v0 == v1:\n\
 >                 \    log_test_pass(bn, tst)\n\
 >                 \  else:\n\
->                 \    log_test_fail(bn, tst, \"Values not equal\")\n\
+>                 \    log_test_fail(bn, tst, \"Values not equal:\n\" + torepr(v0) + \"\n\" + torepr(v1))\n\
 >                 \  end\n\
 >                 \  false\n\
->                 \end"])
+>                 \end"])-}
 >     ]
 >    where
 >      --app2 op a b = App (App (Iden op) a) b
 >      --binop a op b = app2 op a b
 >      --str = Sel . Str
 >      --num = Sel . Num
->      p2d s = either error id $ do
+>      {-p2d s = either error id $ do
 >          x <- parseStmts "" s
 >          y <- desugarStmts x
->          pure $ (\(Program (Just z) _) -> z) y
+>          pure $ (\(Program (Just z) _) -> z) y-}
 
 
 > testDesugarExpr :: (String,Expr) -> T.TestTree

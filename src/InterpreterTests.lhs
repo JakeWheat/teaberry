@@ -281,6 +281,11 @@
 >           \add2 = lam (a): a + 2 end\n\
 >           \myVar = 1"
 
+TODO:
+
+test a trivial test passing
+test a trivial test failing
+
 
      [("check \"a first block\":\n\
        \  5 is 5\n\

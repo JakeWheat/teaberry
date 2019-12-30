@@ -88,20 +88,25 @@ when a fun or rec is seen, it will collect subsequent funs and recs
 >     (s :) <$> desugarTestStmts ss
 
 > desugarTestStmts (x@(S.TBinOp e "is" e1) : ss) = do
->     let str = P.prettyTestStmt x
+>     let syn = P.prettyTestStmt x
 >         blockName = "unknown"
 >         mys = S.StExpr $ S.Block
 >          [S.LetDecl "bn" $ S.Sel $ S.Str blockName
->          ,S.LetDecl "tst" $ S.Sel $ S.Str str
+>          ,S.LetDecl "tst" $ S.Sel $ S.Str syn
 >          ,S.LetDecl "v0" e
 >          ,S.LetDecl "v1" e1
 >          ,S.StExpr $ S.If [(S.App (S.Iden "==") [S.Iden "v0", S.Iden "v1"]
 >               ,S.App (S.Iden "log_test_pass") [S.Iden "bn", S.Iden "tst"])]
 >              (Just $ S.App (S.Iden "log_test_fail")
 >              [S.Iden "bn", S.Iden "tst"
->              ,S.Sel $ S.Str "Values not equal"])
+>              ,str "Values not equal:\n" `plus` app "torepr" [S.Iden "v0"]
+>               `plus` str "\n" `plus` app "torepr" [S.Iden "v1"]])
 >          ,S.StExpr $ S.Iden "false"]
 >     (mys :) <$> desugarTestStmts ss
+>   where
+>       plus a b = S.BinOp a "+" b
+>       str = S.Sel . S.Str
+>       app nm es = S.App (S.Iden nm) es
 
 > desugarTestStmts [] = pure []
 

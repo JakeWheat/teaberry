@@ -1,4 +1,5 @@
 
+> {-# LANGUAGE ScopedTypeVariables #-}
 > module Interpreter (interp
 >                    ,CheckResult(..)
 >                    ,runChecks
@@ -12,7 +13,7 @@
 > import Control.Monad.IO.Class (liftIO)
 > import Control.Monad.Trans.RWS (RWST, runRWST, ask, get, put, local, tell)
 > import Data.List (partition)
-> import Data.Scientific (Scientific)
+> import Data.Scientific (Scientific, floatingOrInteger)
 > import Text.Show.Pretty (ppShow)
 
 > import qualified InterpreterSyntax as I
@@ -42,21 +43,25 @@ todo: make this better: do better wrapping + error messages when the
 type is wrong
 
 > haskellFunImpls :: [(String, [Value] -> Interpreter Value)]
-> haskellFunImpls = [("+", \[NumV a, NumV b] -> pure $ NumV (a + b))
->                   ,("-", \[NumV a, NumV b] -> pure $ NumV (a - b))
->                   ,("*", \x -> case x of
->                                    [NumV a, NumV b] -> pure $ NumV (a * b)
->                                    _ -> throwM $ MyException $ "* needs two num args, got " ++ ppShow x)
->                   ,("==", \[a, b] -> pure $ BoolV (a == b))
->                   ,("raise", \[StrV s] -> throwM $ MyException s)
->                   ,("print", \[x] -> liftIO (putStrLn (show x)) >> pure x)
->                   ,("log_test_pass", \[StrV c, StrV t] -> do
->                            tell [TestPass c t]
->                            pure $ BoolV True)
->                   ,("log_test_fail", \[StrV c, StrV t, StrV m] -> do
->                            tell [TestFail c t m]
->                            pure $ BoolV True)
->                   ]
+> haskellFunImpls =
+>     [("+", \x -> case x of
+>                      [StrV a, StrV b] -> pure $ StrV (a ++ b)
+>                      [NumV a, NumV b] -> pure $ NumV (a + b))
+>     ,("-", \[NumV a, NumV b] -> pure $ NumV (a - b))
+>     ,("*", \x -> case x of
+>                      [NumV a, NumV b] -> pure $ NumV (a * b)
+>                      _ -> throwM $ MyException $ "* needs two num args, got " ++ ppShow x)
+>     ,("==", \[a, b] -> pure $ BoolV (a == b))
+>     ,("raise", \[StrV s] -> throwM $ MyException s)
+>     ,("print", \[xx@(StrV x)] -> liftIO (putStrLn x) >> pure xx)
+>     ,("log_test_pass", \[StrV c, StrV t] -> do
+>           tell [TestPass c t]
+>           pure $ BoolV True)
+>     ,("log_test_fail", \[StrV c, StrV t, StrV m] -> do
+>           tell [TestFail c t m]
+>           pure $ BoolV True)
+>     ,("torepr", \[x] -> pure $ torepr x)
+>     ]
 
 temp testing until agdt are implemented
 
@@ -71,6 +76,7 @@ temp testing until agdt are implemented
 >                ,liftBinOp "=="
 >                ,liftUnop "raise"
 >                ,liftUnop "print"
+>                ,liftUnop "torepr"
 >                ,liftBinOp "log_test_pass"
 >                ,liftTriOp "log_test_fail"
 >                ] emptyEnv
@@ -88,6 +94,13 @@ temp testing until agdt are implemented
 >            | VariantV String String [(String,Value)]
 >            | BoxV Int
 >            deriving (Eq,Show)
+
+> torepr :: Value -> Value
+> torepr (NumV n) = StrV $ case floatingOrInteger n of
+>                              (Right x :: Either Float Integer) -> show x
+>                              Left _ ->  show n
+> torepr (BoolV n) = StrV $ if n then "true" else "false"
+> torepr (ClosV {}) = StrV "<Function>"
 
 ------------------------------------------------------------------------------
 
