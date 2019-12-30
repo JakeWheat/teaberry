@@ -60,14 +60,19 @@ can also think about doing a prepCode or something
 >            ,length fs
 >            ,"Check block: " ++ nm ++ "\n"
 >            ++ intercalate "\n" (map indent msgs)
->            ++ "  " ++ show (length ps) ++ "/" ++ show (length ts) ++ " tests passed in check block: " ++ nm
+>            ++ "\n  " ++ show (length ps) ++ "/" ++ show (length ts) ++ " tests passed in check block: " ++ nm
 >            )
 >     renderTest (a,b) =
 >         "test (" ++ a ++ "): "
 >         ++ case b of
 >                Nothing -> "OK"
 >                Just msg -> "failed, reason:\n" ++ indent msg
->     indent = unlines . map ("  " ++) . lines 
+>     indent [] = []
+>     indent x = "  " ++ indent' x
+>     indent' [] = []
+>     indent' x@[_] = x
+>     indent' ('\n':y@(_:_)) = "\n  " ++ indent' y
+>     indent' (x:y) = x : indent' y
 >            
 >            
 

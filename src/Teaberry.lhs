@@ -24,7 +24,7 @@ and to run only the tests
 >     args <- getArgs
 >     case args of
 >         [] -> help
->         --  ["-x"] -> runX
+>         ["-x"] -> runX
 >         ["-h"] -> help
 >         ["-c", cmd] -> runc cmd
 >         ["-f", fn] -> do
@@ -46,11 +46,11 @@ and to run only the tests
 >           putStrLn $ renderCheckResults v
 >           -- todo: exit with error code if all tests didn't pass
 >       help = putStrLn "-c to run code in arg, -f to run code in file"
->       {-runX = putStrLn $ renderCheckResults
+>       runX = putStrLn $ renderCheckResults
 >              [CheckResult "a first block"
 >               [("5 is 5", Nothing)
 >               ,("4 is 5", Just "Values not equal:\n4\n5")]
 >              ,CheckResult "a second block"
 >              [("6 is 7", Just "Values not equal:\n6\n7")]
->              ]-}
+>              ]
 >              
