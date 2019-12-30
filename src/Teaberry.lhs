@@ -10,6 +10,10 @@ parse command line args and make available to script
 
 add provides and imports
 
+add option to also run tests
+and to run only the tests
+
+
 > import System.Environment (getArgs)
 
 > import Engine (runCode)

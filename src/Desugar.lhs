@@ -7,7 +7,7 @@
 > import qualified Syntax as S
 > import qualified InterpreterSyntax as I
 
-> desugarStmts :: [S.Stmt] -> Either String [I.Stmt]
+> desugarStmts :: [S.Stmt] -> Either String ([I.Stmt], [I.CheckBlock])
 > desugarStmts (s:ss) | isRec s = do
 
 rules for fun and rec:
@@ -20,7 +20,7 @@ when a fun or rec is seen, it will collect subsequent funs and recs
 >     defs <- desugarRecs =<< mapM splitRec (s:adddecls)
 >     -- desugar to interpreter syntax
 >     idecls <- desugarStmts $ map (uncurry S.LetDecl) defs
->     (++) idecls <$> desugarStmts ss'
+>     addStuff idecls <$> desugarStmts ss'
 >   where
 >     isRec (S.FunDecl {}) = True
 >     isRec (S.RecDecl {}) = True
@@ -28,18 +28,24 @@ when a fun or rec is seen, it will collect subsequent funs and recs
 >     splitRec (S.FunDecl nm as bdy whr) = pure (nm, (S.Lam as bdy))
 >     splitRec (S.RecDecl nm e) = pure (nm, e)
 >     splitRec x = Left $ "unexpected non fun/rec decl: " ++ show x
-> desugarStmts (s:ss) = (++) <$> desugarStmt s <*> desugarStmts ss
-> desugarStmts [] = pure []
+> desugarStmts (s:ss) = addStuff <$> desugarStmt s <*> desugarStmts ss
+> desugarStmts [] = pure ([],[])
 
-> desugarStmt :: S.Stmt -> Either String [I.Stmt]
+> addStuff :: ([a],[b]) -> ([a],[b]) -> ([a],[b])
+> addStuff (a,b) (a', b') = (a ++ a', b ++ b')
 
-> desugarStmt (S.StExpr e) = (:[]) <$> I.StExpr <$> desugarExpr e
-> desugarStmt (S.When c t) = (:[]) <$> I.StExpr <$> 
+> liftStmt :: I.Stmt -> ([I.Stmt], [I.CheckBlock])
+> liftStmt s = ([s],[])
+
+> desugarStmt :: S.Stmt -> Either String ([I.Stmt], [I.CheckBlock])
+
+> desugarStmt (S.StExpr e) = liftStmt <$> I.StExpr <$> desugarExpr e
+> desugarStmt (S.When c t) = liftStmt <$> I.StExpr <$> 
 >     desugarExpr (S.If [(c, S.Block [S.StExpr t
 >                                    ,S.StExpr $ S.Iden "nothing"])]
 >                     (Just (S.Iden "nothing")))
 
-> desugarStmt (S.LetDecl nm e) = (:[]) <$> I.LetDecl nm <$> desugarExpr e
+> desugarStmt (S.LetDecl nm e) = liftStmt <$> I.LetDecl nm <$> desugarExpr e
 
 > desugarStmt (S.FunDecl nm as bdy whr) =
 >     desugarStmt (S.RecDecl nm (S.Lam as bdy))
@@ -47,8 +53,8 @@ when a fun or rec is seen, it will collect subsequent funs and recs
 >    defs <- desugarRecs [(nm,e)]
 >    desugarStmts $ map (uncurry S.LetDecl) defs
 
-> desugarStmt (S.VarDecl n e) = (:[]) <$> (I.LetDecl n . I.Box) <$> desugarExpr e
-> desugarStmt (S.SetVar n e) = (:[]) <$> I.StExpr <$> I.SetBox n <$> desugarExpr e
+> desugarStmt (S.VarDecl n e) = liftStmt <$> (I.LetDecl n . I.Box) <$> desugarExpr e
+> desugarStmt (S.SetVar n e) = liftStmt <$> I.StExpr <$> I.SetBox n <$> desugarExpr e
 
 
 --------------------------------------
@@ -95,7 +101,10 @@ when a fun or rec is seen, it will collect subsequent funs and recs
 >    desugarExpr (S.Let defs ex)
 
 > desugarExpr (S.Block ss) = do
->     ss' <- desugarStmts ss
+>     (ss', x) <- desugarStmts ss
+>     case x of
+>         [] -> pure ()
+>         _ -> Left "tests not at the top level are not supported"
 >     let f :: [I.Stmt] -> Either String I.Expr
 >         f [] = Left "empty block"
 >         f [I.StExpr e] = pure e

@@ -293,5 +293,5 @@
 >     x <- I.interp I.defaultHaskellFFIEnv (extract iast)
 >     either error (T.assertEqual "" ex) x
 >  where
->    extract [a@(I.StExpr {})] = a
->    extract x = error $ show x
+>    extract ([a@(I.StExpr {})], _) = a
+>    extract (x,_) = error $ show x

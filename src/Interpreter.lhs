@@ -37,7 +37,7 @@
 
 
 todo: make this better: do better wrapping + error messages when the
- type is wrong
+type is wrong
 
 > haskellFunImpls :: [(String, [Value] -> Interpreter Value)]
 > haskellFunImpls = [("+", \[NumV a, NumV b] -> pure $ NumV (a + b))
@@ -202,3 +202,40 @@ instead of the other one
 >         BoxV i -> put $ extendStore i v' store
 >         _ -> throwM $ MyException $ "attemped to setbox non box value: " ++ show v
 >     pure v'
+
+
+what does a check need to do:
+1. run in a block with an env - like normal blocks
+2. each test needs to run a bool returning function or something
+  and also provide a failure statement
+
+write the test results to the monad writer for now
+  (after agdt working, can make the testing more native)
+the summaries and stuff can be done after the tests are run from the
+log
+
+each test should produce:
+ 1. a function which returns true if it passes
+ 2. a failure string which describes the failure for the logging
+
+5 is 5 in a test:
+-> "5 is 5", lam(): 5 == 5
+
+check:
+  a = 5
+  a is 5
+end
+->
+block:
+  a = 5
+  runtest(5 == 5, "5 is 5")
+end
+
+the runtest will be a haskell ffi program
+it needs access to the monad to log
+  (when it becomes more native, it will use more in-language
+   machinery)
+
+when you compile a program now, you get back a program data structure
+which you can run, or you can run the tests
+
