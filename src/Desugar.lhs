@@ -74,7 +74,7 @@ when a fun or rec is seen, it will collect subsequent funs and recs
 
 > desugarStmt (S.Check nm sts) = do
 >     let nm' = maybe "anonymous check block" id nm
->     sts' <- desugarTestStmts sts
+>     sts' <- desugarTestStmts nm' sts
 >     (sts'',x) <- desugarStmts' sts'
 >     case x of
 >         [] -> pure ()
@@ -83,13 +83,13 @@ when a fun or rec is seen, it will collect subsequent funs and recs
 >     pure ([], [I.CheckBlock nm' (I.StExpr sts''')])
 >     
 
-> desugarTestStmts :: [S.TestStmt] -> Either String [S.Stmt]
-> desugarTestStmts (S.TStmt s : ss) = do
->     (s :) <$> desugarTestStmts ss
+> desugarTestStmts :: String -> [S.TestStmt] -> Either String [S.Stmt]
+> desugarTestStmts cn (S.TStmt s : ss) = do
+>     (s :) <$> desugarTestStmts cn ss
 
-> desugarTestStmts (x@(S.TBinOp e "is" e1) : ss) = do
+> desugarTestStmts cn (x@(S.TBinOp e "is" e1) : ss) = do
 >     let syn = P.prettyTestStmt x
->         blockName = "unknown"
+>         blockName = cn
 >         mys = S.StExpr $ S.Block
 >          [S.LetDecl "bn" $ S.Sel $ S.Str blockName
 >          ,S.LetDecl "tst" $ S.Sel $ S.Str syn
@@ -102,13 +102,13 @@ when a fun or rec is seen, it will collect subsequent funs and recs
 >              ,str "Values not equal:\n" `plus` app "torepr" [S.Iden "v0"]
 >               `plus` str "\n" `plus` app "torepr" [S.Iden "v1"]])
 >          ,S.StExpr $ S.Iden "false"]
->     (mys :) <$> desugarTestStmts ss
+>     (mys :) <$> desugarTestStmts cn ss
 >   where
 >       plus a b = S.BinOp a "+" b
 >       str = S.Sel . S.Str
 >       app nm es = S.App (S.Iden nm) es
 
-> desugarTestStmts [] = pure []
+> desugarTestStmts _ [] = pure []
 
 
 block:
