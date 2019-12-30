@@ -139,7 +139,10 @@ here's an idea: push reserved keywords distinction into the lexer
 the can get rid of more trys
 
 > reservedKeywords :: [String]
-> reservedKeywords = ["end"]
+> reservedKeywords =
+>     ["end", "lam", "let", "letrec", "if", "else", "ask", "then"
+>     ,"otherwise", "block", "cases", "when", "var", "check"
+>     ,"where", "fun", "rec", "data" ]
 
 > identifierX :: Parser String
 > identifierX =
@@ -202,9 +205,13 @@ consider what other numbers to support, e.g. integer, positive
 todo: escape quotes
 and make sure it doesn't parse newlines when it shouldn't
 
-> stringE :: Parser Expr
-> stringE = (Sel . Str) <$> choice [char_ '\'' *> takeWhileP Nothing (/='\'') <* lexeme_ (char_ '\'')
+> stringRaw :: Parser String
+> stringRaw = choice [char_ '\'' *> takeWhileP Nothing (/='\'') <* lexeme_ (char_ '\'')
 >                          ,char_ '"' *> takeWhileP Nothing (/='"') <* lexeme_ (char_ '"')]
+>             <?> "string literal"
+
+> stringE :: Parser Expr
+> stringE = (Sel . Str) <$> stringRaw
 >             <?> "string literal"
 
 > appSuffix :: Parser (Expr -> Expr)
@@ -301,18 +308,14 @@ todo: remove the trys by implementing a proper lexer or a lexer style
 >            ,flip DotExpr <$> identifier]
 
 > cases :: Parser Expr
-> cases = casex <$> (keyword_ "cases" *> parens identifier)
+> cases = Cases <$> (keyword_ "cases" *> parens identifier)
 >               <*> (expr <* symbol_ ":")
->               <*> (some cas <* keyword_ "end")
+>               <*> some cas
+>               <*> (optional els <* keyword_ "end")
 >   where
->      cas = (,) <$> (symbol_ "|" *> pat)
+>      cas = (,) <$> try (symbol_ "|" *> pat)
 >                <*> (symbol_ "=>" *> expr)
->      splitElse [] = ([],Nothing)
->      splitElse xs = case last xs of
->                         (IdenP "else", e) -> (init xs,Just e)
->                         _ -> (xs, Nothing)
->      casex ty e cs = let (cs',el) = splitElse cs
->                      in  Cases ty e cs' el
+>      els = symbol_ "|" *> keyword_ "else" *> symbol_ "=>" *> expr
 
 > pat :: Parser Pat
 > pat = choice

@@ -107,19 +107,45 @@ when a fun or rec is seen, it will collect subsequent funs and recs
 
 
 rec in blocks:
-the rule is:
+
+This is the canonical rewrite which I think says what works and what doesn't
+work in pyret:
+
+(letrec ([v e] ...) b...)
+->
+(let ([v "some dummy value"] ...)
+  (set! v e)
+  ...
+  b)
+
+
 a non lambda binding doesn't do 'rec', it can only
   refer to bindings before it in the list
 a lambda binding can refer to later defined bindings, including non
   lambda ones
 
-how exactly does this work and not work?
-create all the non lambda bindings as vars
-create the lambda bindings using this closure
-update the vars one by one in order
-  -> will get an error if refer to a var not yet initialized
 
-TODO: implement this behaviour
+what about doubling up the non-lambda bindings to 0 arg lambdas
+and seeing if this can make it work more nicely
+
+letrec
+  x = y,
+  y = 1:
+  x + y
+end
+
+->
+
+letrec
+  x' = lam() : y',
+  y' = lam() : 1,
+  x = x'(),
+  y = y'():
+  x + y
+end
+then desugar using the usual algo, making sure the x and y bindings
+ come at the end
+
 
 other todo for letrec:
   generate unique names
@@ -146,7 +172,7 @@ in ex ->
       [fn = lam (asn) : fn'(f0',...,fn',asn)]
   in ex
 
-
+the current rewrite is like this, it has limitations compared to pyret:
 letrec
   fact = lam(n): if n == 1: 1 else: n * fact(n - 1) end end,
   abc = fact(5):
@@ -158,23 +184,7 @@ let
                             else: n * fact(fact, n - 1.0)
                             end end,
   fact = lam(n): factXXX(factXXX, n) end,
-  abc = fact(5): # or: abc = factXXX(factXXX, 5)
-  abc
-end
-
-This doesn't work in pyret - don't try to support it now
-letrec
-  abc = fact(5),
-  fact = lam(n): if n == 1: 1 else: n * fact(n - 1) end end:
-  abc
-end
-->
-let
-  factXXX = lam(fact, n): if n == 1.0: 1.0
-                            else: n * fact(fact, n - 1.0)
-                            end end,
   abc = factXXX(factXXX, 5)
-  fact = lam(n): factXXX(factXXX, n) end,
   abc
 end
 

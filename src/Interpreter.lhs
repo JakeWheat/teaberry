@@ -68,7 +68,7 @@ todo: make this better: do better wrapping + error messages when the
 >            | BoolV Bool
 >            | StrV String
 >            | ClosV I.Expr Env
->            | Variant String String [(String,Value)]
+>            | VariantV String String [(String,Value)]
 >            | BoxV Int
 >            deriving (Eq,Show)
 

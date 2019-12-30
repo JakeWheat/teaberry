@@ -1,4 +1,13 @@
 
+TODO:
+runCode -> runs the script without the tests
+what does the version which also runs the tests look like?
+  what's the api of tests passing or failing?
+runTests -> runs only the tests in the script
+can also think about doing a prepCode or something
+  then you can run the tests, and run the script itself separately
+  without "recompiling"
+
 > module Engine (runCode
 >               ,Value(..)
 >               ) where
