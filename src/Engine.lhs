@@ -10,7 +10,13 @@ can also think about doing a prepCode or something
 
 > module Engine (runCode
 >               ,Value(..)
+>               ,CheckResult(..)
+>               ,renderCheckResults
+>               ,runChecks
 >               ) where
+
+> import Data.List (intercalate, partition)
+> import Data.Maybe (isNothing)
 
 > --import Syntax
 > import Parse (parseStmts)
@@ -37,10 +43,37 @@ can also think about doing a prepCode or something
 todo: move this to an in language data type
 
 > data CheckResult = CheckResult String -- the test block name
->                               [Maybe String] -- Just means there was a failure
+>                               [(String, Maybe String)]
+> -- the second is just if it is a fail, it contains the failure
+> -- message
 
 > renderCheckResults :: [CheckResult] -> String
-> renderCheckResults = undefined
+> renderCheckResults cs =
+>     let bs = map renderCheck cs
+>         totalPasses = sum $ map (\(n,_,_) -> n) bs
+>         totalFails = sum $ map (\(_,n,_) -> n) bs
+>         msgs = map (\(_,_,m) -> m) bs
+>     in intercalate "\n\n" msgs
+>        ++ "\n\n" ++ (show totalPasses) ++ "/" ++ show (totalPasses + totalFails)
+>        ++ " tests passed in all check blocks"
+>   where
+>     renderCheck (CheckResult nm ts) =
+>         let (ps,fs) = partition (isNothing . snd) ts
+>             msgs = map renderTest ts
+>         in (length ps
+>            ,length fs
+>            ,"Check block: " ++ nm ++ "\n"
+>            ++ intercalate "\n" (map indent msgs)
+>            ++ "  " ++ show (length ps) ++ "/" ++ show (length ts) ++ " tests passed in check block: " ++ nm
+>            )
+>     renderTest (a,b) =
+>         "test (" ++ a ++ "): "
+>         ++ case b of
+>                Nothing -> "OK"
+>                Just msg -> "failed, reason:\n" ++ indent msg
+>     indent = unlines . map ("  " ++) . lines 
+>            
+>            
 
 > runChecks :: String -> IO [CheckResult]
 > runChecks = undefined
@@ -58,7 +91,7 @@ Check block: a second block
     Values not equal:
     6
     7
-  The test failed.
+  0/1 tests passed in check block: a first block
  
 1/3 tests passed in all check blocks
 
