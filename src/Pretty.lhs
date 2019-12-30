@@ -5,7 +5,7 @@
 >               ) where
 
 
-> import Syntax (Stmt(..), Expr(..), Selector(..), VariantDecl(..), Pat(..))
+> import Syntax (Stmt(..), Expr(..), Selector(..), VariantDecl(..), Pat(..), TestStmt(..))
 
 > import Prelude hiding ((<>))
 
@@ -90,10 +90,10 @@
 > stmt (SetVar n e) = text n <+> text ":=" <+> nest 2 (expr e)
 
 > stmt (RecDecl n e) = text "rec" <+> text n <+> text "=" <+> nest 2 (expr e)
-> stmt (FunDecl n as e) = text "fun" <+> text n <+> parens (commaSep $ map text as)
+> stmt (FunDecl n as e w) = text "fun" <+> text n <+> parens (commaSep $ map text as)
 >                         <+> text ":" <+> nest 2 (expr e) <+> text "end"
 
-> stmt (DataDecl nm vs) =
+> stmt (DataDecl nm vs w) =
 >     text "data" <+> text nm <+> text ":"
 >     <+> nest 2 (vcat $ map vf vs)
 >     <+> text "end"

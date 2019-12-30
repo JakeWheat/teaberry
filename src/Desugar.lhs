@@ -25,7 +25,7 @@ when a fun or rec is seen, it will collect subsequent funs and recs
 >     isRec (S.FunDecl {}) = True
 >     isRec (S.RecDecl {}) = True
 >     isRec _ = False
->     splitRec (S.FunDecl nm as bdy) = pure (nm, (S.Lam as bdy))
+>     splitRec (S.FunDecl nm as bdy whr) = pure (nm, (S.Lam as bdy))
 >     splitRec (S.RecDecl nm e) = pure (nm, e)
 >     splitRec x = Left $ "unexpected non fun/rec decl: " ++ show x
 > desugarStmts (s:ss) = (++) <$> desugarStmt s <*> desugarStmts ss
@@ -41,7 +41,7 @@ when a fun or rec is seen, it will collect subsequent funs and recs
 
 > desugarStmt (S.LetDecl nm e) = (:[]) <$> I.LetDecl nm <$> desugarExpr e
 
-> desugarStmt (S.FunDecl nm as bdy) =
+> desugarStmt (S.FunDecl nm as bdy whr) =
 >     desugarStmt (S.RecDecl nm (S.Lam as bdy))
 > desugarStmt (S.RecDecl nm e) = do
 >    defs <- desugarRecs [(nm,e)]

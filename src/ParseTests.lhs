@@ -9,7 +9,7 @@
 > import qualified Test.Tasty as T
 > import qualified Test.Tasty.HUnit as T
 
-> import Syntax (Stmt(..), Expr(..), Selector(..), VariantDecl(..), Pat(..))
+> import Syntax (Stmt(..), Expr(..), Selector(..), VariantDecl(..), Pat(..), TestStmt(..))
 > import Parse (parseExpr, parseStmt, parseStmts)
 > import Pretty (prettyExpr, prettyStmts)
 
@@ -67,7 +67,7 @@ todo: review all the whitespace rules that are being ignored
 
 >               ,("block:\n\
 >                 \  fun f(a): a + 1 end\n\
->                 \end", Block[FunDecl "f" ["a"] (BinOp (Iden "a") "+" (num 1))])
+>                 \end", Block[FunDecl "f" ["a"] (BinOp (Iden "a") "+" (num 1)) Nothing])
 
 
 >               ,("block:\n\
@@ -76,7 +76,7 @@ todo: review all the whitespace rules that are being ignored
 >                 \  a + 1\n\
 >                 \end\n\
 >                 \end", Block[FunDecl "f" ["a"] (Block [LetDecl "a" (num 1)
->                                                       ,StExpr $ BinOp (Iden "a") "+" (num 1)])])
+>                                                       ,StExpr $ BinOp (Iden "a") "+" (num 1)]) Nothing])
 
 
 >               ,("if a: b end", If [(Iden "a",Iden "b")] Nothing)
@@ -195,32 +195,32 @@ todo: review all the whitespace rules that are being ignored
 >       \  | node(value, left, right)\n\
 >       \  | leaf(value)\n\
 >       \end", DataDecl "BTree" [VariantDecl "node" ["value", "left", "right"]
->                               ,VariantDecl "leaf" ["value"]])
+>                               ,VariantDecl "leaf" ["value"]] Nothing)
 
 >     ,("data MyEnum:\n\
 >       \  | node(left, right)\n\
 >       \  | leaf\n\
 >       \end", DataDecl "MyEnum" [VariantDecl "node" ["left", "right"]
->                               ,VariantDecl "leaf" []])
+>                               ,VariantDecl "leaf" []] Nothing)
 
 >     ,("data MyEnum:\n\
 >       \  | node(left, right)\n\
 >       \  | leaf()\n\
 >       \end", DataDecl "MyEnum" [VariantDecl "node" ["left", "right"]
->                               ,VariantDecl "leaf" []])
+>                               ,VariantDecl "leaf" []] Nothing)
 
 >     ,("data Point:\n\
 >       \  | pt(x, y)\n\
->       \end", DataDecl "Point" [VariantDecl "pt" ["x", "y"]])
+>       \end", DataDecl "Point" [VariantDecl "pt" ["x", "y"]] Nothing)
 
 >     ,("data Point: pt(x, y) end"
->      ,DataDecl "Point" [VariantDecl "pt" ["x", "y"]])
+>      ,DataDecl "Point" [VariantDecl "pt" ["x", "y"]] Nothing)
 
 >     ,("data Point: pt() end"
->      ,DataDecl "Point" [VariantDecl "pt" []])
+>      ,DataDecl "Point" [VariantDecl "pt" []] Nothing)
 
 >     ,("data Point: pt end"
->      ,DataDecl "Point" [VariantDecl "pt" []])
+>      ,DataDecl "Point" [VariantDecl "pt" []] Nothing)
 
 
 

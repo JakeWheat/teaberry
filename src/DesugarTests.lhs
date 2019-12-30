@@ -69,6 +69,18 @@
 >                 ,Seq (LetDecl "a" (num 5))
 >                      (StExpr $ App (App (Iden "+") (Iden "a")) (num 5)))
 
+desugaring a data decl:
+
+data Point:
+  | pt(x, y)
+end
+
+->
+
+is-Point = lam(x): I.AppHaskell "DataType" [x] == "Point"
+pt = lam (x,y): I.AppHaskell "makeVariant" ("Point", "pt", [list: x,y])
+is-pt = lam(x): I.AppHaskell "DataType" [x] == "Point" && I.AppHaskell "VariantType" [x] == "pt"
+
 
 >                 ]
 >   where

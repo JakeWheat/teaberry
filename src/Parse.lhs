@@ -380,7 +380,8 @@ put all the parsers which start with a keyword first
 >     <$> (keyword "fun" *> identifier)
 >     <*> parens (commaSep identifier)
 >     <*> (symbol_ ":" *> (unwrapSingle <$>
->          (Block <$> (some stmt <* keyword_ "end"))))
+>          (Block <$> some stmt)))
+>     <*> pure Nothing  <* keyword_ "end"
 >   where
 >       unwrapSingle (Block [StExpr (a)]) = a
 >       unwrapSingle x = x
@@ -393,7 +394,8 @@ put all the parsers which start with a keyword first
 > dataDecl :: Parser Stmt
 > dataDecl = DataDecl
 >     <$> (keyword_ "data" *> identifier <* symbol_ ":")
->     <*> ((((:[]) <$> singleVariant) <|> some variant) <* keyword_ "end")
+>     <*> (((:[]) <$> singleVariant) <|> some variant)
+>     <*> pure Nothing  <* keyword_ "end"
 >   where
 >     singleVariant = VariantDecl
 >                     <$> identifier <*> option [] (parens (commaSep identifier))
