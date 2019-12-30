@@ -8,7 +8,10 @@
 >                   ,parseStmtExamples
 >                   ,testParseStmts
 >                   ,parseStmtsExamples)
-> import DesugarTests (testDesugar,desugarExamples)
+> import DesugarTests (testDesugarExpr
+>                     ,desugarExprExamples
+>                     ,testDesugarStmts
+>                     ,desugarStmtsExamples)
 > import InterpreterTests (testInterpreter,interpreterExamples)
 
 
@@ -19,6 +22,7 @@
 >             [T.testGroup "parseExpr" $ map testParseExpr parseExprExamples
 >             ,T.testGroup "parseStmt" $ map testParseStmt parseStmtExamples
 >             ,T.testGroup "parseStmts" $ map testParseStmts parseStmtsExamples]
->         ,T.testGroup "desugar" $ map testDesugar desugarExamples
+>         ,T.testGroup "desugarExpr" $ map testDesugarExpr desugarExprExamples
+>         ,T.testGroup "desugarStmts" $ map testDesugarStmts desugarStmtsExamples
 >         ,T.testGroup "interpret" $ map testInterpreter interpreterExamples
 >         ]

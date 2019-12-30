@@ -6,6 +6,7 @@ The syntax which the interpreter uses
 > import Data.Scientific (Scientific)
 
 > data Program = Program [Stmt] [CheckBlock]
+>               deriving (Eq,Show)
 
 TODO: add provides and imports
   is this really a program? or something else?
@@ -39,5 +40,6 @@ TODO: add provides and imports
 >               deriving (Eq,Show)
 
 > data CheckBlock = CheckBlock String [Stmt]
+>               deriving (Eq,Show)
 
 

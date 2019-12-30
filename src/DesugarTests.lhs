@@ -1,15 +1,20 @@
 
-> module DesugarTests (desugarExamples, testDesugar) where
+> module DesugarTests (desugarExprExamples
+>                     ,testDesugarExpr
+>                     ,desugarStmtsExamples
+>                     ,testDesugarStmts
+>                     ) where
 >
 > import qualified Test.Tasty as T
 > import qualified Test.Tasty.HUnit as T
 
-> import Parse (parseExpr)
-> import InterpreterSyntax (Stmt(..), Expr(..), Selector(..))
-> import Desugar (desugarExpr)
+> import Parse (parseExpr, parseStmts)
+> import InterpreterSyntax (Stmt(..), Expr(..), Selector(..), CheckBlock(..))
+> import Desugar (desugarExpr, desugarStmts)
 
-> desugarExamples :: [(String, Expr)]
-> desugarExamples = [("a", Iden "a")
+> desugarExprExamples :: [(String, Expr)]
+> desugarExprExamples =
+>     [("a", Iden "a")
 >                 ,("true", Iden "true")
 >                 ,("false", Iden "false")
 >                 ,("3", num 3)
@@ -88,7 +93,17 @@ is-pt = lam(x): I.AppHaskell "DataType" [x] == "Point" && I.AppHaskell "VariantT
 >       binop a op b = App (App (Iden op) a) b
 >       num = Sel . Num
 
-> testDesugar :: (String,Expr) -> T.TestTree
-> testDesugar (src, ex) = T.testCase ("desugar " ++ src) $
+> desugarStmtsExamples :: [(String, ([Stmt],[CheckBlock]))]
+> desugarStmtsExamples = []
+
+
+> testDesugarExpr :: (String,Expr) -> T.TestTree
+> testDesugarExpr (src, ex) = T.testCase ("desugar " ++ src) $
 >     either error (T.assertEqual "" ex) $
 >       desugarExpr =<< parseExpr "" src
+
+
+> testDesugarStmts :: (String,([Stmt],[CheckBlock])) -> T.TestTree
+> testDesugarStmts (src, ex) = T.testCase ("desugar " ++ src) $
+>     either error (T.assertEqual "" ex) $
+>       desugarStmts =<< parseStmts "" src
