@@ -298,8 +298,5 @@
 >     let s = "block:\n" ++ defs ++ "\n" ++ src ++ "\nend"
 >         ast = either error id $ parseStmts "" s
 >         iast = either error id $ desugarStmts ast
->     x <- I.interp iast
->     either error (T.assertEqual "" ex) x
->  where
->    {-extract ([a@(I.StExpr {})], _) = a
->    extract (x,_) = error $ show x-}
+>     Right (Just x) <- I.interp iast
+>     T.assertEqual "" ex x

@@ -38,7 +38,7 @@ can also think about doing a prepCode or something
 > runCode src = do
 >     let p = either error id $ compileProgram src
 >     x <- interp p
->     either error (pure . Just) x
+>     either error pure x
 >  {-where
 >    extract [a@(I.StExpr {})] = a
 >    extract x = error $ "not an stexpr:" ++ show x-}

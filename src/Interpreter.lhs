@@ -124,13 +124,13 @@ temp testing until agdt are implemented
 
 > instance Exception MyException
 
-> interp :: I.Program -> IO (Either String Value)
+> interp :: I.Program -> IO (Either String (Maybe Value))
 > interp (I.Program sts _) = do
 >     case sts of
->         Nothing -> pure $ pure $ BoolV False
+>         Nothing -> pure $ pure Nothing
 >         Just x -> do
 >             (result, _store, _log) <- runRWST (interpStmt' x) defaultHaskellFFIEnv emptyStore
->             pure $ pure $ result
+>             pure $ pure $ Just $ result
 
 > {-interpx :: I.Stmt -> IO (Either String Value)
 > interpx st = do
