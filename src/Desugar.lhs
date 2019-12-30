@@ -14,13 +14,13 @@ TODO: change this to return a program
 doing this weird create [I.Stmt], then seqify, doesn't seem like a
 good way to do it
 
-> desugarStmts :: [S.Stmt] -> Either String ([I.Stmt], [I.CheckBlock])
+> desugarStmts :: [S.Stmt] -> Either String I.Program
 > desugarStmts st = do
 >     (a,b) <- desugarStmts' st
 >     a' <- case a of
->             [] -> pure []
->             _ -> (\x -> [I.StExpr x]) <$> seqify a
->     pure (a', b)
+>             [] -> pure Nothing
+>             _ -> (Just . I.StExpr) <$> seqify a
+>     pure $ I.Program a' b
 
 
 > desugarStmts' :: [S.Stmt] -> Either String ([I.Stmt], [I.CheckBlock])
@@ -79,7 +79,8 @@ when a fun or rec is seen, it will collect subsequent funs and recs
 >     case x of
 >         [] -> pure ()
 >         _ -> Left $ "internal error: test in desugared test"
->     pure ([], [I.CheckBlock nm' sts''])
+>     sts''' <- seqify sts''
+>     pure ([], [I.CheckBlock nm' (I.StExpr sts''')])
 >     
 
 > desugarTestStmts :: [S.TestStmt] -> Either String [S.Stmt]

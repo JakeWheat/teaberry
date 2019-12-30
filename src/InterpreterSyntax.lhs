@@ -5,7 +5,7 @@ The syntax which the interpreter uses
 
 > import Data.Scientific (Scientific)
 
-> data Program = Program [Stmt] [CheckBlock]
+> data Program = Program (Maybe Stmt) [CheckBlock]
 >               deriving (Eq,Show)
 
 TODO: add provides and imports
@@ -39,7 +39,7 @@ TODO: add provides and imports
 >               | Str String
 >               deriving (Eq,Show)
 
-> data CheckBlock = CheckBlock String [Stmt]
+> data CheckBlock = CheckBlock String Stmt
 >               deriving (Eq,Show)
 
 

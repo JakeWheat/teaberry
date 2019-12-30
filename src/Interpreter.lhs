@@ -126,10 +126,11 @@ temp testing until agdt are implemented
 
 > interp :: I.Program -> IO (Either String Value)
 > interp (I.Program sts _) = do
->     (result, _store, _log) <- runRWST (mapM interpStmt' sts) defaultHaskellFFIEnv emptyStore
->     case result of
->         [] -> pure $ pure $ BoolV False
->         _ -> pure $ pure $ last result
+>     case sts of
+>         Nothing -> pure $ pure $ BoolV False
+>         Just x -> do
+>             (result, _store, _log) <- runRWST (interpStmt' x) defaultHaskellFFIEnv emptyStore
+>             pure $ pure $ result
 
 > {-interpx :: I.Stmt -> IO (Either String Value)
 > interpx st = do
@@ -138,7 +139,7 @@ temp testing until agdt are implemented
 
 > runChecks :: I.Program -> IO (Either String [CheckResult])
 > runChecks (I.Program _ cbs) = do
->     let st = concat $ map f cbs
+>     let st = map f cbs
 >     (_result, _store, lg) <- runRWST (mapM interpStmt' st) defaultHaskellFFIEnv emptyStore
 >     let gs = map (\x -> (blockName x, toCheckResult x)) lg
 >         gs' = partitionN gs

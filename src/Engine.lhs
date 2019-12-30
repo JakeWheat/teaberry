@@ -32,8 +32,7 @@ can also think about doing a prepCode or something
 > compileProgram :: String -> Either String I.Program
 > compileProgram src = do
 >     ast <- parseStmts "" src
->     p <- desugarStmts ast
->     pure $ uncurry Program p
+>     desugarStmts ast
 
 > runCode :: String -> IO (Maybe Value)
 > runCode src = do
@@ -75,6 +74,7 @@ can also think about doing a prepCode or something
 > runChecks :: String -> IO [CheckResult]
 > runChecks src = do
 >     let p = either error id $ compileProgram src
+>     --putStrLn $ ppShow p
 >     x <- I.runChecks p
 >     either error pure x
 >  -- where

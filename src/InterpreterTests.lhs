@@ -10,7 +10,7 @@
 > import Desugar (desugarStmts)
 > import Interpreter (Value(..))
 > import qualified Interpreter as I
-> import qualified InterpreterSyntax as I
+> --import qualified InterpreterSyntax as I
 >
 
 > interpreterExamples :: [(String, String, Value)]
@@ -298,7 +298,7 @@
 >     let s = "block:\n" ++ defs ++ "\n" ++ src ++ "\nend"
 >         ast = either error id $ parseStmts "" s
 >         iast = either error id $ desugarStmts ast
->     x <- I.interp (uncurry I.Program iast)
+>     x <- I.interp iast
 >     either error (T.assertEqual "" ex) x
 >  where
 >    {-extract ([a@(I.StExpr {})], _) = a
