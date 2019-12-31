@@ -149,5 +149,14 @@
 > xSep x ds = sep $ punctuate (text x) ds
 
 > program :: Program -> Doc
-> program (Program _ _ _ sts) = stmts sts
+> program (Program prov _ _ sts) =
+>     vcat [maybe empty provide prov
+>          ,stmts sts]
+
+> provide :: Provide -> Doc
+> provide (ProvideAll) = text "provide" <+> text "*"
+> provide (Provide ps) =
+>     text "provide" <+> text "{" <+> nest 2 (commaSep $ map p ps) <+> text "}" <+> text "end"
+>   where
+>     p (a,b) = text a <+> text ":" <+> text b
 

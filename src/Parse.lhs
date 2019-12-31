@@ -148,7 +148,10 @@ the can get rid of more trys
 > reservedKeywords =
 >     ["end", "lam", "let", "letrec", "if", "else", "ask", "then"
 >     ,"otherwise", "block", "cases", "when", "var", "check"
->     ,"where", "fun", "rec", "data" ]
+>     ,"where", "fun", "rec", "data"
+>     ,"import", "provide", "provide-types"
+>     ,"from"
+>     ]
 
 > identifierX :: Parser String
 > identifierX =
@@ -461,5 +464,12 @@ todo: factor this with the stmt parser
 >             ,"satisfies", "violates", "raises"]
 
 > program :: Parser Program
-> program = Program Nothing Nothing [] <$> many stmt
+> program = Program <$> optional provide <*> pure Nothing <*> pure [] <*> many stmt
+
+> provide :: Parser Provide
+> provide = try (keyword_ "provide" *> choice
+>     [Provide <$> (symbol_ "{" *> commaSep p <* symbol_ "}" <* keyword_ "end")
+>     ,ProvideAll <$ symbol_ "*"])
+>   where
+>     p = (,) <$> identifier <*> (symbol_ ":" *> identifier)
 

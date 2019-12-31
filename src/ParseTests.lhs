@@ -299,7 +299,19 @@ todo: review all the whitespace rules that are being ignored
 >      num = Sel . Num
 
 > parseProgramExamples :: [(String,Program)]
-> parseProgramExamples = []
+> parseProgramExamples =
+>     [("\"hello\""
+>      ,Program Nothing Nothing [] [StExpr $ Sel $ Str "hello"])
+
+>     ,("provide {\n\
+>       \  x : x\n\
+>       \}\n\
+>       \end\n\
+>       \5"
+>      ,Program (Just $ Provide [("x","x")]) Nothing [] [StExpr $ Sel $ Num 5])
+
+>     ]
+
 
 > testParseX :: (Eq a, Show a) => (FilePath -> String -> Either String a)
 >            -> (a -> String)
