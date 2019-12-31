@@ -223,6 +223,11 @@ end
 then desugar using the usual algo, making sure the x and y bindings
  come at the end
 
+here is a case to cover, a recursive value:
+rec tr = node("rec", lam(): tr end, lam(): tr end)
+
+without the lambdas, is this only possible in a lazy language?
+check the graphs section of papl
 
 other todo for letrec:
   generate unique names

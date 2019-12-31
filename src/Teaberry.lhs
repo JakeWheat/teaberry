@@ -12,6 +12,16 @@ add provides and imports
 
 add option to also run tests
 and to run only the tests
+possibly run tests quietly and exit more noisily if there is a failure
+  -> this is interesting for non top level tests which are still pretty useful
+     but don't really fit into a normal test only run
+     think about how to make them more viable:
+     option to execute every time the block is 'executed'
+       or just the first time
+     if you want to test these as part of a test only run
+     -> want to log the results with all the other test results
+     and maybe make some test assertions about how many times a test is run
+     to make sure there's a failure if e.g. it isn't run at all
 
 
 > import System.Environment (getArgs)

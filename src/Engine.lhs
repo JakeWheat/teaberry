@@ -7,6 +7,9 @@ runTests -> runs only the tests in the script
 can also think about doing a prepCode or something
   then you can run the tests, and run the script itself separately
   without "recompiling"
+once do imports, have an option to run all tests
+  or just the tests in the immediately loaded file
+
 
 > module Engine (runCode
 >               ,Value(..)

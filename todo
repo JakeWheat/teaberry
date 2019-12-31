@@ -1,11 +1,23 @@
 
 basic untyped pyret dialect
 
+
+ability to run scripts in the language as part of the system automated
+  testing
+
+tuples
+records
+import and provides
+data, cases, boxes
+annotations, contracts
+
+plenty of example scripts
+
 finish rec
 top level rec handling
-import and provides
-agdt
-api/ux
+api/ux/ffi another pass
+scripting front end
+a quick standard lib
 
 table stuff
 
