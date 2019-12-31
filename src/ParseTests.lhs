@@ -345,6 +345,47 @@ todo: review all the whitespace rules that are being ignored
 >      ,Program (Just ProvideAll)
 >       (Just ProvideTypesAll) [] [StExpr $ Sel $ Num 5])
 
+>     ,("import file(\"./pyret/main2.arr\") as _\n\
+>       \5"
+>      ,Program Nothing Nothing
+>       [Import (ImportSpecial "file" ["./pyret/main2.arr"]) "_"]
+>       [StExpr $ Sel $ Num 5])
+
+>     ,("import s_exp as S\n\
+>       \5"
+>      ,Program Nothing Nothing
+>       [Import (ImportName "s_exp") "S"]
+>       [StExpr $ Sel $ Num 5])
+
+>     ,("import is_invalid_array_index from error\n\
+>       \5"
+>      ,Program Nothing Nothing
+>       [ImportFrom ["is_invalid_array_index"] (ImportName "error")]
+>       [StExpr $ Sel $ Num 5])
+
+>     ,("import \"./tests/test-strings.arr\" as _\n\
+>       \5"
+>      ,Program Nothing Nothing
+>       [Import (ImportString "./tests/test-strings.arr") "_"]
+>       [StExpr $ Sel $ Num 5])
+
+>     ,("import a,b from c\n\
+>       \5"
+>      ,Program Nothing Nothing
+>       [ImportFrom ["a", "b"] (ImportName "c")]
+>       [StExpr $ Sel $ Num 5])
+
+
+>     ,("provide *\n\
+>       \provide_types *\n\
+>       \import file(\"./pyret/main2.arr\") as _\n\
+>       \import s_exp as S\n\
+>       \5"
+>      ,Program (Just ProvideAll) (Just ProvideTypesAll)
+>       [Import (ImportSpecial "file" ["./pyret/main2.arr"]) "_"
+>       ,Import (ImportName "s_exp") "S"]
+>       [StExpr $ Sel $ Num 5])
+
 >     ]
 
 

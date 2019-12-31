@@ -464,7 +464,7 @@ todo: factor this with the stmt parser
 >             ,"satisfies", "violates", "raises"]
 
 > program :: Parser Program
-> program = Program <$> optional provide <*> optional provideTypes <*> pure [] <*> many stmt
+> program = Program <$> optional provide <*> optional provideTypes <*> many importS <*> many stmt
 
 > provide :: Parser Provide
 > provide = try (keyword_ "provide" *> choice
@@ -479,4 +479,17 @@ todo: factor this with the stmt parser
 >     ,ProvideTypesAll <$ symbol_ "*"] 
 >   where
 >     p = (,) <$> identifier <*> (symbol_ "::" *> identifier)
+
+> importS :: Parser Import
+> importS = do
+>     keyword_ "import"
+>     choice [try importFrom
+>            ,importAs]
+>   where
+>     importFrom = ImportFrom <$> commaSep identifier <*> (keyword_ "from" *> importSource)
+>     importSource = choice [try (ImportSpecial <$> identifier
+>                                 <*> parens (commaSep stringRaw))
+>                           ,ImportString <$> stringRaw
+>                           ,ImportName <$> identifier]
+>     importAs = Import <$> importSource <*> (keyword_ "as" *> identifier)
 

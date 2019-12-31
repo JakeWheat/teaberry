@@ -149,9 +149,10 @@
 > xSep x ds = sep $ punctuate (text x) ds
 
 > program :: Program -> Doc
-> program (Program prov provt _ sts) =
+> program (Program prov provt im sts) =
 >     vcat [maybe empty provide prov
 >          ,maybe empty provideTypes provt
+>          ,vcat $ map importp im
 >          ,stmts sts]
 
 > provide :: Provide -> Doc
@@ -167,4 +168,13 @@
 >     text "provide_types" <+> text "{" <+> nest 2 (commaSep $ map p ps) <+> text "}"
 >   where
 >     p (a,b) = text a <+> text "::" <+> text b
+
+> importp :: Import -> Doc
+> importp (Import is s) = text "import" <+> importSource is <+> text "as" <+> text s
+> importp (ImportFrom is s) = text "import" <+> (commaSep $ map text is) <+> text "from" <+> importSource s
+ 
+> importSource :: ImportSource -> Doc
+> importSource (ImportSpecial nm as) = text nm <> parens (commaSep $ map (doubleQuotes . text) as)
+> importSource (ImportName s) = text s
+> importSource (ImportString s) = doubleQuotes (text s)
 
