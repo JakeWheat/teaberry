@@ -20,7 +20,6 @@
 
 > main :: IO ()
 > main = do
->     --testTests <- T.testGroup "test tests" <$> mapM testDetailedSourceFile detailedSourceFileTests
 >     sourceFileTests <- T.testGroup "source file tests" <$> mapM testSourceFile sourceFiles
 >     T.defaultMain $ T.testGroup "all"
 >         [T.testGroup "parse"
@@ -30,6 +29,6 @@
 >         ,T.testGroup "desugarExpr" $ map testDesugarExpr desugarExprExamples
 >         ,T.testGroup "desugarStmts" $ map testDesugarStmts desugarStmtsExamples
 >         ,T.testGroup "interpret" $ map testInterpreter interpreterExamples
+>         ,T.testGroup "test tests" $ map testDetailedSourceFile detailedSourceFileTests
 >         ,sourceFileTests
->         --,T.testGroup "test tests" testTests
 >         ]

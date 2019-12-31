@@ -1,4 +1,7 @@
 
+TODO:
+move most of these tests to language based tests
+
 > {-# LANGUAGE TupleSections #-}
 > module InterpreterTests (interpreterExamples, testInterpreter) where
 
@@ -280,23 +283,6 @@
 >           \f4 = lam (x): if x: 1 else: 0 end end\n\
 >           \add2 = lam (a): a + 2 end\n\
 >           \myVar = 1"
-
-TODO:
-
-test a trivial test passing
-test a trivial test failing
-
-
-     [("check \"a first block\":\n\
-       \  5 is 5\n\
-       \end"
-      ,([],[CheckBlock "a first block"
-            [StExpr $ app2 "runtest" (binop (num 5) "==" (num 5)) (str "5 is 5")]]))
-     ]
-
-
-
-
 
 > testInterpreter :: (String, String, Value) -> T.TestTree
 > testInterpreter (src, defs, ex) = T.testCase ("interp " ++ src) $ do

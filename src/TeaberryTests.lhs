@@ -8,6 +8,8 @@ wrapper to lift tests written in the language into tests for the
 >                      ,detailedSourceFileTests
 >                      ,testDetailedSourceFile) where
 
+> import Data.List (partition)
+> import Data.Maybe (isNothing)
 
 > import qualified Test.Tasty as T
 > import qualified Test.Tasty.HUnit as T
@@ -15,18 +17,31 @@ wrapper to lift tests written in the language into tests for the
 > import qualified Engine as E
 
 
-todo: run tests on a few example files and check the precise test results
+> detailedSourceFileTests :: [(FilePath, Int, Int)]
+> detailedSourceFileTests =
+>     [(p "test_is_pass.tea", 1, 0)
+>     ,(p "test_is_fail.tea", 0, 1)
+>     ,(p "two_tests_pass.tea", 2, 0)
+>     ,(p "two_tests_fail.tea", 0, 2)
+>     ,(p "one_pass_one_fail.tea", 1, 1)
+>      -- test trivial success for each kind of test
+>      -- test trivial failure for each kind of test
+>     ]
+>   where
+>       p = ("examples/tests/testing_tests/" ++)
 
-this will also test that test failures are picked up
-
-> -- tests which run the tests, and then check predicates on the results
-> data DetailedSourceFileTest = A Int
-
-> detailedSourceFileTests :: [DetailedSourceFileTest]
-> detailedSourceFileTests = undefined
-
-> testDetailedSourceFile :: T.TestTree
-> testDetailedSourceFile = undefined
+> testDetailedSourceFile :: (FilePath, Int, Int) -> T.TestTree
+> testDetailedSourceFile (fn, passNum, failNum) = T.testCase fn $ do
+>     src <- readFile fn
+>     cs <- E.runChecks src
+>     let cnts = map passAndFailCount cs
+>     T.assertEqual "pass, fail count"
+>         (passNum,failNum)
+>         (sum $ map fst cnts,sum $ map snd cnts)
+>   where
+>     passAndFailCount (E.CheckResult _cn ts) =
+>         let (a,b) = partition (\(_,x) -> isNothing x) ts
+>         in (length a, length b)
 
 > -- these tests load the file, then run the tests from the files
 > -- then hoist the tests into Tasty

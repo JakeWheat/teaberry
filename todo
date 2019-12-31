@@ -40,3 +40,38 @@ think about a lower level interpreter (keep the high level one too)
   1. prep for llvm compilation
   2. optimisation
 
+
+-------------------------------------
+
+overall testing architecture:
+
+1. test most things in language source: this is the main way to test
+the interpreter as well as the whole system
+
+2. think about the desugaring tests. these are useful for a sanity
+check/maintaining code. they are difficult to write at the moment
+try to find better ways to write the tests and structure the code
+
+3. test parsing and pretty printing directly
+
+4. testing the test framework stuff
+
+5. tests for the engine api
+-> will cover ffi in the future
+
+6. tests for the command line api
+
+then more advanced testing:
+performance benchmarks
+stability tests
+anomaly tests
+
+after start doing more advanced features, will do more testing types
+in addition to elaborating on these
+
+think about some sort of quickcheck style testing
+-> this will be much more useful once start on a low level bytecode or
+   llvm implementation
+
+ability to profile effectively
+test reports, ci, more interesting testing stuff
