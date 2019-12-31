@@ -5,13 +5,9 @@
 > import ParseTests (testParseExpr
 >                   ,parseExprExamples
 >                   ,testParseStmt
->                   ,parseStmtExamples
->                   ,testParseStmts
->                   ,parseStmtsExamples)
+>                   ,parseStmtExamples)
 > import DesugarTests (testDesugarExpr
->                     ,desugarExprExamples
->                     ,testDesugarStmts
->                     ,desugarStmtsExamples)
+>                     ,desugarExprExamples)
 > import InterpreterTests (testInterpreter,interpreterExamples)
 > import TeaberryTests (sourceFiles
 >                      ,testSourceFile
@@ -24,10 +20,8 @@
 >     T.defaultMain $ T.testGroup "all"
 >         [T.testGroup "parse"
 >             [T.testGroup "parseExpr" $ map testParseExpr parseExprExamples
->             ,T.testGroup "parseStmt" $ map testParseStmt parseStmtExamples
->             ,T.testGroup "parseStmts" $ map testParseStmts parseStmtsExamples]
+>             ,T.testGroup "parseStmt" $ map testParseStmt parseStmtExamples]
 >         ,T.testGroup "desugarExpr" $ map testDesugarExpr desugarExprExamples
->         ,T.testGroup "desugarStmts" $ map testDesugarStmts desugarStmtsExamples
 >         ,T.testGroup "interpret" $ map testInterpreter interpreterExamples
 >         ,T.testGroup "test tests" $ map testDetailedSourceFile detailedSourceFileTests
 >         ,sourceFileTests

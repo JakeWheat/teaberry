@@ -49,16 +49,16 @@
 
 = api
 
-> parseExpr :: String -> String -> Either String Expr
+> parseExpr :: FilePath -> String -> Either String Expr
 > parseExpr fn src = either (Left . errorBundlePretty) Right $
 >                    parse (whiteSpace *> expr <* eof) fn src
 
-> parseStmt :: String -> String -> Either String Stmt
+> parseStmt :: FilePath -> String -> Either String Stmt
 > parseStmt fn src = either (Left . errorBundlePretty) Right $
 >                    parse (whiteSpace *> stmt <* eof) fn src
 
 
-> parseStmts :: String -> String -> Either String [Stmt]
+> parseStmts :: FilePath -> String -> Either String [Stmt]
 > parseStmts fn src = either (Left . errorBundlePretty) Right $
 >                     parse (whiteSpace *> many stmt <* eof) fn src
 

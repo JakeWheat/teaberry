@@ -2,15 +2,13 @@
 > module ParseTests (parseExprExamples
 >                   ,testParseExpr
 >                   ,parseStmtExamples
->                   ,testParseStmt
->                   ,parseStmtsExamples
->                   ,testParseStmts) where
+>                   ,testParseStmt) where
 >
 > import qualified Test.Tasty as T
 > import qualified Test.Tasty.HUnit as T
 
 > import Syntax (Stmt(..), Expr(..), Selector(..), VariantDecl(..), Pat(..), TestStmt(..))
-> import Parse (parseExpr, parseStmt, parseStmts)
+> import Parse (parseExpr, parseStmt)
 > import Pretty (prettyExpr, prettyStmts)
 
 > parseExprExamples :: [(String, Expr)]
@@ -291,39 +289,24 @@ todo: review all the whitespace rules that are being ignored
 >  where
 >      num = Sel . Num
 
-> parseStmtsExamples :: [(String, [Stmt])]
-> parseStmtsExamples = [("", [])]
+
+> testParseX :: (Eq a, Show a) => (FilePath -> String -> Either String a)
+>            -> (a -> String)
+>            -> (String,a)
+>            -> T.TestTree
+> testParseX parse pretty (src, ex) = T.testCase src $ do
+>     case parse "" src of
+>         Left er -> error er
+>         Right x -> do
+>             T.assertEqual "" ex x
+>             let src1 = pretty x
+>             case parse "" src1 of
+>                 Left er -> error er
+>                 Right x1 -> T.assertEqual "ppp" ex x1
 
 
 > testParseExpr :: (String,Expr) -> T.TestTree
-> testParseExpr (src, ex) = T.testCase ("parseexpr " ++ src) $ do
->     case parseExpr "" src of
->         Left er -> error er
->         Right x -> do
->             T.assertEqual "" ex x
->             let src1 = prettyExpr x
->             case parseExpr "" src1 of
->                 Left er -> error er
->                 Right x1 -> T.assertEqual "ppp" ex x1
+> testParseExpr t = testParseX parseExpr prettyExpr t
 
 > testParseStmt :: (String,Stmt) -> T.TestTree
-> testParseStmt (src, ex) = T.testCase ("parsestmt " ++ src) $ do
->     case parseStmt "" src of
->         Left er -> error er
->         Right x -> do
->             T.assertEqual "" ex x
->             let src1 = prettyStmts [x]
->             case parseStmt "" src1 of
->                 Left er -> error er
->                 Right x1 -> T.assertEqual "ppp" ex x1
-
-> testParseStmts :: (String,[Stmt]) -> T.TestTree
-> testParseStmts (src, ex) = T.testCase ("parsestmts " ++ src) $ do
->     case parseStmts "" src of
->         Left er -> error er
->         Right x -> do
->             T.assertEqual "" ex x
->             let src1 = prettyStmts x
->             case parseStmts "" src1 of
->                 Left er -> error er
->                 Right x1 -> T.assertEqual "ppp" ex x1
+> testParseStmt t = testParseX parseStmt (prettyStmts . (:[])) t
