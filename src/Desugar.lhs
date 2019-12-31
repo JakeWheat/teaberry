@@ -9,8 +9,6 @@
 > import qualified Pretty as P
 
 
-TODO: change this to return a program
-
 doing this weird create [I.Stmt], then seqify, doesn't seem like a
 good way to do it
 
@@ -24,28 +22,31 @@ good way to do it
 
 
 > desugarStmts' :: [S.Stmt] -> Either String ([I.Stmt], [I.CheckBlock])
-> desugarStmts' (s:ss) | isRec s = do
+> desugarStmts' (s:ss) | Just s' <- convRec s = do
 
 rules for fun and rec:
 when a fun or rec is seen, it will collect subsequent funs and recs
 (both) and then desugar them all together as one letrec
 
 >     -- get all the immediately following recursive defs
->     let (adddecls,ss') = span isRec ss
+>     let (adddecls,ss') = spanMaybe convRec ss
 >     -- desugar them to regular let together
->     defs <- desugarRecs =<< mapM splitRec (s:adddecls)
+>     defs <- desugarRecs (s' : adddecls)
 >     -- desugar to interpreter syntax
 >     idecls <- desugarStmts' $ map (uncurry S.LetDecl) defs
 >     addStuff idecls <$> desugarStmts' ss'
 >   where
->     isRec (S.FunDecl {}) = True
->     isRec (S.RecDecl {}) = True
->     isRec _ = False
->     splitRec (S.FunDecl nm as bdy whr) = pure (nm, (S.Lam as bdy))
->     splitRec (S.RecDecl nm e) = pure (nm, e)
->     splitRec x = Left $ "unexpected non fun/rec decl: " ++ show x
+>     convRec (S.FunDecl nm as bdy whr) = Just (nm, (S.Lam as bdy))
+>     convRec (S.RecDecl nm e) = Just (nm, e)
+>     convRec _ = Nothing -- x = Left $ "unexpected non fun/rec decl: " ++ show x
 > desugarStmts' (s:ss) = addStuff <$> desugarStmt s <*> desugarStmts' ss
 > desugarStmts' [] = pure ([],[])
+
+> spanMaybe :: (t -> Maybe a) -> [t] -> ([a], [t])
+> spanMaybe _ xs@[] =  ([], xs)
+> spanMaybe p xs@(x:xs') = case p x of
+>     Just y  -> let (ys, zs) = spanMaybe p xs' in (y : ys, zs)
+>     Nothing -> ([], xs)
 
 > addStuff :: ([a],[b]) -> ([a],[b]) -> ([a],[b])
 > addStuff (a,b) (a', b') = (a ++ a', b ++ b')
