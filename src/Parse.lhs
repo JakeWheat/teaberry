@@ -45,7 +45,11 @@
 
 > import Syntax (Stmt(..), Expr(..), Selector(..), VariantDecl(..)
 >               , Pat(..), TestStmt(..)
->               ,Program(..))
+>               ,Program(..)
+>               ,Provide(..)
+>               ,ProvideTypes(..)
+>               ,Import(..)
+>               ,ImportSource(..))
 
 ------------------------------------------------------------------------------
 
@@ -457,5 +461,5 @@ todo: factor this with the stmt parser
 >             ,"satisfies", "violates", "raises"]
 
 > program :: Parser Program
-> program = Program <$> many stmt
+> program = Program Nothing Nothing [] <$> many stmt
 

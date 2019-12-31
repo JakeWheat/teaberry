@@ -10,7 +10,7 @@
 
 
 > desugarProgram :: S.Program -> Either String I.Program
-> desugarProgram (S.Program stmts) =
+> desugarProgram (S.Program Nothing Nothing [] stmts) =
 >     desugarStmts stmts
 
 doing this weird create [I.Stmt], then seqify, doesn't seem like a

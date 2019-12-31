@@ -10,15 +10,38 @@ The high level syntax which the parser produces
 >               ,Pat(..)
 >               ,TestStmt(..)
 >               ,Program(..)
+>               ,Provide(..)
+>               ,ProvideTypes(..)
+>               ,Import(..)
+>               ,ImportSource(..)
 >               ) where
 
 > import Data.Data (Data,Typeable)
 > import Data.Scientific (Scientific)
 > import GHC.Generics (Generic)
 
-> data Program = Program [Stmt]
+> data Program = Program (Maybe Provide) (Maybe ProvideTypes)
+>                [Import]
+>                [Stmt]
 >               deriving (Eq,Show)
 
+> data Provide = ProvideAll
+>              | Provide [(String, String)]
+>              deriving (Eq,Show)
+> data ProvideTypes = ProvideTypesAll
+>                   | ProvideTypes [(String,String)]
+>                   deriving (Eq,Show)
+
+> data Import = Import ImportSource String
+>             | ImportFrom [String] ImportSource
+>                   deriving (Eq,Show)
+
+> data ImportSource = ImportSpecial String [String]
+>                   | ImportName String
+>                   | ImportString String
+>                   deriving (Eq,Show)
+
+ 
 
 > data Stmt = StExpr Expr
 >           | When Expr Expr

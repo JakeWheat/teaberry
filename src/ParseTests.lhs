@@ -11,7 +11,12 @@
 > import qualified Test.Tasty.HUnit as T
 
 > import Syntax (Stmt(..), Expr(..), Selector(..), VariantDecl(..), Pat(..), TestStmt(..)
->               ,Program(..))
+>               ,Program(..)
+>               ,Provide(..)
+>               ,ProvideTypes(..)
+>               ,Import(..)
+>               ,ImportSource(..))
+
 > import Parse (parseExpr, parseStmt, parseProgram)
 > import Pretty (prettyExpr, prettyStmts, prettyProgram)
 

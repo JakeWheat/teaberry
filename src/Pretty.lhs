@@ -15,7 +15,11 @@
 >                          {-braces, ($$), ($+$),-} vcat)
 
 > import Syntax (Stmt(..), Expr(..), Selector(..), VariantDecl(..), Pat(..), TestStmt(..)
->               ,Program(..))
+>               ,Program(..)
+>               ,Provide(..)
+>               ,ProvideTypes(..)
+>               ,Import(..)
+>               ,ImportSource(..))
 
 
 > prettyExpr :: Expr -> String
@@ -145,5 +149,5 @@
 > xSep x ds = sep $ punctuate (text x) ds
 
 > program :: Program -> Doc
-> program (Program sts) = stmts sts
+> program (Program _ _ _ sts) = stmts sts
 
