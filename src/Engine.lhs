@@ -22,9 +22,9 @@ once do imports, have an option to run all tests
 > import Data.Maybe (isNothing)
 
 > --import Syntax
-> import Parse (parseStmts)
+> import Parse (parseProgram)
 > --import Pretty
-> import Desugar (desugarStmts)
+> import Desugar (desugarProgram)
 > import Interpreter (interp, Value(..), CheckResult(..))
 > import qualified Interpreter as I
 > import InterpreterSyntax as I
@@ -34,8 +34,8 @@ once do imports, have an option to run all tests
 
 > compileProgram :: String -> Either String I.Program
 > compileProgram src = do
->     ast <- parseStmts "" src
->     desugarStmts ast
+>     ast <- parseProgram "" src
+>     desugarProgram ast
 
 > runCode :: String -> IO (Maybe Value)
 > runCode src = do

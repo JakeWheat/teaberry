@@ -2,14 +2,18 @@
 > module ParseTests (parseExprExamples
 >                   ,testParseExpr
 >                   ,parseStmtExamples
->                   ,testParseStmt) where
+>                   ,testParseStmt
+>                   ,parseProgramExamples
+>                   ,testParseProgram
+>                   ) where
 >
 > import qualified Test.Tasty as T
 > import qualified Test.Tasty.HUnit as T
 
-> import Syntax (Stmt(..), Expr(..), Selector(..), VariantDecl(..), Pat(..), TestStmt(..))
-> import Parse (parseExpr, parseStmt)
-> import Pretty (prettyExpr, prettyStmts)
+> import Syntax (Stmt(..), Expr(..), Selector(..), VariantDecl(..), Pat(..), TestStmt(..)
+>               ,Program(..))
+> import Parse (parseExpr, parseStmt, parseProgram)
+> import Pretty (prettyExpr, prettyStmts, prettyProgram)
 
 > parseExprExamples :: [(String, Expr)]
 > parseExprExamples = [("a", Iden "a")
@@ -289,6 +293,8 @@ todo: review all the whitespace rules that are being ignored
 >  where
 >      num = Sel . Num
 
+> parseProgramExamples :: [(String,Program)]
+> parseProgramExamples = []
 
 > testParseX :: (Eq a, Show a) => (FilePath -> String -> Either String a)
 >            -> (a -> String)
@@ -310,3 +316,7 @@ todo: review all the whitespace rules that are being ignored
 
 > testParseStmt :: (String,Stmt) -> T.TestTree
 > testParseStmt t = testParseX parseStmt (prettyStmts . (:[])) t
+
+> testParseProgram :: (String,Program) -> T.TestTree
+> testParseProgram t = testParseX parseProgram prettyProgram t
+

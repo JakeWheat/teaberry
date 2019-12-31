@@ -1,7 +1,7 @@
 
 > module Parse (parseExpr
 >              ,parseStmt
->              ,parseStmts) where
+>              ,parseProgram) where
 
 
 > import Text.Megaparsec (Parsec
@@ -43,7 +43,9 @@
 > import Data.Char (isAlphaNum,isDigit)
 
 
-> import Syntax (Stmt(..), Expr(..), Selector(..), VariantDecl(..), Pat(..), TestStmt(..))
+> import Syntax (Stmt(..), Expr(..), Selector(..), VariantDecl(..)
+>               , Pat(..), TestStmt(..)
+>               ,Program(..))
 
 ------------------------------------------------------------------------------
 
@@ -58,10 +60,10 @@
 >                    parse (whiteSpace *> stmt <* eof) fn src
 
 
-> parseStmts :: FilePath -> String -> Either String [Stmt]
-> parseStmts fn src = either (Left . errorBundlePretty) Right $
->                     parse (whiteSpace *> many stmt <* eof) fn src
 
+> parseProgram :: FilePath -> String -> Either String Program
+> parseProgram fn src = either (Left . errorBundlePretty) Right $
+>                     parse (whiteSpace *> program <* eof) fn src
 
 ------------------------------------------------------------------------------
 
@@ -453,3 +455,7 @@ todo: factor this with the stmt parser
 >       tks = ["is_not", "is"
 >             ,"raises_other_than", "raises_satisfies", "raises_violates"
 >             ,"satisfies", "violates", "raises"]
+
+> program :: Parser Program
+> program = Program <$> many stmt
+

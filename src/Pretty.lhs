@@ -3,6 +3,7 @@
 > module Pretty (prettyExpr
 >               ,prettyStmts
 >               ,prettyTestStmt
+>               ,prettyProgram
 >               ) where
 
 > import Data.Scientific (floatingOrInteger)
@@ -13,7 +14,9 @@
 >                          doubleQuotes,
 >                          {-braces, ($$), ($+$),-} vcat)
 
-> import Syntax (Stmt(..), Expr(..), Selector(..), VariantDecl(..), Pat(..), TestStmt(..))
+> import Syntax (Stmt(..), Expr(..), Selector(..), VariantDecl(..), Pat(..), TestStmt(..)
+>               ,Program(..))
+
 
 > prettyExpr :: Expr -> String
 > prettyExpr = render . expr
@@ -23,6 +26,10 @@
 
 > prettyTestStmt :: TestStmt -> String
 > prettyTestStmt = render . testStmt
+
+> prettyProgram :: Program -> String
+> prettyProgram = render . program
+
 
 > expr :: Expr -> Doc
 > expr (Sel (Num n)) = text $ case floatingOrInteger n of
@@ -136,3 +143,7 @@
 
 > xSep :: String -> [Doc] -> Doc
 > xSep x ds = sep $ punctuate (text x) ds
+
+> program :: Program -> Doc
+> program (Program sts) = stmts sts
+

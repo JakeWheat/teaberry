@@ -9,8 +9,8 @@ move most of these tests to language based tests
 > import qualified Test.Tasty as T
 > import qualified Test.Tasty.HUnit as T
 
-> import Parse (parseStmts)
-> import Desugar (desugarStmts)
+> import Parse (parseProgram)
+> import Desugar (desugarProgram)
 > import Interpreter (Value(..))
 > import qualified Interpreter as I
 > --import qualified InterpreterSyntax as I
@@ -287,7 +287,7 @@ move most of these tests to language based tests
 > testInterpreter :: (String, String, Value) -> T.TestTree
 > testInterpreter (src, defs, ex) = T.testCase ("interp " ++ src) $ do
 >     let s = "block:\n" ++ defs ++ "\n" ++ src ++ "\nend"
->         ast = either error id $ parseStmts "" s
->         iast = either error id $ desugarStmts ast
+>         ast = either error id $ parseProgram "" s
+>         iast = either error id $ desugarProgram ast
 >     Right (Just x) <- I.interp iast
 >     T.assertEqual "" ex x

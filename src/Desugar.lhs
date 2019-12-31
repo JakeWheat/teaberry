@@ -1,5 +1,5 @@
 
-> module Desugar (desugarStmts,desugarExpr) where
+> module Desugar (desugarProgram,desugarExpr) where
 
 > import Data.Generics.Uniplate.Data (transformBi)
 > import Data.Maybe (catMaybes, mapMaybe)
@@ -8,6 +8,10 @@
 > import qualified InterpreterSyntax as I
 > import qualified Pretty as P
 
+
+> desugarProgram :: S.Program -> Either String I.Program
+> desugarProgram (S.Program stmts) =
+>     desugarStmts stmts
 
 doing this weird create [I.Stmt], then seqify, doesn't seem like a
 good way to do it
