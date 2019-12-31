@@ -1,16 +1,14 @@
 
 > module DesugarTests (desugarExprExamples
 >                     ,testDesugarExpr
->                     ,desugarStmtsExamples
->                     ,testDesugarStmts
 >                     ) where
 >
 > import qualified Test.Tasty as T
 > import qualified Test.Tasty.HUnit as T
 
-> import Parse (parseExpr, parseStmts)
+> import Parse (parseExpr)
 > import InterpreterSyntax (Stmt(..), Expr(..), Selector(..), {-CheckBlock(..),-} Program(..))
-> import Desugar (desugarExpr, desugarStmts)
+> import Desugar (desugarExpr)
 > --import qualified Syntax as S
 
 > desugarExprExamples :: [(String, Expr)]
@@ -109,7 +107,7 @@ block:
   false
 end
 
-> desugarStmtsExamples :: [(String, Program)]
+> {-desugarStmtsExamples :: [(String, Program)]
 > desugarStmtsExamples =
 >     [{-("check \"a first block\":\n\
 >       \  5 is 5\n\
@@ -136,7 +134,7 @@ end
 >      {-p2d s = either error id $ do
 >          x <- parseStmts "" s
 >          y <- desugarStmts x
->          pure $ (\(Program (Just z) _) -> z) y-}
+>          pure $ (\(Program (Just z) _) -> z) y-}-}
 
 
 > testDesugarExpr :: (String,Expr) -> T.TestTree
@@ -145,7 +143,7 @@ end
 >       desugarExpr =<< parseExpr "" src
 
 
-> testDesugarStmts :: (String,Program) -> T.TestTree
+> {-testDesugarStmts :: (String,Program) -> T.TestTree
 > testDesugarStmts (src, ex) = T.testCase ("desugar " ++ src) $
 >     either error (T.assertEqual "" ex) $
->       desugarStmts =<< parseStmts "" src
+>       desugarStmts =<< parseStmts "" src-}
