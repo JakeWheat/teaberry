@@ -310,6 +310,41 @@ todo: review all the whitespace rules that are being ignored
 >       \5"
 >      ,Program (Just $ Provide [("x","x")]) Nothing [] [StExpr $ Sel $ Num 5])
 
+>     ,("provide {\n\
+>       \  x : x,\n\
+>       \  y : z\n\
+>       \}\n\
+>       \end\n\
+>       \5"
+>      ,Program (Just $ Provide [("x","x")
+>                               ,("y", "z")])
+>       Nothing [] [StExpr $ Sel $ Num 5])
+
+>     ,("provide *\n\
+>       \5"
+>      ,Program (Just ProvideAll)
+>       Nothing [] [StExpr $ Sel $ Num 5])
+
+
+>     ,("provide_types {\n\
+>       \  Foo:: Foo,\n\
+>       \  FooBar:: FooBar\n\
+>       \}\n\
+>       \5"
+>      ,Program Nothing
+>       (Just $ ProvideTypes [("Foo", "Foo"),("FooBar", "FooBar")]) [] [StExpr $ Sel $ Num 5])
+
+>     ,("provide_types *\n\
+>       \5"
+>      ,Program Nothing
+>       (Just ProvideTypesAll) [] [StExpr $ Sel $ Num 5])
+
+>     ,("provide *\n\
+>       \provide_types *\n\
+>       \5"
+>      ,Program (Just ProvideAll)
+>       (Just ProvideTypesAll) [] [StExpr $ Sel $ Num 5])
+
 >     ]
 
 

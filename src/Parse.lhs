@@ -464,7 +464,7 @@ todo: factor this with the stmt parser
 >             ,"satisfies", "violates", "raises"]
 
 > program :: Parser Program
-> program = Program <$> optional provide <*> pure Nothing <*> pure [] <*> many stmt
+> program = Program <$> optional provide <*> optional provideTypes <*> pure [] <*> many stmt
 
 > provide :: Parser Provide
 > provide = try (keyword_ "provide" *> choice
@@ -472,4 +472,11 @@ todo: factor this with the stmt parser
 >     ,ProvideAll <$ symbol_ "*"])
 >   where
 >     p = (,) <$> identifier <*> (symbol_ ":" *> identifier)
+
+> provideTypes :: Parser ProvideTypes
+> provideTypes = keyword_ "provide_types" *> choice
+>     [ProvideTypes <$> (symbol_ "{" *> commaSep p <* symbol_ "}")
+>     ,ProvideTypesAll <$ symbol_ "*"] 
+>   where
+>     p = (,) <$> identifier <*> (symbol_ "::" *> identifier)
 
