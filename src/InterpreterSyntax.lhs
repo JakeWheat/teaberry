@@ -19,7 +19,6 @@ TODO: add provides and imports
 >           | Iden String
 >           | If Expr Expr Expr
 >           | App Expr Expr
->           | AppVoid Expr
 >           | Lam String Expr
 >           | LamVoid Expr
 >           | Let String Expr Expr

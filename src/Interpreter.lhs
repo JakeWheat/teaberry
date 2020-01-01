@@ -274,18 +274,12 @@ instead of the other one
 >         ClosV (I.Lam n bdy) env' -> do
 >              argVal <- interp' a
 >              local (const $ extendEnv n argVal env') $ interp' bdy
->         ClosV ee _ -> throwM $ MyException $ "non lambda in closure expression: " ++ show ee
->         _ -> throwM $ MyException $ "non function in app position: " ++ show x
-
-> interp' (I.AppVoid f) = do
->     x <- interp' f
->     case x of
 >         ClosV (I.LamVoid bdy) env' -> do
->              local (const env') $ interp' bdy
+>              case a of
+>                  I.Sel I.VoidS -> local (const env') $ interp' bdy
+>                  _ -> throwM $ MyException $ "0 arg lambda called with something other than literal void: " ++ show a
 >         ClosV ee _ -> throwM $ MyException $ "non lambda in closure expression: " ++ show ee
 >         _ -> throwM $ MyException $ "non function in app position: " ++ show x
-
-
 
 > interp' (I.Let nm v bdy) = do
 >     v' <- interp' v

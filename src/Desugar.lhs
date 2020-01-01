@@ -138,7 +138,7 @@ end
 > desugarExpr (S.App f xs) = do
 >     f' <- desugarExpr f
 >     xs' <- mapM desugarExpr xs
->     let r g [] = Right $ I.AppVoid g
+>     let r g [] = Right $ I.App g (I.Sel $ I.VoidS)
 >         r g [y] = Right $ I.App g y
 >         r g (y:ys) = r (I.App g y) ys
 >     r f' xs'
