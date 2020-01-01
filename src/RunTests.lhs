@@ -10,7 +10,7 @@
 >                   ,parseProgramExamples)
 > import DesugarTests (testDesugarExpr
 >                     ,desugarExprExamples)
-> import InterpreterTests (testInterpreter,interpreterExamples)
+> import InterpreterTests (testInterpreter,interpreterTests)
 > import TeaberryTests (sourceFiles
 >                      ,testSourceFile
 >                      ,detailedSourceFileTests
@@ -29,7 +29,7 @@
 >             ,T.testGroup "parseStmt" $ map testParseStmt parseStmtExamples
 >             ,T.testGroup "parseProgram" $ map testParseProgram parseProgramExamples]
 >         ,T.testGroup "desugarExpr" $ map testDesugarExpr desugarExprExamples
->         ,T.testGroup "interpret" $ map testInterpreter interpreterExamples
+>         ,T.testGroup "interpret" $ map testInterpreter interpreterTests
 >         ,T.testGroup "test tests" $ map testDetailedSourceFile detailedSourceFileTests
 >         ,sourceFileTests
 >         ]

@@ -1,0 +1,280 @@
+check:
+
+  if true: 1 else: 2 end is 1
+  if false: 1 else: 2 end is 2
+
+end
+
+
+check:
+  var x = 10
+  x is 10
+  x := 15
+  x is 15
+end
+
+check:
+  double = lam(x): x + x end
+  quad = lam(x): double(double(x)) end
+  const5 = lam(_): 5 end
+  f4 = lam(x): if x: 1 else: 0 end end
+  add2 = lam(a): a + 2 end
+  myVar = 1
+  
+  add2(1) is 3
+  5 + quad(3) is 17
+  const5(3) * 4 is 20
+  10 + const5(10) is 10 + 5
+  10 + double(1 + 2) is 10 + 3 + 3
+  10 + quad(1 + 2) is 10 + 3 + 3 + 3 + 3
+end
+
+check:
+  lam(x): x + 5 end(10) is 15
+  let x=4,y=5: x + y end is 9
+  let x=4,y=5: x - y end is -1
+  let myF=lam(x): x + 5 end: myF(20) end is 25
+  block:
+    1 + 2
+    3 + 4
+  end is 7
+end
+
+aa = 5
+block:
+  print(torepr(aa))
+end
+
+
+fun square(n):
+  n * n
+end
+
+check:
+  # todo: use the outer fun square
+  fun square(n):
+    n * n
+  end
+  square(4) is 16
+  square(2) is 4
+end
+
+fun apply-twice(f, x):
+  f(f(x))
+where:
+  apply-twice(square, 2) is 16
+  apply-twice(square, 3) is 81
+end
+
+check:
+  # todo: rely on the where checker in the outer def, remove this whole check
+  fun square(n):
+    n * n
+  end
+
+  fun apply-twice(f, x):
+    f(f(x))
+  end
+
+  apply-twice(square, 2) is 16
+  apply-twice(square, 3) is 81
+end
+
+# enable this when it's all working
+#check:
+#  apply-twice(lam(x): x + 1 end, 10) is 12
+#end
+
+fun fact1(n #|:: NumNonNegative|#) #|-> Number|#:
+  #doc: "Returns n! = 1 * 2 * 3 ... * n"
+  if n == 0: 1
+  else:
+    n * fact1(n - 1)
+  end
+where:
+  fact1(1) is 1
+  fact1(5) is 120
+end
+
+check:
+  letrec fact = lam(n):
+    if n == 1: 1 else: n * fact(n - 1) end
+  end: fact(5) end is 120
+end
+
+check:
+  lam(): 7 end() is 7
+end
+
+check:
+  letrec
+    fact = lam(n): if n == 1: 1 else: n * fact(n - 1) end end,
+    abc = 5:
+    fact(abc)
+  end is 120
+  
+  letrec
+    fact = lam(n): if n == 1: 1 else: n * fact(n - 1) end end,
+    abc = fact(5):
+    abc
+  end is 120
+  
+  letrec
+    abc = fact(5),
+    fact = lam(n): if n == 1: 1 else: n * fact(n - 1) end end:
+    abc
+  end is 120
+
+  letrec
+    zero = 0,
+    one = zero + 1
+    : one
+  end is 1
+
+end
+
+check:
+
+  #todo: review the tests, some weird syntax bits because of the way
+  # these were previously run in the haskell tests
+  # try to make it more idiomatic
+
+  block:
+    fun addeven4(x): if x == 0: 0 else: x + addodd4(x - 1) end end
+    rec addodd4 = lam(x) : if x == 0: 0 else: x + addeven4(x - 1) end end
+    addeven4(6) # is 21 # todo: this is a bug
+  end is 21
+  
+  block:
+    rec addeven4 = lam(x) : if x == 0: 0 else: x + addodd4(x - 1) end end
+    fun addodd4(x): if x == 0: 0 else: x + addeven4(x - 1) end end
+    addeven4(6)
+  end is 21
+  
+  
+  block:
+    a = 4
+    a + 3
+  end is 7
+  
+  block:
+    a = 4
+    b = 5
+    a + b
+  end is 9
+  
+  block:
+    f1 = lam(factx,x): if x == 0: 1 else: x * factx(factx,x - 1) end end
+    fact = lam(y): f1(f1,y) end
+    fact(1)
+  end is 1
+  
+  block:
+    var a = 5
+    a
+  end is 5
+  
+  block:
+    var a = 5
+    a := 6
+    a
+  end is 6
+  
+  block:
+    var a = 5
+    a := a + 1
+    a
+  end is 6
+ 
+  block:
+    fun mk-counter():
+      var ctr = 0
+      lam(): block:
+          ctr := ctr + 1
+          ctr
+        end
+      end
+    end
+    x = mk-counter()
+    y = mk-counter()
+    y()
+    y()
+    x()
+  end is 1
+  
+  block:
+    fun fact(x):
+      if x == 0: 1
+      else: x * fact(x - 1)
+      end
+    end
+    fact(5)
+  end is 120
+  
+  block:
+    rec fact = lam(x):
+      if x == 0: 1
+      else: x * fact(x - 1)
+      end
+    end
+    fact(5)
+  end is 120
+  
+  letrec 
+    addeven = lam(x) : if x == 0: 0 else: x + addodd(x - 1) end end,
+    addodd = lam(x) : if x == 0: 0 else: x + addeven(x - 1) end end:
+    addeven(6)
+  end is 21
+  
+end
+
+check:
+  f = lam(x, y): x - y end
+  f(5, 3) is 2
+end
+
+#|
+#todo: needs pattern binding
+check:
+  f = lam({x;y}): x - y end
+  f({5;3}) is 2
+end
+|#
+
+check:
+  x = 10
+  f = lam(y): y + x end
+  f(5) is 15
+end
+#|
+check:
+  x = 10
+  f = {(y :: Number) -> Number: x + y}
+  f(5) is 15
+end
+
+check:
+  o = {x : "original-x", y: "original-y"}
+  o2 = o.{x : "new-x", z : "new-z"}
+  o2.x is "new-x"
+  o2.y is "original-y"
+  o2.z is "new-z"
+end
+
+ask:
+  | x == 0 then: 1
+  | x > 0 then: x
+  | otherwise: x * -1
+end
+
+#is equivalent to
+
+if x == 0:
+  1
+else if x > 0:
+  x
+else:
+  x * -1
+end
+
+|#
