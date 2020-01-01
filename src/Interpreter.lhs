@@ -209,6 +209,9 @@ todo: move this to an in language data type
 >        BoolV False -> interp' e
 >        _ -> throwM $ MyException $ "expected bool in if test, got " ++ show c'
 
+the AppHaskell is only used in the env, the desugarer never produces
+it
+
 > interp' (I.AppHaskell nm exps) = do
 >     f <- maybe (throwM $ MyException $ "ffi fn not found: " ++ nm) pure $ lookup nm haskellFunImpls
 >     vs <- mapM interp' exps

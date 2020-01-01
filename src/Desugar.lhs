@@ -10,15 +10,12 @@
 
 
 > desugarProgram :: S.Program -> Either String I.Program
-> desugarProgram (S.Program Nothing Nothing [] stmts) =
->     desugarStmts stmts
+> desugarProgram (S.Program Nothing Nothing [] stmts) = do
 
 doing this weird create [I.Stmt], then seqify, doesn't seem like a
 good way to do it
 
-> desugarStmts :: [S.Stmt] -> Either String I.Program
-> desugarStmts st = do
->     (a,b) <- desugarStmts' st
+>     (a,b) <- desugarStmts' stmts
 >     a' <- case a of
 >             [] -> pure Nothing
 >             _ -> (Just . I.StExpr) <$> seqify a
