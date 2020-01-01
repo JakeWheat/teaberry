@@ -68,6 +68,11 @@ type is wrong
 >                      _ -> throwM $ MyException $ "< needs two num args, got " ++ ppShow x)
 >     ,("==", \[a, b] -> pure $ BoolV (a == b))
 
+>     -- boolean ops
+>     ,("and", \[BoolV a, BoolV b] -> pure $ BoolV (a && b))
+>     ,("or", \[BoolV a, BoolV b] -> pure $ BoolV (a || b))
+>     ,("not", \[BoolV a] -> pure $ BoolV (not a))
+
 >     -- misc
 >     ,("raise", \[StrV s] -> throwM $ MyException s)
 >     ,("print", \[xx@(StrV x)] -> liftIO (putStrLn x) >> pure xx)
@@ -100,6 +105,9 @@ temp testing until agdt are implemented
 >                ,liftBinOp "=="
 >                ,liftBinOp "<"
 >                ,liftBinOp ">"
+>                ,liftBinOp "and"
+>                ,liftBinOp "or"
+>                ,liftUnOp "not"
 >                ,liftUnOp "raise"
 >                ,liftUnOp "print"
 >                ,liftUnOp "torepr"

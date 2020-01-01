@@ -53,6 +53,7 @@ wrapper to lift tests written in the language into tests for the
 >     ,"tuples.tea"
 >     ,"arithmetic.tea"
 >     ,"comparisons.tea"
+>     ,"boolean.tea"
 >     ]
 
 > testSourceFile :: FilePath -> IO T.TestTree
