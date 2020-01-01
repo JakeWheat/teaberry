@@ -10,6 +10,7 @@ wrapper to lift tests written in the language into tests for the
 
 > import Data.List (partition)
 > import Data.Maybe (isNothing)
+> import Control.Exception.Safe (catch, SomeException(..))
 
 > import qualified Test.Tasty as T
 > import qualified Test.Tasty.HUnit as T
@@ -56,10 +57,14 @@ wrapper to lift tests written in the language into tests for the
 
 > testSourceFile :: FilePath -> IO T.TestTree
 > testSourceFile fp = do
->     src <- readFile fp
->     x <- E.runChecks src
+>     -- make sure if there is any sort of issue, it goes into a test failure
+>     -- and doesn't stop the tests from running
+>     x <- (do
+>           src <- readFile fp
+>           E.runChecks src
+>          )`catch` (\(SomeException e) -> pure $ Left $ show e)
 >     case x of
->         Left e -> pure $ T.testCase fp $ T.assertFailure $ "tests didn't run:" ++ e
+>         Left e -> pure $ T.testCase fp $ T.assertFailure $ "tests didn't run: " ++ e
 >         Right cs -> do
 >             let ts :: [T.TestTree]
 >                 ts = map (getTests fp) cs
