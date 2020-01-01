@@ -16,19 +16,21 @@ once do imports, have an option to run all tests
 >               ,CheckResult(..)
 >               ,renderCheckResults
 >               ,runChecks
->		,compileReport
+>               ,compileReport
+>               ,format
 >               ) where
 
 > import Data.List (intercalate, partition)
 > import Data.Maybe (isNothing)
+> import Text.Show.Pretty (ppShow)
+> --import Debug.Trace
 
+> import Pretty (prettyProgram)
 > import Parse (parseProgram)
 > import Desugar (desugarProgram)
 > import Interpreter (interp, Value(..), CheckResult(..))
 > import qualified Interpreter as I
 > import InterpreterSyntax as I
-> import Text.Show.Pretty (ppShow)
-> --import Debug.Trace
 
 > compileProgram :: String -> Either String I.Program
 > compileProgram src = do
@@ -94,4 +96,8 @@ at the moment, it's totally unreadable and useless for debugging
 >     x <- I.runChecks p
 >     either error pure x
 
+> format :: String -> Either String String
+> format src = do
+>     ast <- parseProgram "" src
+>     pure $ prettyProgram ast
 

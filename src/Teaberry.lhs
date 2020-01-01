@@ -30,7 +30,8 @@ possibly run tests quietly and exit more noisily if there is a failure
 >               ,runChecks
 >               ,renderCheckResults
 >               ,CheckResult(..)
->               ,compileReport)
+>               ,compileReport
+>               ,format)
 
 
 > main :: IO ()
@@ -50,6 +51,9 @@ possibly run tests quietly and exit more noisily if there is a failure
 >         ["-r", fn] -> do
 >             cmd <- readFile fn
 >             putStrLn $ either id id $ compileReport cmd
+>         ["-p", fn] -> do
+>             cmd <- readFile fn
+>             putStrLn $ either id id $ format cmd
 >         _ -> help
 >     --let cmd = "a = 5\nprint(a + 4)\na"
 >   where

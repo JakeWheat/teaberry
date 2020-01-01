@@ -121,9 +121,9 @@
 >       vf (VariantDecl vnm fs) = text "|" <+> text vnm <+> parens (commaSep $ map text fs)
 
 > stmt (Check nm ts) =
->     text "check" <+> maybe empty (doubleQuotes . text) nm <> text ":"
->     <+> nest 2 (testStmts ts)
->     <+> text "end"
+>     vcat [text "check" <+> maybe empty (doubleQuotes . text) nm <> text ":"
+>          ,nest 2 (testStmts ts)
+>          ,text "end"]
 
 
 > stmts :: [Stmt] -> Doc
