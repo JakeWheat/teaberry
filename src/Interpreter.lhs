@@ -175,13 +175,14 @@ temp testing until agdt are implemented
 >     ) `catch` (\(MyException s) -> pure $ Left $ s)
 
 > runChecks :: I.Program -> IO (Either String [CheckResult])
-> runChecks (I.Program _ cbs) = do
+> runChecks (I.Program _ cbs) = (do
 >     let st = map f cbs
 >     (_result, _store, lg) <- runRWST (mapM interpStmt' st) defaultHaskellFFIEnv emptyStore
 >     let gs = map (\x -> (blockName x, toCheckResult x)) lg
 >         gs' = partitionN gs
 >         ts = map (uncurry CheckResult) gs'
 >     pure $ pure ts
+>     ) `catch` (\(MyException s) -> pure $ Left $ s)
 >   where
 >     f (I.CheckBlock _ s) = s
 >     blockName (TestPass x _) = x

@@ -34,7 +34,7 @@ wrapper to lift tests written in the language into tests for the
 > testDetailedSourceFile :: (FilePath, Int, Int) -> T.TestTree
 > testDetailedSourceFile (fn, passNum, failNum) = T.testCase fn $ do
 >     src <- readFile fn
->     cs <- E.runChecks src
+>     cs <- either error id <$> E.runChecks src
 >     let cnts = map passAndFailCount cs
 >     T.assertEqual "pass, fail count"
 >         (passNum,failNum)
@@ -57,10 +57,13 @@ wrapper to lift tests written in the language into tests for the
 > testSourceFile :: FilePath -> IO T.TestTree
 > testSourceFile fp = do
 >     src <- readFile fp
->     cs <- E.runChecks src
->     let ts :: [T.TestTree]
->         ts = map (getTests fp) cs
->     pure $ T.testGroup fp ts
+>     x <- E.runChecks src
+>     case x of
+>         Left e -> pure $ T.testCase fp $ T.assertFailure $ "tests didn't run:" ++ e
+>         Right cs -> do
+>             let ts :: [T.TestTree]
+>                 ts = map (getTests fp) cs
+>             pure $ T.testGroup fp ts
 >
 > getTests :: FilePath -> E.CheckResult -> T.TestTree
 > getTests fp (E.CheckResult cn ts) = T.testGroup (fp ++ " " ++ cn) $ do

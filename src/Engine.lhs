@@ -51,11 +51,11 @@ at the moment, it's totally unreadable and useless for debugging
 >     pure (ppShow ast ++ "\n\n" ++ ppShow iast)
 
 
-> runCode :: String -> IO (Maybe Value)
+> runCode :: String -> IO (Either String (Maybe Value))
 > runCode src = do
->     let p = either error id $ compileProgram src
->     x <- interp p
->     either error pure x
+>     case compileProgram src of
+>         Left e -> pure $ Left e
+>         Right p -> interp p
 
 > renderCheckResults :: [CheckResult] -> String
 > renderCheckResults cs =
@@ -90,11 +90,11 @@ at the moment, it's totally unreadable and useless for debugging
 >            
 >            
 
-> runChecks :: String -> IO [CheckResult]
-> runChecks src = do
->     let p = either error id $ compileProgram src
->     x <- I.runChecks p
->     either error pure x
+> runChecks :: String -> IO (Either String [CheckResult])
+> runChecks src =
+>     case compileProgram src of
+>         Left e -> pure $ Left e
+>         Right p -> I.runChecks p
 
 > format :: String -> Either String String
 > format src = do

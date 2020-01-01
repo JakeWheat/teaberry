@@ -60,11 +60,14 @@ possibly run tests quietly and exit more noisily if there is a failure
 >       runc cmd = do
 >           v <- runCode cmd
 >           case v of
->               Nothing -> pure ()
->               Just v' -> putStrLn $ show v'
+>               Left e -> putStrLn $ show e -- todo exit with error code
+>               Right Nothing -> pure ()
+>               Right (Just v') -> putStrLn $ show v'
 >       runt cmd = do
 >           v <- runChecks cmd
->           putStrLn $ renderCheckResults v
+>           case v of
+>               Left e -> putStrLn $ show e -- todo exit with error code
+>               Right v1 ->putStrLn $ renderCheckResults v1
 >           -- todo: exit with error code if all tests didn't pass
 >       help = putStrLn "-c to run code in arg, -f to run code in file"
 >       runX = putStrLn $ renderCheckResults
