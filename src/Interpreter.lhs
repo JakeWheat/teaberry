@@ -77,14 +77,14 @@ temp testing until agdt are implemented
 >                ,liftBinOp "+"
 >                ,liftBinOp "-"
 >                ,liftBinOp "=="
->                ,liftUnop "raise"
->                ,liftUnop "print"
->                ,liftUnop "torepr"
+>                ,liftUnOp "raise"
+>                ,liftUnOp "print"
+>                ,liftUnOp "torepr"
 >                ,liftBinOp "log_test_pass"
 >                ,liftTriOp "log_test_fail"
 >                ] emptyEnv
 >   where
->      liftUnop f = (f, ClosV (I.Lam "a" (I.AppHaskell f [I.Iden "a"])) emptyEnv)
+>      liftUnOp f = (f, ClosV (I.Lam "a" (I.AppHaskell f [I.Iden "a"])) emptyEnv)
 >      liftBinOp f = (f, ClosV (I.Lam "a" (I.Lam "b" (I.AppHaskell f [I.Iden "a", I.Iden "b"]))) emptyEnv)
 >      liftTriOp f = (f, ClosV (I.Lam "a" (I.Lam "b" (I.Lam "c"
 >                         (I.AppHaskell f [I.Iden "a", I.Iden "b", I.Iden "c"])))) emptyEnv)
