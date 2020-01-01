@@ -8,7 +8,6 @@ The high level syntax which the parser produces
 >               ,Selector(..)
 >               ,VariantDecl(..)
 >               ,Pat(..)
->               ,TestStmt(..)
 >               ,Program(..)
 >               ,Provide(..)
 >               ,ProvideTypes(..)
@@ -48,11 +47,13 @@ The high level syntax which the parser produces
 >           | When Expr Expr
 >           | LetDecl String Expr
 >           | RecDecl String Expr
->           | FunDecl String [String] Expr (Maybe [TestStmt])
+>           | FunDecl String [String] Expr (Maybe [Stmt])
 >           | VarDecl String Expr
 >           | SetVar String Expr
->           | DataDecl String [VariantDecl] (Maybe [TestStmt])
->           | Check (Maybe String) [TestStmt]
+>           | DataDecl String [VariantDecl] (Maybe [Stmt])
+>           | TPred Expr String Expr Expr -- is%, is-not%
+>           | TPostfixOp Expr String --- does-not-raise
+>           | Check (Maybe String) [Stmt]
 >           deriving (Eq,Show,Data,Typeable,Generic) 
 
 
@@ -92,10 +93,4 @@ The high level syntax which the parser produces
 
 > data VariantDecl = VariantDecl String [String]
 >                  deriving (Eq,Show,Data,Typeable,Generic) 
-
-> data TestStmt = TStmt Stmt
->               | TBinOp Expr String Expr
->               | TPred Expr String Expr Expr -- is%, is-not%
->               | TPostfixOp Expr String --- does-not-raise
->               deriving (Eq,Show,Data,Typeable,Generic) 
 

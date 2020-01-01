@@ -10,7 +10,7 @@
 > import qualified Test.Tasty as T
 > import qualified Test.Tasty.HUnit as T
 
-> import Syntax (Stmt(..), Expr(..), Selector(..), VariantDecl(..), Pat(..), TestStmt(..)
+> import Syntax (Stmt(..), Expr(..), Selector(..), VariantDecl(..), Pat(..)
 >               ,Program(..)
 >               ,Provide(..)
 >               ,ProvideTypes(..)
@@ -235,15 +235,15 @@ todo: review all the whitespace rules that are being ignored
 >                 \  4 is 5\n\
 >                 \end"
 >                ,Check (Just "a first block")
->                 [TBinOp (num 5) "is" (num 5)
->                 ,TBinOp (num 4) "is" (num 5)
+>                 [StExpr $ BinOp (num 5) "is" (num 5)
+>                 ,StExpr $ BinOp (num 4) "is" (num 5)
 >                 ])
 
 >               ,("check:\n\
 >                 \  6 is 7\n\
 >                 \end"
 >                ,Check Nothing
->                 [TBinOp (num 6) "is" (num 7)
+>                 [StExpr $ BinOp (num 6) "is" (num 7)
 >                 ])
 
 >               ,("check \"all test syntax\":\n\
@@ -260,17 +260,17 @@ todo: review all the whitespace rules that are being ignored
 >                 \  expr raises_violates pred\n\
 >                 \end"
 >                ,Check (Just "all test syntax")
->                 [TBinOp (Iden "expr1") "is" (Iden "expr2")
->                 ,TBinOp (Iden "expr1") "is_not" (Iden "expr2")
+>                 [StExpr $ BinOp (Iden "expr1") "is" (Iden "expr2")
+>                 ,StExpr $ BinOp (Iden "expr1") "is_not" (Iden "expr2")
 >                 ,TPred (Iden "expr1") "is%" (Iden "pred") (Iden "expr2")
 >                 ,TPred (Iden "expr1") "is_not%" (Iden "pred") (Iden "expr2")
->                 ,TBinOp (Iden "expr") "satisfies" (Iden "pred")
->                 ,TBinOp (Iden "expr") "violates" (Iden "pred")
->                 ,TBinOp (Iden "expr") "raises" (Sel $ Str "exn_string")
->                 ,TBinOp (Iden "expr") "raises_other_than" (Sel $ Str "exn_string")
+>                 ,StExpr $ BinOp (Iden "expr") "satisfies" (Iden "pred")
+>                 ,StExpr $ BinOp (Iden "expr") "violates" (Iden "pred")
+>                 ,StExpr $ BinOp (Iden "expr") "raises" (Sel $ Str "exn_string")
+>                 ,StExpr $ BinOp (Iden "expr") "raises_other_than" (Sel $ Str "exn_string")
 >                 ,TPostfixOp (Iden "expr") "does_not_raise"
->                 ,TBinOp (Iden "expr") "raises_satisfies" (Iden "pred")
->                 ,TBinOp (Iden "expr") "raises_violates" (Iden "pred")
+>                 ,StExpr $ BinOp (Iden "expr") "raises_satisfies" (Iden "pred")
+>                 ,StExpr $ BinOp (Iden "expr") "raises_violates" (Iden "pred")
 >                 ])
 
 >               ,("data Point:\n\
@@ -280,8 +280,8 @@ todo: review all the whitespace rules that are being ignored
 >                 \  is_Point(a_pt) is true\n\
 >                 \end"
 >                ,DataDecl "Point" [VariantDecl "pt" ["x", "y"]]
->                 (Just [TStmt (LetDecl "a_pt" (App (Iden "pt") [num 1, num 2]))
->                       ,TBinOp (App (Iden "is_Point") [Iden "a_pt"]) "is" (Iden "true")]))
+>                 (Just [LetDecl "a_pt" (App (Iden "pt") [num 1, num 2])
+>                       ,StExpr $ BinOp (App (Iden "is_Point") [Iden "a_pt"]) "is" (Iden "true")]))
 >
 >               ,("fun double(n):\n\
 >                 \  n + n\n\
@@ -290,8 +290,8 @@ todo: review all the whitespace rules that are being ignored
 >                 \  double(15) is 30\n\
 >                 \end"
 >                ,FunDecl "double" ["n"] (BinOp (Iden "n") "+" (Iden "n"))
->                 (Just [TBinOp (App (Iden "double") [num 10]) "is" (num 20)
->                      ,TBinOp (App (Iden "double") [num 15]) "is" (num 30)]))
+>                 (Just [StExpr $ BinOp (App (Iden "double") [num 10]) "is" (num 20)
+>                      ,StExpr $ BinOp (App (Iden "double") [num 15]) "is" (num 30)]))
 
 
 >     ]

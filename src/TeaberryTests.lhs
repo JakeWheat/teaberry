@@ -24,6 +24,7 @@ wrapper to lift tests written in the language into tests for the
 >     ,(p "two_tests_pass.tea", 2, 0)
 >     ,(p "two_tests_fail.tea", 0, 2)
 >     ,(p "one_pass_one_fail.tea", 1, 1)
+>     ,(p "nested.tea", 1, 0)
 >      -- test trivial success for each kind of test
 >      -- test trivial failure for each kind of test
 >     ]

@@ -2,7 +2,6 @@
 > {-# LANGUAGE ScopedTypeVariables #-}
 > module Pretty (prettyExpr
 >               ,prettyStmts
->               ,prettyTestStmt
 >               ,prettyProgram
 >               ) where
 
@@ -12,7 +11,7 @@
 >                          doubleQuotes,
 >                          {-braces, ($$), ($+$),-} vcat)
 
-> import Syntax (Stmt(..), Expr(..), Selector(..), VariantDecl(..), Pat(..), TestStmt(..)
+> import Syntax (Stmt(..), Expr(..), Selector(..), VariantDecl(..), Pat(..), Stmt(..)
 >               ,Program(..)
 >               ,Provide(..)
 >               ,ProvideTypes(..)
@@ -26,9 +25,6 @@
 
 > prettyStmts :: [Stmt] -> String
 > prettyStmts = render . stmts
-
-> prettyTestStmt :: TestStmt -> String
-> prettyTestStmt = render . testStmt
 
 > prettyProgram :: Program -> String
 > prettyProgram = render . program
@@ -121,25 +117,19 @@
 
 > stmt (Check nm ts) =
 >     vcat [text "check" <+> maybe empty (doubleQuotes . text) nm <> text ":"
->          ,nest 2 (testStmts ts)
+>          ,nest 2 (stmts ts)
 >          ,text "end"]
 
+> stmt (TPred e0 t pr e1) = expr e0 <+> text t <> parens (expr pr) <+> expr e1
+> stmt (TPostfixOp e o) = expr e <+> text o
 
 > stmts :: [Stmt] -> Doc
 > stmts = vcat . map stmt
 
-> testStmts :: [TestStmt] -> Doc
-> testStmts = vcat . map testStmt
-
-> testStmt :: TestStmt -> Doc
-> testStmt (TStmt st) = stmt st
-> testStmt (TBinOp e0 op e1) = expr e0 <+> text op <+> expr e1
-> testStmt (TPred e0 t pr e1) = expr e0 <+> text t <> parens (expr pr) <+> expr e1
-> testStmt (TPostfixOp e o) = expr e <+> text o
 
 
-> whereBlock :: [TestStmt] -> Doc
-> whereBlock ts = text "where:" <+> nest 2 (testStmts ts)
+> whereBlock :: [Stmt] -> Doc
+> whereBlock ts = text "where:" <+> nest 2 (stmts ts)
 
 > commaSep :: [Doc] -> Doc
 > commaSep ds = sep $ punctuate comma ds

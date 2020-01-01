@@ -57,6 +57,11 @@ when a fun or rec is seen, it will collect subsequent funs and recs
 
 > desugarStmt :: S.Stmt -> Either String ([I.Stmt], [I.CheckBlock])
 
+> desugarStmt  (S.StExpr x@(S.BinOp e0 "is" e1)) = do
+>   let p = P.prettyExpr x
+>   y <- desugarIs "unknown" p e0 e1
+>   desugarStmt y
+> 
 > desugarStmt (S.StExpr e) = liftStmt <$> I.StExpr <$> desugarExpr e
 > desugarStmt (S.When c t) = liftStmt <$> I.StExpr <$> 
 >     desugarExpr (S.If [(c, S.Block [S.StExpr t
@@ -76,8 +81,7 @@ when a fun or rec is seen, it will collect subsequent funs and recs
 
 > desugarStmt (S.Check nm sts) = do
 >     let nm' = maybe "anonymous check block" id nm
->     sts' <- desugarTestStmts nm' sts
->     (sts'',x) <- desugarStmts' sts'
+>     (sts'',x) <- desugarStmts' sts
 >     case x of
 >         [] -> pure ()
 >         _ -> Left $ "internal error: test in desugared test"
@@ -85,13 +89,10 @@ when a fun or rec is seen, it will collect subsequent funs and recs
 >     pure ([], [I.CheckBlock nm' (I.StExpr sts''')])
 >     
 
-> desugarTestStmts :: String -> [S.TestStmt] -> Either String [S.Stmt]
-> desugarTestStmts cn (S.TStmt s : ss) = do
->     (s :) <$> desugarTestStmts cn ss
-
-> desugarTestStmts cn (x@(S.TBinOp e "is" e1) : ss) = do
->     let syn = P.prettyTestStmt x
->         blockName = cn
+> desugarIs :: String -> String -> S.Expr -> S.Expr -> Either String S.Stmt
+> desugarIs blockName syn e e1 = do
+>     let --syn = P.prettyStmt x
+>         -- blockName = cn
 >         mys = S.StExpr $ S.Block
 >          [S.LetDecl "bn" $ S.Sel $ S.Str blockName
 >          ,S.LetDecl "tst" $ S.Sel $ S.Str syn
@@ -104,14 +105,11 @@ when a fun or rec is seen, it will collect subsequent funs and recs
 >              ,str "Values not equal:\n" `plus` app "torepr" [S.Iden "v0"]
 >               `plus` str "\n" `plus` app "torepr" [S.Iden "v1"]])
 >          ,S.StExpr $ S.Iden "false"]
->     (mys :) <$> desugarTestStmts cn ss
+>     pure mys
 >   where
 >       plus a b = S.BinOp a "+" b
 >       str = S.Sel . S.Str
 >       app nm es = S.App (S.Iden nm) es
-
-> desugarTestStmts _ [] = pure []
-
 
 block:
   tst = "5 is 6"

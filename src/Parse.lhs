@@ -44,7 +44,7 @@
 
 
 > import Syntax (Stmt(..), Expr(..), Selector(..), VariantDecl(..)
->               , Pat(..), TestStmt(..)
+>               , Pat(..)
 >               ,Program(..)
 >               ,Provide(..)
 >               ,ProvideTypes(..)
@@ -369,7 +369,7 @@ put all the parsers which start with a keyword first
 >     ,dataDecl
 >     ,checkBlock
 >     ,setVarStmt
->     ,expr <**> option StExpr letDecl
+>     ,expr <**> option StExpr (choice [letDecl, testPost])
 >     ]
 
 > whenStmt :: Parser Stmt
@@ -386,10 +386,10 @@ put all the parsers which start with a keyword first
 
 > checkBlock :: Parser Stmt
 > checkBlock = Check <$> (keyword "check" *> optional stringRaw <* symbol_ ":")
->    <*> (many testStmt <* keyword_ "end")
+>    <*> (many stmt <* keyword_ "end")
 
-> whereBlock :: Parser [TestStmt]
-> whereBlock = keyword_ "where" *> symbol_ ":" *> many testStmt
+> whereBlock :: Parser [Stmt]
+> whereBlock = keyword_ "where" *> symbol_ ":" *> many stmt
 
 > funDecl :: Parser Stmt
 > funDecl = FunDecl
@@ -428,23 +428,7 @@ put all the parsers which start with a keyword first
 
 -----------------------------------------
 
-todo: factor this with the stmt parser
-
-> testStmt :: Parser TestStmt
-> testStmt = choice
->     [TStmt <$> whenStmt
->     ,TStmt <$> recDecl
->     ,TStmt <$> funDecl
->     ,TStmt <$> varDecl
->     ,TStmt <$> dataDecl
->     ,TStmt <$> checkBlock
->     ,TStmt <$> setVarStmt
->     ,expr <**> option (TStmt . StExpr) (choice [letDeclw, testPost])
->     ]
->   where
->     letDeclw = (TStmt . ) <$> letDecl 
-
-> testPost :: Parser (Expr -> TestStmt)
+> testPost :: Parser (Expr -> Stmt)
 > testPost = choice [isPred, postOp, inf]
 >   where
 >       isPred = do
@@ -458,7 +442,7 @@ todo: factor this with the stmt parser
 >       inf = do
 >           k <- choice $ map keyword tks
 >           e <- expr
->           pure (\x -> TBinOp x k e)
+>           pure (\x -> StExpr $ BinOp x k e)
 >       tks = ["is_not", "is"
 >             ,"raises_other_than", "raises_satisfies", "raises_violates"
 >             ,"satisfies", "violates", "raises"]
