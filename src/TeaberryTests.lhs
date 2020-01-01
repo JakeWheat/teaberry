@@ -57,6 +57,7 @@ wrapper to lift tests written in the language into tests for the
 >     ,"ahoy.tea"
 >     ,"basics.tea"
 >     ,"empty.tea"
+>     ,"empty_check.tea"
 >     ]
 
 > testSourceFile :: FilePath -> IO T.TestTree
