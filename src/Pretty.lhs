@@ -6,8 +6,6 @@
 >               ,prettyProgram
 >               ) where
 
-> import Data.Scientific (floatingOrInteger)
-
 > import Prelude hiding ((<>))
 > import Text.PrettyPrint (render, text, (<>), (<+>), empty, parens,
 >                          nest, Doc, punctuate, comma, sep, {-quotes,-}
@@ -19,8 +17,9 @@
 >               ,Provide(..)
 >               ,ProvideTypes(..)
 >               ,Import(..)
->               ,ImportSource(..))
-
+>               ,ImportSource(..)
+>               ,extractInt)
+>  
 
 > prettyExpr :: Expr -> String
 > prettyExpr = render . expr
@@ -36,9 +35,9 @@
 
 
 > expr :: Expr -> Doc
-> expr (Sel (Num n)) = text $ case floatingOrInteger n of
->                          (Right x :: Either Float Integer) -> show x
->                          Left _ ->  show n
+> expr (Sel (Num n)) = text $ case extractInt n of
+>                              Just x -> show x
+>                              Nothing ->  show n
 > expr (Sel (Str s)) = doubleQuotes (text s)
 > expr (Sel (Tuple es)) = text "{" <> nest 2 (xSep ";" (map expr es) <> text "}")
 > expr (Iden n) = text n

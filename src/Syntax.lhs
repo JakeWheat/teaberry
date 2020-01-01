@@ -2,7 +2,7 @@
 
 The high level syntax which the parser produces
 
-> {-# LANGUAGE DeriveDataTypeable,DeriveGeneric #-}
+> {-# LANGUAGE DeriveDataTypeable,DeriveGeneric, ScopedTypeVariables #-}
 > module Syntax (Stmt(..)
 >               ,Expr(..)
 >               ,Selector(..)
@@ -14,10 +14,11 @@ The high level syntax which the parser produces
 >               ,ProvideTypes(..)
 >               ,Import(..)
 >               ,ImportSource(..)
+>               ,extractInt
 >               ) where
 
 > import Data.Data (Data,Typeable)
-> import Data.Scientific (Scientific)
+> import Data.Scientific (Scientific,floatingOrInteger)
 > import GHC.Generics (Generic)
 
 > data Program = Program (Maybe Provide) (Maybe ProvideTypes)
@@ -82,6 +83,11 @@ The high level syntax which the parser produces
 >               | Str String
 >               | Tuple [Expr]
 >               deriving (Eq,Show,Data,Typeable,Generic) 
+
+> extractInt :: Scientific -> Maybe Int
+> extractInt n = case floatingOrInteger n of
+>                          (Right x :: Either Float Integer) -> Just $ fromIntegral x
+>                          Left _ -> Nothing
 
 
 > data VariantDecl = VariantDecl String [String]

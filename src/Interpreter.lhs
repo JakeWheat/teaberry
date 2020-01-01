@@ -7,16 +7,19 @@
 >                    ,extendEnv
 >                    ,extendsEnv
 >                    ,Env
->                    ,Value(..)) where
+>                    ,Value(..)
+>                    ,extractInt
+>                    ) where
 
 > import Control.Exception.Safe (Exception, throwM)
 > import Control.Monad.IO.Class (liftIO)
 > import Control.Monad.Trans.RWS (RWST, runRWST, ask, get, put, local, tell)
 > import Data.List (partition)
-> import Data.Scientific (Scientific, floatingOrInteger)
+> import Data.Scientific (Scientific)
 > import Text.Show.Pretty (ppShow)
 
 > import qualified InterpreterSyntax as I
+> import Syntax (extractInt)
 
 ------------------------------------------------------------------------------
 
@@ -96,9 +99,9 @@ temp testing until agdt are implemented
 >            deriving (Eq,Show)
 
 > torepr :: Value -> Value
-> torepr (NumV n) = StrV $ case floatingOrInteger n of
->                              (Right x :: Either Float Integer) -> show x
->                              Left _ ->  show n
+> torepr (NumV n) = StrV $ case extractInt n of
+>                              Just x -> show x
+>                              Nothing ->  show n
 > torepr (BoolV n) = StrV $ if n then "true" else "false"
 > torepr (ClosV {}) = StrV "<Function>"
 
