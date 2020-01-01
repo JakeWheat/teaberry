@@ -117,6 +117,20 @@ when a fun or rec is seen, it will collect subsequent funs and recs
 > desugarStmt (S.VarDecl n e) = liftStmt <$> (I.LetDecl n . I.Box) <$> desugarExpr' e
 > desugarStmt (S.SetVar n e) = liftStmt <$> I.SetBox n <$> desugarExpr' e
 
+
+
+desugaring check blocks:
+
+a check block is desugared to this:
+
+block:
+  checkblockid = n # unique number, and the variable name checkblock id should be unique (todo)
+  log_check_block(checkblockid, "blockname")
+  {desuged statements in the check block}
+  VoidV # a check block has no value (until non top level check blocks are supported)
+end
+
+
 > desugarStmt (S.Check nm sts) = do
 >     nm' <- case nm of
 >                   Just x -> pure x
@@ -131,6 +145,22 @@ when a fun or rec is seen, it will collect subsequent funs and recs
 >     let sts''' = seqify sts''
 >     pure ([], [I.CheckBlock nm' (sts''')])
 >     
+
+an "is" test desugars to
+
+block:
+  add_test(lam():
+    shadow v0 = aexpr
+    shadow v1 = bexpr # todo: change to tuple bind to avoid shadowing capture)
+    shadow name = "aexpr is bexpr"
+    if v0 == v1:
+      log_test_pass(checkblockid, name)
+    else:
+      shadow failmsg = "Values not equal:\n" + torepr(v0) + "\n" + torepr(v1)
+      log_test_fail(checkblockid, name, failmsg)
+    end
+  end
+end
 
 > desugarIs :: String -> String -> S.Expr -> S.Expr -> DesugarStack S.Stmt
 > desugarIs blockName syn e e1 = do
@@ -153,18 +183,6 @@ when a fun or rec is seen, it will collect subsequent funs and recs
 >       plus a b = S.BinOp a "+" b
 >       str = S.Sel . S.Str
 >       app nm es = S.App (S.Iden nm) es
-
-block:
-  tst = "5 is 6"
-  v0 = 5
-  v1 = 6
-  if v0 == v1:
-    log_test_pass(tst)
-  else:
-    log_test_failure(tst, "Values not equal:\n" + torepr(v0) + "\n" + torepr(v1))
-  end
-  false
-end
 
 
 --------------------------------------

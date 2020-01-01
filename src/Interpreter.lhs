@@ -25,6 +25,16 @@
 
 = values and environments
 
+> data Value = NumV Scientific
+>            | BoolV Bool
+>            | StrV String
+>            | TupleV [Value] -- todo use variant, which is also used for plain records
+>            | ClosV I.Expr Env
+>            | VariantV String String [(String,Value)]
+>            | BoxV Int
+>            | VoidV
+>            deriving (Eq,Show)
+
 > data Env = Env [(String,Value)]
 >            deriving (Eq,Show)
 
@@ -41,6 +51,14 @@
 > lookupEnv :: String -> Env -> Maybe Value
 > lookupEnv nm (Env e) = lookup nm e
 
+
+------------------------------------------------------------------------------
+
+= haskell native functions
+
+a bit hacky at the moment, being used to bootstrap the system before
+some of these are written in language and others using a proper ffi
+system
 
 todo: make this better: do better wrapping + error messages when the
 type is wrong
@@ -79,22 +97,16 @@ type is wrong
 >     ,("torepr", \[x] -> pure $ torepr x)
 >
 >      -- some internals
->     ,("log_test_pass", \[StrV c, StrV t] -> do
->           tell [TestPass c t]
->           pure $ BoolV True)
->     ,("log_test_fail", \[StrV c, StrV t, StrV m] -> do
->           tell [TestFail c t m]
->           pure $ BoolV True)
+>     ,("log_check_block", logCheckBlock)
+>     ,("log_test_pass", logTestPass)
+>     ,("log_test_fail", logTestFail)
+>     ,("add_test", addTest)
+>      
 >     ,("tupleget", \[TupleV vs, NumV x] -> do
 >              i <- maybe (throwM $ MyException $ "expected integral, got " ++ show x)
 >                         pure (extractInt x)
 >              pure $ vs !! i)
 >     ]
-
-temp testing until agdt are implemented
-
-> data TestResultLog = TestPass String String -- check block name, test source
->                    | TestFail String String String -- check block name, test source, failure message
 
 > defaultHaskellFFIEnv :: Env
 > defaultHaskellFFIEnv = 
@@ -121,23 +133,47 @@ temp testing until agdt are implemented
 >      liftTriOp f = (f, ClosV (I.Lam "a" (I.Lam "b" (I.Lam "c"
 >                         (I.AppHaskell f [I.Iden "a", I.Iden "b", I.Iden "c"])))) emptyEnv)
 
-
-> data Value = NumV Scientific
->            | BoolV Bool
->            | StrV String
->            | TupleV [Value] -- todo use variant, which is also used for plain records
->            | ClosV I.Expr Env
->            | VariantV String String [(String,Value)]
->            | BoxV Int
->            | VoidV
->            deriving (Eq,Show)
-
 > torepr :: Value -> Value
 > torepr (NumV n) = StrV $ case extractInt n of
 >                              Just x -> show x
 >                              Nothing ->  show n
 > torepr (BoolV n) = StrV $ if n then "true" else "false"
 > torepr (ClosV {}) = StrV "<Function>"
+
+------------------------------------------------------------------------------
+
+temp testing until agdt are implemented
+
+> data TestResultLog = TestPass String String -- check block name, test source
+>                    | TestFail String String String -- check block name, test source, failure message
+
+
+> logTestPass :: [Value] -> Interpreter Value
+> logTestPass = \[StrV c, StrV t] -> do
+>     tell [TestPass c t]
+>     pure VoidV
+
+> logTestFail :: [Value] -> Interpreter Value
+> logTestFail = \[StrV c, StrV t, StrV m] -> do
+>     tell [TestFail c t m]
+>     pure VoidV
+
+> logCheckBlock :: [Value] -> Interpreter Value
+> logCheckBlock = \_ -> do
+>     -- todo
+>     pure VoidV
+
+> addTest :: [Value] -> Interpreter Value
+> addTest = \_ -> do
+>     -- todo
+>     pure VoidV
+
+log_test_pass
+log_test_fail
+log_check_block
+
+
+add_test
 
 ------------------------------------------------------------------------------
 
@@ -175,8 +211,8 @@ temp testing until agdt are implemented
 > instance Exception MyException
 
 > interp :: I.Program -> IO (Either String Value)
-> interp (I.Program exp _) = (do
->     (result, _store, _log) <- runRWST (interp' exp) defaultHaskellFFIEnv emptyStore
+> interp (I.Program ex _) = (do
+>     (result, _store, _log) <- runRWST (interp' ex) defaultHaskellFFIEnv emptyStore
 >     pure $ pure $ result
 >     ) `catch` (\(MyException s) -> pure $ Left $ s)
 
