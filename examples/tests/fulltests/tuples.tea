@@ -1,0 +1,64 @@
+check:
+  t = {"a";"b";true}
+  t.{0} is "a"
+  t.{1} is "b"
+  t.{2} is true
+
+  myobj3 = {}
+  myobj4 = {1}
+  myobj4.{0} is 1
+
+end
+
+#|
+check:
+  {x; y} = {1; 2}
+  x is 1
+  y is 2
+end
+|#
+
+#|
+check:
+  {{w; x}; {y; z}} = {{5; true}; {"hello"; 4}}
+  w is 5
+  x is true
+  y is "hello"
+  z is 4
+end
+
+check:
+  {{w; x} as wx; {y; z} as yz} as wxyz = {{5; true}; {"hello"; 4}}
+  w is 5
+  x is true
+  y is "hello"
+  z is 4
+  wx is {5; true}
+  yz is {"hello"; 4}
+  wxyz is {wx; yz}
+end
+
+check:
+  {x; y} = {1; 2}
+  x is 1
+  y is 2
+
+  fun sum-two({k; v}, {a; b; c}):
+    k + v + a + b + c
+  end
+
+  sum-two({10; 12}, {1; 4; 5}) is 32
+
+  fun sum-vals(elts) block:
+    var sum = 0
+    for each({k; v} from elts):
+      sum := sum + v
+    end
+    sum
+  end
+
+  elts = [list: {"a"; 5}, {"b"; 6}, {"c"; 7}]
+  sum-vals(elts) is 18
+end
+
+|#
