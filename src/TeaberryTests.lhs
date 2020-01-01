@@ -50,6 +50,7 @@ wrapper to lift tests written in the language into tests for the
 > sourceFiles = map ("examples/tests/fulltests/" ++)
 >     ["trivial_is.tea"
 >     ,"tuples.tea"
+>     ,"arithmetic.tea"
 >     ]
 
 > testSourceFile :: FilePath -> IO T.TestTree

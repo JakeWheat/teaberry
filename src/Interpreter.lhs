@@ -55,6 +55,9 @@ type is wrong
 >     ,("*", \x -> case x of
 >                      [NumV a, NumV b] -> pure $ NumV (a * b)
 >                      _ -> throwM $ MyException $ "* needs two num args, got " ++ ppShow x)
+>     ,("/", \x -> case x of
+>                      [NumV a, NumV b] -> pure $ NumV (a / b)
+>                      _ -> throwM $ MyException $ "/ needs two num args, got " ++ ppShow x)
 >     -- comparisons
 >     ,("==", \[a, b] -> pure $ BoolV (a == b))
 
@@ -84,6 +87,7 @@ temp testing until agdt are implemented
 > defaultHaskellFFIEnv :: Env
 > defaultHaskellFFIEnv = 
 >     extendsEnv [liftBinOp "*"
+>                ,liftBinOp "/"
 >                ,liftBinOp "+"
 >                ,liftBinOp "-"
 >                ,liftBinOp "=="
