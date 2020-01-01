@@ -16,20 +16,18 @@ once do imports, have an option to run all tests
 >               ,CheckResult(..)
 >               ,renderCheckResults
 >               ,runChecks
+>		,compileReport
 >               ) where
 
 > import Data.List (intercalate, partition)
 > import Data.Maybe (isNothing)
 
-> --import Syntax
 > import Parse (parseProgram)
-> --import Pretty
 > import Desugar (desugarProgram)
 > import Interpreter (interp, Value(..), CheckResult(..))
 > import qualified Interpreter as I
 > import InterpreterSyntax as I
-
-> --import Text.Show.Pretty (ppShow)
+> import Text.Show.Pretty (ppShow)
 > --import Debug.Trace
 
 > compileProgram :: String -> Either String I.Program
@@ -37,14 +35,25 @@ once do imports, have an option to run all tests
 >     ast <- parseProgram "" src
 >     desugarProgram ast
 
+
+compile report
+
+what would make this actually useful, is to be able to pretty print
+ the interpreter syntax as concrete syntax
+at the moment, it's totally unreadable and useless for debugging
+
+> compileReport :: String -> Either String String
+> compileReport src = do
+>     ast <- parseProgram "" src
+>     iast <- desugarProgram ast
+>     pure (ppShow ast ++ "\n\n" ++ ppShow iast)
+
+
 > runCode :: String -> IO (Maybe Value)
 > runCode src = do
 >     let p = either error id $ compileProgram src
 >     x <- interp p
 >     either error pure x
->  {-where
->    extract [a@(I.StExpr {})] = a
->    extract x = error $ "not an stexpr:" ++ show x-}
 
 > renderCheckResults :: [CheckResult] -> String
 > renderCheckResults cs =
@@ -82,27 +91,7 @@ once do imports, have an option to run all tests
 > runChecks :: String -> IO [CheckResult]
 > runChecks src = do
 >     let p = either error id $ compileProgram src
->     --putStrLn $ ppShow p
 >     x <- I.runChecks p
 >     either error pure x
->  -- where
->    --extract [a@(I.StExpr {})] = a
->    --extract x = error $ "not an stexpr:" ++ show x
 
-Check block: a first block
-  test (5 is 5): ok
-  test (4 is 5): failed, reason:
-    Values not equal:
-    4
-    5
-  1/2 tests passed in check block: a first block
- 
-Check block: a second block
-  test (6 is 7): failed, reason:
-    Values not equal:
-    6
-    7
-  0/1 tests passed in check block: a first block
- 
-1/3 tests passed in all check blocks
 
