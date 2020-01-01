@@ -150,7 +150,7 @@ the can get rid of more trys
 >     ,"otherwise", "block", "cases", "when", "var", "check"
 >     ,"where", "fun", "rec", "data"
 >     ,"import", "provide", "provide-types"
->     ,"from"
+>     ,"from", "and", "or"
 >     ]
 
 > identifierX :: Parser String
@@ -243,7 +243,7 @@ todo: remove the trys by implementing a proper lexer or a lexer style
  approach
 
 > binOpSym :: Parser String
-> binOpSym = choice [symbol "+"
+> binOpSym = choice ([symbol "+"
 >                   ,symbol "*"
 >                   ,try $ symbol "<="
 >                   ,try $ symbol "=="
@@ -253,7 +253,10 @@ todo: remove the trys by implementing a proper lexer or a lexer style
 >                   ,symbol ">"
 >                   ,symbol "-"
 >                   ,symbol "/"
->                   ]
+>                   ] ++ map keyword
+>                   ["and"
+>                   ,"or"
+>                   ])
 > 
 
 > unaryMinus :: Parser Expr

@@ -44,6 +44,9 @@
 
 >                ,("a(3,4)", App (Iden "a") [num 3, num 4])
 
+>                ,("a and b", BinOp (Iden "a") "and" (Iden "b"))
+>                ,("a or b", BinOp (Iden "a") "or" (Iden "b"))
+>                ,("(1 < 2)", Parens $ (BinOp (num 1) "<" (num 2)))
 >                ,("- a", UnaryMinus (Iden "a"))
 
 >                ,("(a)", Parens (Iden "a"))
