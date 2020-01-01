@@ -37,6 +37,7 @@ TODO: add provides and imports
 
 > data Selector = Num Scientific
 >               | Str String
+>               | Tuple [Expr]
 >               deriving (Eq,Show)
 
 > data CheckBlock = CheckBlock String Stmt

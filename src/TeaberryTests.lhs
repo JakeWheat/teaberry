@@ -48,7 +48,9 @@ wrapper to lift tests written in the language into tests for the
 > -- then hoist the tests into Tasty
 > sourceFiles :: [FilePath]
 > sourceFiles = map ("examples/tests/fulltests/" ++)
->     ["trivial_is.tea"]
+>     ["trivial_is.tea"
+>     ,"tuples.tea"
+>     ]
 
 > testSourceFile :: FilePath -> IO T.TestTree
 > testSourceFile fp = do

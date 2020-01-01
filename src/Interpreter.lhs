@@ -47,23 +47,33 @@ type is wrong
 
 > haskellFunImpls :: [(String, [Value] -> Interpreter Value)]
 > haskellFunImpls =
->     [("+", \x -> case x of
+>     [-- arithmetic
+>      ("+", \x -> case x of
 >                      [StrV a, StrV b] -> pure $ StrV (a ++ b)
 >                      [NumV a, NumV b] -> pure $ NumV (a + b))
 >     ,("-", \[NumV a, NumV b] -> pure $ NumV (a - b))
 >     ,("*", \x -> case x of
 >                      [NumV a, NumV b] -> pure $ NumV (a * b)
 >                      _ -> throwM $ MyException $ "* needs two num args, got " ++ ppShow x)
+>     -- comparisons
 >     ,("==", \[a, b] -> pure $ BoolV (a == b))
+
+>     -- misc
 >     ,("raise", \[StrV s] -> throwM $ MyException s)
 >     ,("print", \[xx@(StrV x)] -> liftIO (putStrLn x) >> pure xx)
+>     ,("torepr", \[x] -> pure $ torepr x)
+>
+>      -- some internals
 >     ,("log_test_pass", \[StrV c, StrV t] -> do
 >           tell [TestPass c t]
 >           pure $ BoolV True)
 >     ,("log_test_fail", \[StrV c, StrV t, StrV m] -> do
 >           tell [TestFail c t m]
 >           pure $ BoolV True)
->     ,("torepr", \[x] -> pure $ torepr x)
+>     ,("tupleget", \[TupleV vs, NumV x] -> do
+>              i <- maybe (throwM $ MyException $ "expected integral, got " ++ show x)
+>                         pure (extractInt x)
+>              pure $ vs !! i)
 >     ]
 
 temp testing until agdt are implemented
@@ -82,6 +92,7 @@ temp testing until agdt are implemented
 >                ,liftUnOp "torepr"
 >                ,liftBinOp "log_test_pass"
 >                ,liftTriOp "log_test_fail"
+>                ,liftBinOp "tupleget"
 >                ] emptyEnv
 >   where
 >      liftUnOp f = (f, ClosV (I.Lam "a" (I.AppHaskell f [I.Iden "a"])) emptyEnv)
@@ -93,6 +104,7 @@ temp testing until agdt are implemented
 > data Value = NumV Scientific
 >            | BoolV Bool
 >            | StrV String
+>            | TupleV [Value]
 >            | ClosV I.Expr Env
 >            | VariantV String String [(String,Value)]
 >            | BoxV Int
@@ -191,6 +203,10 @@ todo: move this to an in language data type
 > interp' :: I.Expr -> Interpreter Value
 > interp' (I.Sel (I.Num n)) = pure $ NumV n
 > interp' (I.Sel (I.Str s)) = pure $ StrV s
+> interp' (I.Sel (I.Tuple es)) = do
+>     vs <- mapM interp' es
+>     pure $ TupleV vs
+
 > interp' (I.Iden e) = do
 >     env <- ask
 >     v <- maybe (throwM $ MyException $ "Identifier not found: " ++ e)
@@ -273,3 +289,5 @@ instead of the other one
 >         BoxV i -> put $ extendStore i v' store
 >         _ -> throwM $ MyException $ "attemped to setbox non box value: " ++ show v
 >     pure v'
+
+> interp' x = error $ "interp' " ++ show x

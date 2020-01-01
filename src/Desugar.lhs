@@ -174,6 +174,16 @@ end
 >         _ -> Left "tests not at the top level are not supported"
 >     seqify ss'
 
+> desugarExpr (S.Sel (S.Tuple ts)) = do
+>     ts' <- mapM desugarExpr ts
+>     pure $ I.Sel $ I.Tuple ts'
+
+> desugarExpr (S.TupleGet e i) = do
+>     desugarExpr (S.App (S.Iden "tupleget") [e, S.Sel $ S.Num $ fromIntegral i])
+
+
+> desugarExpr x = error $ "desugarExpr: " ++ show x
+
 > seqify :: [I.Stmt] -> Either String I.Expr
 > seqify [] = Left "empty block"
 > seqify [I.StExpr e] = pure e
