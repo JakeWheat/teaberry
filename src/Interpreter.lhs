@@ -11,7 +11,7 @@
 >                    ,extractInt
 >                    ) where
 
-> import Control.Exception.Safe (Exception, throwM)
+> import Control.Exception.Safe (Exception, throwM, catch)
 > import Control.Monad.IO.Class (liftIO)
 > import Control.Monad.Trans.RWS (RWST, runRWST, ask, get, put, local, tell)
 > import Data.List (partition)
@@ -141,17 +141,13 @@ temp testing until agdt are implemented
 > instance Exception MyException
 
 > interp :: I.Program -> IO (Either String (Maybe Value))
-> interp (I.Program sts _) = do
+> interp (I.Program sts _) = (do
 >     case sts of
 >         Nothing -> pure $ pure Nothing
 >         Just x -> do
 >             (result, _store, _log) <- runRWST (interpStmt' x) defaultHaskellFFIEnv emptyStore
 >             pure $ pure $ Just $ result
-
-> {-interpx :: I.Stmt -> IO (Either String Value)
-> interpx st = do
->     (result, _store, _log) <- runRWST (interpStmt' st) defaultHaskellFFIEnv emptyStore
->     pure $ pure result-}
+>     ) `catch` (\(MyException s) -> pure $ Left $ s)
 
 > runChecks :: I.Program -> IO (Either String [CheckResult])
 > runChecks (I.Program _ cbs) = do
