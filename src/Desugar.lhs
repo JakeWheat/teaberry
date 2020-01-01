@@ -4,22 +4,41 @@
 > import Data.Generics.Uniplate.Data (transformBi)
 > import Data.Maybe (catMaybes, mapMaybe)
 
+> import Control.Monad.RWS (RWST(..), runRWST)
+> import Control.Monad.Except (Except, runExcept, throwError)
+
+
 > import qualified Syntax as S
 > import qualified InterpreterSyntax as I
 > import qualified Pretty as P
 
 
 > desugarProgram :: S.Program -> Either String I.Program
-> desugarProgram (S.Program Nothing Nothing [] stmts) = do
+> desugarProgram (S.Program Nothing Nothing [] stmts) =
+>     case runExcept (runRWST f () ()) of
+>         Left e -> Left e
+>         Right (result, _store, _log) -> Right result
+>   where
+>     f :: RWST () [()] () (Except String) I.Program
+>     f = do
 
 doing this weird create [I.Stmt], then seqify, doesn't seem like a
 good way to do it
 
->     (a,b) <- desugarStmts' stmts
->     pure $ I.Program (seqify a) b
+>         (a,b) <- desugarStmts' stmts
+>         pure $ I.Program (seqify a) b
+
+> desugarExpr :: S.Expr -> Either String I.Expr
+> desugarExpr e =
+>     case runExcept (runRWST (desugarExpr' e) () ()) of
+>         Left x -> Left x
+>         Right (result, _store, _log) -> Right result
 
 
-> desugarStmts' :: [S.Stmt] -> Either String ([I.Expr], [I.CheckBlock])
+> type DesugarStack = RWST () [()] () (Except String)
+
+
+> desugarStmts' :: [S.Stmt] -> DesugarStack ([I.Expr], [I.CheckBlock])
 > desugarStmts' (s:ss) | Just s' <- convRec s = do
 
 rules for fun and rec:
@@ -52,20 +71,20 @@ when a fun or rec is seen, it will collect subsequent funs and recs
 > liftStmt :: I.Expr -> ([I.Expr], [I.CheckBlock])
 > liftStmt s = ([s],[])
 
-> desugarStmt :: S.Stmt -> Either String ([I.Expr], [I.CheckBlock])
+> desugarStmt :: S.Stmt -> DesugarStack ([I.Expr], [I.CheckBlock])
 
 > desugarStmt  (S.StExpr x@(S.BinOp e0 "is" e1)) = do
 >   let p = P.prettyExpr x
 >   y <- desugarIs "unknown" p e0 e1
 >   desugarStmt y
 > 
-> desugarStmt (S.StExpr e) = liftStmt <$> desugarExpr e
+> desugarStmt (S.StExpr e) = liftStmt <$> desugarExpr' e
 > desugarStmt (S.When c t) = liftStmt <$>
->     desugarExpr (S.If [(c, S.Block [S.StExpr t
+>     desugarExpr' (S.If [(c, S.Block [S.StExpr t
 >                                    ,S.StExpr $ S.Iden "nothing"])]
 >                     (Just (S.Iden "nothing")))
 
-> desugarStmt (S.LetDecl nm e) = liftStmt <$> I.LetDecl nm <$> desugarExpr e
+> desugarStmt (S.LetDecl nm e) = liftStmt <$> I.LetDecl nm <$> desugarExpr' e
 
 > desugarStmt (S.FunDecl nm as bdy whr) =
 >     desugarStmt (S.RecDecl nm (S.Lam as bdy))
@@ -73,20 +92,20 @@ when a fun or rec is seen, it will collect subsequent funs and recs
 >    defs <- desugarRecs [(nm,e)]
 >    desugarStmts' $ map (uncurry S.LetDecl) defs
 
-> desugarStmt (S.VarDecl n e) = liftStmt <$> (I.LetDecl n . I.Box) <$> desugarExpr e
-> desugarStmt (S.SetVar n e) = liftStmt <$> I.SetBox n <$> desugarExpr e
+> desugarStmt (S.VarDecl n e) = liftStmt <$> (I.LetDecl n . I.Box) <$> desugarExpr' e
+> desugarStmt (S.SetVar n e) = liftStmt <$> I.SetBox n <$> desugarExpr' e
 
 > desugarStmt (S.Check nm sts) = do
 >     let nm' = maybe "anonymous check block" id nm
 >     (sts'',x) <- desugarStmts' sts
 >     case x of
 >         [] -> pure ()
->         _ -> Left $ "internal error: test in desugared test"
+>         _ -> throwError $ "internal error: test in desugared test"
 >     let sts''' = seqify sts''
 >     pure ([], [I.CheckBlock nm' (sts''')])
 >     
 
-> desugarIs :: String -> String -> S.Expr -> S.Expr -> Either String S.Stmt
+> desugarIs :: String -> String -> S.Expr -> S.Expr -> DesugarStack S.Stmt
 > desugarIs blockName syn e e1 = do
 >     let --syn = P.prettyStmt x
 >         -- blockName = cn
@@ -124,62 +143,62 @@ end
 --------------------------------------
 
 
-> desugarExpr :: S.Expr -> Either String I.Expr
-> desugarExpr (S.Sel (S.Num n)) = Right $ I.Sel (I.Num n)
-> desugarExpr (S.Sel (S.Str s)) = Right $ I.Sel (I.Str s)
-> desugarExpr (S.Iden i) = Right $ I.Iden i
-> desugarExpr (S.Parens e) = desugarExpr e
-> desugarExpr (S.Ask b e) = desugarExpr (S.If b e)
+> desugarExpr' :: S.Expr -> DesugarStack I.Expr
+> desugarExpr' (S.Sel (S.Num n)) = pure $ I.Sel (I.Num n)
+> desugarExpr' (S.Sel (S.Str s)) = pure $ I.Sel (I.Str s)
+> desugarExpr' (S.Iden i) = pure $ I.Iden i
+> desugarExpr' (S.Parens e) = desugarExpr' e
+> desugarExpr' (S.Ask b e) = desugarExpr' (S.If b e)
 
-> desugarExpr (S.If [] Nothing) = Right $ I.App (I.Iden "raise") (I.Sel $ I.Str "no branches matched")
-> desugarExpr (S.If [] (Just e)) = desugarExpr e
-> desugarExpr (S.If ((c,t):xs) els) = I.If <$> desugarExpr c <*> desugarExpr t <*> desugarExpr (S.If xs els)
+> desugarExpr' (S.If [] Nothing) = pure $ I.App (I.Iden "raise") (I.Sel $ I.Str "no branches matched")
+> desugarExpr' (S.If [] (Just e)) = desugarExpr' e
+> desugarExpr' (S.If ((c,t):xs) els) = I.If <$> desugarExpr' c <*> desugarExpr' t <*> desugarExpr' (S.If xs els)
 
-> desugarExpr (S.App f xs) = do
->     f' <- desugarExpr f
->     xs' <- mapM desugarExpr xs
->     let r g [] = Right $ I.App g (I.Sel $ I.VoidS)
->         r g [y] = Right $ I.App g y
+> desugarExpr' (S.App f xs) = do
+>     f' <- desugarExpr' f
+>     xs' <- mapM desugarExpr' xs
+>     let r g [] = pure $ I.App g (I.Sel $ I.VoidS)
+>         r g [y] = pure $ I.App g y
 >         r g (y:ys) = r (I.App g y) ys
 >     r f' xs'
 
-> desugarExpr (S.UnaryMinus e) = desugarExpr (S.App (S.Iden "*") [S.Sel $ S.Num (-1), e])
+> desugarExpr' (S.UnaryMinus e) = desugarExpr' (S.App (S.Iden "*") [S.Sel $ S.Num (-1), e])
 
-> desugarExpr (S.BinOp a op b) = desugarExpr (S.App (S.Iden op) [a,b])
+> desugarExpr' (S.BinOp a op b) = desugarExpr' (S.App (S.Iden op) [a,b])
 
-> desugarExpr (S.Lam [] bdy) = I.LamVoid <$> desugarExpr bdy
-> desugarExpr (S.Lam [x] bdy) = I.Lam x <$> desugarExpr bdy
-> desugarExpr (S.Lam (x:xs) bdy) = I.Lam x <$> desugarExpr (S.Lam xs bdy)
+> desugarExpr' (S.Lam [] bdy) = I.LamVoid <$> desugarExpr' bdy
+> desugarExpr' (S.Lam [x] bdy) = I.Lam x <$> desugarExpr' bdy
+> desugarExpr' (S.Lam (x:xs) bdy) = I.Lam x <$> desugarExpr' (S.Lam xs bdy)
 
-> desugarExpr (S.Let [] bdy) = desugarExpr bdy
-> desugarExpr (S.Let ((n,lbdy):ls) bdy) = do
->     bdy' <- desugarExpr (S.Let ls bdy)
->     lbdy' <- desugarExpr lbdy
->     Right $ I.Let n lbdy' bdy'
+> desugarExpr' (S.Let [] bdy) = desugarExpr' bdy
+> desugarExpr' (S.Let ((n,lbdy):ls) bdy) = do
+>     bdy' <- desugarExpr' (S.Let ls bdy)
+>     lbdy' <- desugarExpr' lbdy
+>     pure $ I.Let n lbdy' bdy'
 
 
 
-> desugarExpr (S.LetRec fs ex) = do
+> desugarExpr' (S.LetRec fs ex) = do
 >    defs <- desugarRecs fs
 >    {-trace (prettyExpr (S.Let defs ex)) -}
->    desugarExpr (S.Let defs ex)
+>    desugarExpr' (S.Let defs ex)
 
-> desugarExpr (S.Block ss) = do
+> desugarExpr' (S.Block ss) = do
 >     (ss', x) <- desugarStmts' ss
 >     case x of
 >         [] -> pure ()
->         _ -> Left "tests not at the top level are not supported"
+>         _ -> throwError "tests not at the top level are not supported"
 >     pure $ seqify ss'
 
-> desugarExpr (S.Sel (S.Tuple ts)) = do
->     ts' <- mapM desugarExpr ts
+> desugarExpr' (S.Sel (S.Tuple ts)) = do
+>     ts' <- mapM desugarExpr' ts
 >     pure $ I.Sel $ I.Tuple ts'
 
-> desugarExpr (S.TupleGet e i) = do
->     desugarExpr (S.App (S.Iden "tupleget") [e, S.Sel $ S.Num $ fromIntegral i])
+> desugarExpr' (S.TupleGet e i) = do
+>     desugarExpr' (S.App (S.Iden "tupleget") [e, S.Sel $ S.Num $ fromIntegral i])
 
 
-> desugarExpr x = error $ "desugarExpr: " ++ show x
+> desugarExpr' x = error $ "desugarExpr': " ++ show x
 
 > seqify :: [I.Expr] -> I.Expr
 > seqify [] = I.Sel I.VoidS
@@ -275,7 +294,7 @@ let
 end
 
 
-> desugarRecs :: [(String,S.Expr)] -> Either String [(String,S.Expr)]
+> desugarRecs :: [(String,S.Expr)] -> DesugarStack [(String,S.Expr)]
 > desugarRecs rs =
 >     let
 >         recnms = flip mapMaybe rs (\r -> case r of

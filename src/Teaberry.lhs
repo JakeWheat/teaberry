@@ -31,7 +31,8 @@ possibly run tests quietly and exit more noisily if there is a failure
 >               ,renderCheckResults
 >               ,CheckResult(..)
 >               ,compileReport
->               ,format)
+>               ,format
+>               ,Value(VoidV))
 
 
 > main :: IO ()
@@ -61,8 +62,8 @@ possibly run tests quietly and exit more noisily if there is a failure
 >           v <- runCode cmd
 >           case v of
 >               Left e -> putStrLn $ show e -- todo exit with error code
->               Right Nothing -> pure ()
->               Right (Just v') -> putStrLn $ show v'
+>               Right VoidV -> pure ()
+>               Right v' -> putStrLn $ show v'
 >       runt cmd = do
 >           v <- runChecks cmd
 >           case v of
