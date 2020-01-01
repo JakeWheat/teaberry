@@ -58,7 +58,14 @@ type is wrong
 >     ,("/", \x -> case x of
 >                      [NumV a, NumV b] -> pure $ NumV (a / b)
 >                      _ -> throwM $ MyException $ "/ needs two num args, got " ++ ppShow x)
->     -- comparisons
+>     -- comparisons - needs some work
+>     ,("<", \x -> case x of
+>                      [NumV a, NumV b] -> pure $ BoolV (a < b)
+>                      _ -> throwM $ MyException $ "< needs two num args, got " ++ ppShow x)
+
+>     ,(">", \x -> case x of
+>                      [NumV a, NumV b] -> pure $ BoolV (a > b)
+>                      _ -> throwM $ MyException $ "< needs two num args, got " ++ ppShow x)
 >     ,("==", \[a, b] -> pure $ BoolV (a == b))
 
 >     -- misc
@@ -91,6 +98,8 @@ temp testing until agdt are implemented
 >                ,liftBinOp "+"
 >                ,liftBinOp "-"
 >                ,liftBinOp "=="
+>                ,liftBinOp "<"
+>                ,liftBinOp ">"
 >                ,liftUnOp "raise"
 >                ,liftUnOp "print"
 >                ,liftUnOp "torepr"
