@@ -4,7 +4,7 @@
 > import Data.Generics.Uniplate.Data (transformBi)
 > import Data.Maybe (catMaybes, mapMaybe)
 
-> import Control.Monad.RWS (RWST(..), runRWST)
+> import Control.Monad.RWS (RWST(..), runRWST, ask, local,state)
 > import Control.Monad.Except (Except, runExcept, throwError)
 
 
@@ -15,11 +15,11 @@
 
 > desugarProgram :: S.Program -> Either String I.Program
 > desugarProgram (S.Program Nothing Nothing [] stmts) =
->     case runExcept (runRWST f () ()) of
+>     case runExcept (runRWST f defaultDesugarReader defaultDesugarStore) of
 >         Left e -> Left e
 >         Right (result, _store, _log) -> Right result
 >   where
->     f :: RWST () [()] () (Except String) I.Program
+>     f :: RWST DesugarReader [()] DesugarStore (Except String) I.Program
 >     f = do
 
 doing this weird create [I.Stmt], then seqify, doesn't seem like a
@@ -30,12 +30,28 @@ good way to do it
 
 > desugarExpr :: S.Expr -> Either String I.Expr
 > desugarExpr e =
->     case runExcept (runRWST (desugarExpr' e) () ()) of
+>     case runExcept (runRWST (desugarExpr' e) defaultDesugarReader defaultDesugarStore) of
 >         Left x -> Left x
 >         Right (result, _store, _log) -> Right result
 
 
-> type DesugarStack = RWST () [()] () (Except String)
+> data DesugarReader = DesugarReader
+>     {inCheckBlockName :: Maybe String -- just iff in a check block
+>     }
+>     deriving (Eq,Show)
+
+> defaultDesugarReader :: DesugarReader
+> defaultDesugarReader = DesugarReader Nothing
+
+> data DesugarStore = DesugarStore
+>     {nextCheckBlockID :: Int -- the id for the next anonymous check block name
+>     }
+>     deriving (Eq,Show)
+
+> defaultDesugarStore :: DesugarStore
+> defaultDesugarStore = DesugarStore 1
+
+> type DesugarStack = RWST DesugarReader [()] DesugarStore (Except String)
 
 
 > desugarStmts' :: [S.Stmt] -> DesugarStack ([I.Expr], [I.CheckBlock])
@@ -56,8 +72,12 @@ when a fun or rec is seen, it will collect subsequent funs and recs
 >     convRec (S.FunDecl nm as bdy whr) = Just (nm, (S.Lam as bdy))
 >     convRec (S.RecDecl nm e) = Just (nm, e)
 >     convRec _ = Nothing -- x = Left $ "unexpected non fun/rec decl: " ++ show x
+
 > desugarStmts' (s:ss) = addStuff <$> desugarStmt s <*> desugarStmts' ss
 > desugarStmts' [] = pure ([],[])
+
+> getCheckBlockName :: DesugarStack (Maybe String)
+> getCheckBlockName = inCheckBlockName <$> ask
 
 > spanMaybe :: (t -> Maybe a) -> [t] -> ([a], [t])
 > spanMaybe _ xs@[] =  ([], xs)
@@ -75,7 +95,9 @@ when a fun or rec is seen, it will collect subsequent funs and recs
 
 > desugarStmt  (S.StExpr x@(S.BinOp e0 "is" e1)) = do
 >   let p = P.prettyExpr x
->   y <- desugarIs "unknown" p e0 e1
+>   checkBlockName <- getCheckBlockName
+>   n <- maybe (throwError $ "'is' outside of checkblock") pure checkBlockName
+>   y <- desugarIs n p e0 e1
 >   desugarStmt y
 > 
 > desugarStmt (S.StExpr e) = liftStmt <$> desugarExpr' e
@@ -96,8 +118,13 @@ when a fun or rec is seen, it will collect subsequent funs and recs
 > desugarStmt (S.SetVar n e) = liftStmt <$> I.SetBox n <$> desugarExpr' e
 
 > desugarStmt (S.Check nm sts) = do
->     let nm' = maybe "anonymous check block" id nm
->     (sts'',x) <- desugarStmts' sts
+>     nm' <- case nm of
+>                   Just x -> pure x
+>                   Nothing -> do
+>                       i <- state (\st -> (nextCheckBlockID st
+>                                          ,st {nextCheckBlockID = nextCheckBlockID st + 1}))
+>                       pure $ "check-block-" ++ show i
+>     (sts'',x) <- local (\x -> x {inCheckBlockName = Just nm'}) $  desugarStmts' sts
 >     case x of
 >         [] -> pure ()
 >         _ -> throwError $ "internal error: test in desugared test"

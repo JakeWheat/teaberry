@@ -4,7 +4,7 @@
 # add individual tests to other files so they become the tests
 # and this becomes a small tour of the language
 
-check:
+check "ifs":
 
   if true: 1 else: 2 end is 1
   if false: 1 else: 2 end is 2
@@ -12,14 +12,14 @@ check:
 end
 
 
-check:
+check "vars":
   var x = 10
   x is 10
   x := 15
   x is 15
 end
 
-check:
+check "idens, lambdas":
   double = lam(x): x + x end
   quad = lam(x): double(double(x)) end
   const5 = lam(_): 5 end
