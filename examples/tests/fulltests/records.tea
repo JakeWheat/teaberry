@@ -1,9 +1,24 @@
 
 check:
   x = 33
-  a = {a: "one"; b : 2; c : x }
+  a = {a: "one", b : 2, c : x }
   a.a is "one"
   a.b is 2
   a.c is 33
+
+  my_obj = {s: "Hello", b: true, n: 42}
+  fun g(thing :: {n :: Number}) -> Number:
+    thing.n
+  end
+
+  g(my_obj) is 42
+
+  # this succeeds with type checking on in pyret:
+  #my_obj2 :: {n :: Number, s :: String, b :: Boolean} = {s: "Hello", b: true, n: 42}
+  #fun g2(thing :: {n :: Number}) -> Number:
+  #  thing.n
+  #end
+  #g2(my_obj2) is 42
+  
 end
 
