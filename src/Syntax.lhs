@@ -83,6 +83,7 @@ The high level syntax which the parser produces
 > data Selector = Num Scientific
 >               | Str String
 >               | Tuple [Expr]
+>               | VoidS
 >               deriving (Eq,Show,Data,Typeable,Generic) 
 
 > extractInt :: Scientific -> Maybe Int

@@ -36,6 +36,7 @@
 >                              Nothing ->  show n
 > expr (Sel (Str s)) = doubleQuotes (text s)
 > expr (Sel (Tuple es)) = text "{" <> nest 2 (xSep ";" (map expr es) <> text "}")
+> expr (Sel VoidS) = text "()"
 > expr (Iden n) = text n
 > expr (Parens e) = parens (expr e)
 > expr (If cs el) =

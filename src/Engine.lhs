@@ -23,14 +23,15 @@ once do imports, have an option to run all tests
 > import Data.List (intercalate, partition)
 > import Data.Maybe (isNothing)
 > import Text.Show.Pretty (ppShow)
-> --import Debug.Trace
+> --import Debug.Trace (trace)
 
 > import Pretty (prettyProgram)
 > import Parse (parseProgram)
 > import Desugar (desugarProgram)
 > import Interpreter (interp, Value(..), CheckResult(..))
 > import qualified Interpreter as I
-> import InterpreterSyntax as I
+> import qualified InterpreterSyntax as I
+> import qualified PrettyInterpreter as I
 
 > compileProgram :: String -> Either String I.Program
 > compileProgram src = do
@@ -48,7 +49,9 @@ at the moment, it's totally unreadable and useless for debugging
 > compileReport src = do
 >     ast <- parseProgram "" src
 >     iast <- desugarProgram ast
->     pure (ppShow ast ++ "\n\n" ++ ppShow iast)
+>     pure (ppShow ast ++ "\n==============================\n"
+>           ++ ppShow iast ++ "\n==============================\n"
+>           ++ I.prettyProgram iast)
 
 
 > runCode :: String -> IO (Either String Value)

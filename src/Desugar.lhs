@@ -7,6 +7,7 @@
 > import Control.Monad.RWS (RWST(..), runRWST, ask, local,state)
 > import Control.Monad.Except (Except, runExcept, throwError)
 
+> import Debug.Trace (trace)
 
 > import qualified Syntax as S
 > import qualified InterpreterSyntax as I
@@ -36,7 +37,7 @@ good way to do it
 
 
 > data DesugarReader = DesugarReader
->     {inCheckBlockName :: Maybe String -- just iff in a check block
+>     {inCheckBlockID :: Maybe Int -- just iff in a check block
 >     }
 >     deriving (Eq,Show)
 
@@ -44,12 +45,13 @@ good way to do it
 > defaultDesugarReader = DesugarReader Nothing
 
 > data DesugarStore = DesugarStore
->     {nextCheckBlockID :: Int -- the id for the next anonymous check block name
+>     {nextCheckBlockNameID :: Int -- the id for the next anonymous check block name
+>     ,nextCheckBlockID :: Int
 >     }
 >     deriving (Eq,Show)
 
 > defaultDesugarStore :: DesugarStore
-> defaultDesugarStore = DesugarStore 1
+> defaultDesugarStore = DesugarStore 1 0
 
 > type DesugarStack = RWST DesugarReader [()] DesugarStore (Except String)
 
@@ -76,9 +78,6 @@ when a fun or rec is seen, it will collect subsequent funs and recs
 > desugarStmts' (s:ss) = addStuff <$> desugarStmt s <*> desugarStmts' ss
 > desugarStmts' [] = pure ([],[])
 
-> getCheckBlockName :: DesugarStack (Maybe String)
-> getCheckBlockName = inCheckBlockName <$> ask
-
 > spanMaybe :: (t -> Maybe a) -> [t] -> ([a], [t])
 > spanMaybe _ xs@[] =  ([], xs)
 > spanMaybe p xs@(x:xs') = case p x of
@@ -93,11 +92,9 @@ when a fun or rec is seen, it will collect subsequent funs and recs
 
 > desugarStmt :: S.Stmt -> DesugarStack ([I.Expr], [I.CheckBlock])
 
-> desugarStmt  (S.StExpr x@(S.BinOp e0 "is" e1)) = do
+> desugarStmt (S.StExpr x@(S.BinOp e0 "is" e1)) = do
 >   let p = P.prettyExpr x
->   checkBlockName <- getCheckBlockName
->   n <- maybe (throwError $ "'is' outside of checkblock") pure checkBlockName
->   y <- desugarIs n p e0 e1
+>   y <- desugarIs p e0 e1
 >   desugarStmt y
 > 
 > desugarStmt (S.StExpr e) = liftStmt <$> desugarExpr' e
@@ -135,10 +132,22 @@ end
 >     nm' <- case nm of
 >                   Just x -> pure x
 >                   Nothing -> do
->                       i <- state (\st -> (nextCheckBlockID st
->                                          ,st {nextCheckBlockID = nextCheckBlockID st + 1}))
+>                       i <- state (\st -> (nextCheckBlockNameID st
+>                                          ,st {nextCheckBlockNameID = nextCheckBlockNameID st + 1}))
 >                       pure $ "check-block-" ++ show i
->     (sts'',x) <- local (\x -> x {inCheckBlockName = Just nm'}) $  desugarStmts' sts
+>     checkblockid <- state (\st -> (nextCheckBlockID st
+>                                   ,st {nextCheckBlockID  = nextCheckBlockID st + 1}))
+>     let checkblockidnm = "checkblockid"
+>         blockNameVal = S.Sel $ S.Str nm'
+>         checkblockidval = S.Sel $ S.Num $ fromIntegral checkblockid
+>         blockWrap =
+>             [{-S.StExpr $ S.App (S.Iden "print") [S.Sel $ S.Str $ "Desugar check block enter"]
+>             ,-}S.LetDecl checkblockidnm checkblockidval
+>             ,S.StExpr $ S.App (S.Iden "log_check_block") [S.Iden checkblockidnm
+>                                                          ,blockNameVal]
+>             ] ++ sts ++ [S.StExpr $ S.Sel S.VoidS]
+>     
+>     (sts'',x) <- local (\x -> x {inCheckBlockID = Just checkblockid}) $ desugarStmts' blockWrap
 >     case x of
 >         [] -> pure ()
 >         _ -> throwError $ "internal error: test in desugared test"
@@ -151,7 +160,7 @@ an "is" test desugars to
 block:
   add_test(lam():
     shadow v0 = aexpr
-    shadow v1 = bexpr # todo: change to tuple bind to avoid shadowing capture)
+    shadow v1 = bexpr # todo: change to tuple bind to avoid shadowing capture
     shadow name = "aexpr is bexpr"
     if v0 == v1:
       log_test_pass(checkblockid, name)
@@ -159,25 +168,26 @@ block:
       shadow failmsg = "Values not equal:\n" + torepr(v0) + "\n" + torepr(v1)
       log_test_fail(checkblockid, name, failmsg)
     end
-  end
+  end)
 end
 
-> desugarIs :: String -> String -> S.Expr -> S.Expr -> DesugarStack S.Stmt
-> desugarIs blockName syn e e1 = do
->     let --syn = P.prettyStmt x
->         -- blockName = cn
->         mys = S.StExpr $ S.Block
->          [S.LetDecl "bn" $ S.Sel $ S.Str blockName
->          ,S.LetDecl "tst" $ S.Sel $ S.Str syn
->          ,S.LetDecl "v0" e
->          ,S.LetDecl "v1" e1
->          ,S.StExpr $ S.If [(S.App (S.Iden "==") [S.Iden "v0", S.Iden "v1"]
->               ,S.App (S.Iden "log_test_pass") [S.Iden "bn", S.Iden "tst"])]
->              (Just $ S.App (S.Iden "log_test_fail")
->              [S.Iden "bn", S.Iden "tst"
->              ,str "Values not equal:\n" `plus` app "torepr" [S.Iden "v0"]
->               `plus` str "\n" `plus` app "torepr" [S.Iden "v1"]])
->          ,S.StExpr $ S.Iden "false"]
+> desugarIs :: String -> S.Expr -> S.Expr -> DesugarStack  S.Stmt
+> desugarIs syn e e1 = do
+>     x <- inCheckBlockID <$> ask
+>     checkBlockID <- maybe (throwError $ "'is' outside of checkblock")
+>                     (pure . S.Sel . S.Num . fromIntegral) x
+>     let mys = S.StExpr $ S.App (S.Iden "add_test") $ [S.Lam [] $ S.Block
+>                    [{-S.StExpr $ S.App (S.Iden "print") [S.Sel $ S.Str $ "Desugar test enter"]
+>                    ,-}S.LetDecl "v0" e
+>                    ,S.LetDecl "v1" e1
+>                    ,S.LetDecl "name" $ S.Sel $ S.Str syn
+>                    ,S.StExpr $ S.If [(S.App (S.Iden "==") [S.Iden "v0", S.Iden "v1"]
+>                                    ,S.App (S.Iden "log_test_pass") [checkBlockID, S.Iden "name"])]
+>                        (Just $ S.Block
+>                         [S.LetDecl "failmsg" (str "Values not equal:\n" `plus` app "torepr" [S.Iden "v0"]
+>                                               `plus` str "\n" `plus` app "torepr" [S.Iden "v1"])
+>                         ,S.StExpr $ S.App (S.Iden "log_test_fail")
+>                          [checkBlockID, S.Iden "name", S.Iden "failmsg"]])]]
 >     pure mys
 >   where
 >       plus a b = S.BinOp a "+" b
@@ -191,6 +201,7 @@ end
 > desugarExpr' :: S.Expr -> DesugarStack I.Expr
 > desugarExpr' (S.Sel (S.Num n)) = pure $ I.Sel (I.Num n)
 > desugarExpr' (S.Sel (S.Str s)) = pure $ I.Sel (I.Str s)
+> desugarExpr' (S.Sel S.VoidS) = pure $ I.Sel I.VoidS
 > desugarExpr' (S.Iden i) = pure $ I.Iden i
 > desugarExpr' (S.Parens e) = desugarExpr' e
 > desugarExpr' (S.Ask b e) = desugarExpr' (S.If b e)

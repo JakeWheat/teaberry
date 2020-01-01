@@ -125,6 +125,8 @@ type is wrong
 >                ,liftUnOp "torepr"
 >                ,liftBinOp "log_test_pass"
 >                ,liftTriOp "log_test_fail"
+>                ,liftBinOp "log_check_block"
+>                ,liftUnOp "add_test"
 >                ,liftBinOp "tupleget"
 >                ] emptyEnv
 >   where
@@ -144,36 +146,31 @@ type is wrong
 
 temp testing until agdt are implemented
 
-> data TestResultLog = TestPass String String -- check block name, test source
->                    | TestFail String String String -- check block name, test source, failure message
+> data TestResultLog = TestPass Scientific String -- check block id, test source
+>                    | TestFail Scientific String String -- check block id, test source, failure message
+>                    | TestBlock Scientific String
 
 
 > logTestPass :: [Value] -> Interpreter Value
-> logTestPass = \[StrV c, StrV t] -> do
->     tell [TestPass c t]
+> logTestPass = \[NumV n, StrV t] -> do
+>     tell [TestPass n t]
 >     pure VoidV
 
 > logTestFail :: [Value] -> Interpreter Value
-> logTestFail = \[StrV c, StrV t, StrV m] -> do
->     tell [TestFail c t m]
+> logTestFail = \[NumV n, StrV t, StrV m] -> do
+>     tell [TestFail n t m]
 >     pure VoidV
 
 > logCheckBlock :: [Value] -> Interpreter Value
-> logCheckBlock = \_ -> do
->     -- todo
+> logCheckBlock = \[NumV i, StrV s] -> do
+>     tell [TestBlock i s]
 >     pure VoidV
 
 > addTest :: [Value] -> Interpreter Value
-> addTest = \_ -> do
->     -- todo
+> addTest = \[ClosV (I.LamVoid bdy) env'] -> do
+>     local (const env') $ interp' bdy
 >     pure VoidV
 
-log_test_pass
-log_test_fail
-log_check_block
-
-
-add_test
 
 ------------------------------------------------------------------------------
 
@@ -231,24 +228,29 @@ Either String (Value, [Value])
 > runChecks (I.Program _ cbs) = (do
 >     let st = map f cbs
 >     (_result, _store, lg) <- runRWST (mapM interp' st) defaultHaskellFFIEnv emptyStore
->     let gs = map (\x -> (blockName x, toCheckResult x)) lg
+>     let (blocknmsx, testresults) = partition isTestBlock lg
+>         blocknms :: [(Scientific, String)]
+>         blocknms = map (\(TestBlock nm id) -> (nm, id)) blocknmsx
+>         gs = map (\x -> (blockID x, toCheckResult x)) testresults
 >         gs' = partitionN gs
->         ts = map (uncurry CheckResult) gs'
+>         ts = map (\(id,nm) -> case lookup id blocknms of
+>                                    Nothing -> error "internal error block id"
+>                                    Just b -> CheckResult b nm) gs'
 >     pure $ pure ts
 >     ) `catch` (\(MyException s) -> pure $ Left $ s)
 >   where
+>     isTestBlock (TestBlock {}) = True
+>     isTestBlock _ = False
 >     f (I.CheckBlock _ s) = s
->     blockName (TestPass x _) = x
->     blockName (TestFail x _ _) = x
+>     blockID (TestPass x _) = x
+>     blockID (TestFail x _ _) = x
 >     toCheckResult (TestPass _ x) = (x,Nothing)
 >     toCheckResult (TestFail _ x m) = (x,Just m)
 
 
-> partitionN :: Eq a => [(a,b)] -> [(a,[b])]
-> partitionN [] = []
-> partitionN vs@((k,_):_) =
->     let (x,y) = partition ((==k) . fst) vs
->     in (k,map snd x) : partitionN y
+ data TestResultLog = TestPass Scientific String -- check block id, test source
+                    | TestFail Scientific String String -- check block id, test source, failure message
+                    | TestBlock Scientific String
 
 
 todo: move this to an in language data type
@@ -259,11 +261,21 @@ todo: move this to an in language data type
 > -- message
 
 
+> partitionN :: Eq a => [(a,b)] -> [(a,[b])]
+> partitionN [] = []
+> partitionN vs@((k,_):_) =
+>     let (x,y) = partition ((==k) . fst) vs
+>     in (k,map snd x) : partitionN y
+
+
+
+
 --------------------------------------
 
 > interp' :: I.Expr -> Interpreter Value
 > interp' (I.Sel (I.Num n)) = pure $ NumV n
 > interp' (I.Sel (I.Str s)) = pure $ StrV s
+> interp' (I.Sel I.VoidS) = pure $ VoidV
 > interp' (I.Sel (I.Tuple es)) = do
 >     vs <- mapM interp' es
 >     pure $ TupleV vs
