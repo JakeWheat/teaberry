@@ -7,7 +7,7 @@
 > import qualified Test.Tasty.HUnit as T
 
 > import Parse (parseExpr)
-> import InterpreterSyntax (Stmt(..), Expr(..), Selector(..), {-CheckBlock(..),-} Program(..))
+> import InterpreterSyntax (Expr(..), Selector(..))
 > import Desugar (desugarExpr)
 > --import qualified Syntax as S
 
@@ -64,14 +64,14 @@
 >     ,("block: a + b\n\
 >       \  c + d\n\
 >       \end"
->      ,Seq (StExpr $ binop (Iden "a") "+" (Iden "b"))
->          (StExpr $ binop (Iden "c") "+" (Iden "d")))
+>      ,Seq (binop (Iden "a") "+" (Iden "b"))
+>          (binop (Iden "c") "+" (Iden "d")))
 >     ,("block:\n\
 >       \    a = 5\n\
 >       \    a + 5\n\
 >       \end"
 >      ,Seq (LetDecl "a" (num 5))
->          (StExpr $ App (App (Iden "+") (Iden "a")) (num 5)))
+>          (App (App (Iden "+") (Iden "a")) (num 5)))
 
 desugaring a data decl:
 

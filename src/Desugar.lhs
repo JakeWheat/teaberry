@@ -16,13 +16,10 @@ doing this weird create [I.Stmt], then seqify, doesn't seem like a
 good way to do it
 
 >     (a,b) <- desugarStmts' stmts
->     a' <- case a of
->             [] -> pure Nothing
->             _ -> (Just . I.StExpr) <$> seqify a
->     pure $ I.Program a' b
+>     pure $ I.Program (seqify a) b
 
 
-> desugarStmts' :: [S.Stmt] -> Either String ([I.Stmt], [I.CheckBlock])
+> desugarStmts' :: [S.Stmt] -> Either String ([I.Expr], [I.CheckBlock])
 > desugarStmts' (s:ss) | Just s' <- convRec s = do
 
 rules for fun and rec:
@@ -52,18 +49,18 @@ when a fun or rec is seen, it will collect subsequent funs and recs
 > addStuff :: ([a],[b]) -> ([a],[b]) -> ([a],[b])
 > addStuff (a,b) (a', b') = (a ++ a', b ++ b')
 
-> liftStmt :: I.Stmt -> ([I.Stmt], [I.CheckBlock])
+> liftStmt :: I.Expr -> ([I.Expr], [I.CheckBlock])
 > liftStmt s = ([s],[])
 
-> desugarStmt :: S.Stmt -> Either String ([I.Stmt], [I.CheckBlock])
+> desugarStmt :: S.Stmt -> Either String ([I.Expr], [I.CheckBlock])
 
 > desugarStmt  (S.StExpr x@(S.BinOp e0 "is" e1)) = do
 >   let p = P.prettyExpr x
 >   y <- desugarIs "unknown" p e0 e1
 >   desugarStmt y
 > 
-> desugarStmt (S.StExpr e) = liftStmt <$> I.StExpr <$> desugarExpr e
-> desugarStmt (S.When c t) = liftStmt <$> I.StExpr <$> 
+> desugarStmt (S.StExpr e) = liftStmt <$> desugarExpr e
+> desugarStmt (S.When c t) = liftStmt <$>
 >     desugarExpr (S.If [(c, S.Block [S.StExpr t
 >                                    ,S.StExpr $ S.Iden "nothing"])]
 >                     (Just (S.Iden "nothing")))
@@ -77,7 +74,7 @@ when a fun or rec is seen, it will collect subsequent funs and recs
 >    desugarStmts' $ map (uncurry S.LetDecl) defs
 
 > desugarStmt (S.VarDecl n e) = liftStmt <$> (I.LetDecl n . I.Box) <$> desugarExpr e
-> desugarStmt (S.SetVar n e) = liftStmt <$> I.StExpr <$> I.SetBox n <$> desugarExpr e
+> desugarStmt (S.SetVar n e) = liftStmt <$> I.SetBox n <$> desugarExpr e
 
 > desugarStmt (S.Check nm sts) = do
 >     let nm' = maybe "anonymous check block" id nm
@@ -85,8 +82,8 @@ when a fun or rec is seen, it will collect subsequent funs and recs
 >     case x of
 >         [] -> pure ()
 >         _ -> Left $ "internal error: test in desugared test"
->     sts''' <- seqify sts''
->     pure ([], [I.CheckBlock nm' (I.StExpr sts''')])
+>     let sts''' = seqify sts''
+>     pure ([], [I.CheckBlock nm' (sts''')])
 >     
 
 > desugarIs :: String -> String -> S.Expr -> S.Expr -> Either String S.Stmt
@@ -172,7 +169,7 @@ end
 >     case x of
 >         [] -> pure ()
 >         _ -> Left "tests not at the top level are not supported"
->     seqify ss'
+>     pure $ seqify ss'
 
 > desugarExpr (S.Sel (S.Tuple ts)) = do
 >     ts' <- mapM desugarExpr ts
@@ -184,12 +181,10 @@ end
 
 > desugarExpr x = error $ "desugarExpr: " ++ show x
 
-> seqify :: [I.Stmt] -> Either String I.Expr
-> seqify [] = Left "empty block"
-> seqify [I.StExpr e] = pure e
-> seqify [I.LetDecl {}] = Left "block ends with decl"
-> seqify [a,b] = pure $ I.Seq a b
-> seqify (a:as) = I.Seq a <$> I.StExpr <$> seqify as
+> seqify :: [I.Expr] -> I.Expr
+> seqify [] = I.Sel I.VoidS
+> seqify [e] = e
+> seqify (e:es) = I.Seq e $ seqify es
 
 
 rec in blocks:

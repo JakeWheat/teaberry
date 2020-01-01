@@ -51,7 +51,7 @@ at the moment, it's totally unreadable and useless for debugging
 >     pure (ppShow ast ++ "\n\n" ++ ppShow iast)
 
 
-> runCode :: String -> IO (Either String (Maybe Value))
+> runCode :: String -> IO (Either String Value)
 > runCode src = do
 >     case compileProgram src of
 >         Left e -> pure $ Left e

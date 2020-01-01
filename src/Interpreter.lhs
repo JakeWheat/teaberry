@@ -125,10 +125,11 @@ temp testing until agdt are implemented
 > data Value = NumV Scientific
 >            | BoolV Bool
 >            | StrV String
->            | TupleV [Value]
+>            | TupleV [Value] -- todo use variant, which is also used for plain records
 >            | ClosV I.Expr Env
 >            | VariantV String String [(String,Value)]
 >            | BoxV Int
+>            | VoidV
 >            deriving (Eq,Show)
 
 > torepr :: Value -> Value
@@ -173,19 +174,27 @@ temp testing until agdt are implemented
 
 > instance Exception MyException
 
-> interp :: I.Program -> IO (Either String (Maybe Value))
-> interp (I.Program sts _) = (do
->     case sts of
->         Nothing -> pure $ pure Nothing
->         Just x -> do
->             (result, _store, _log) <- runRWST (interpStmt' x) defaultHaskellFFIEnv emptyStore
->             pure $ pure $ Just $ result
+> interp :: I.Program -> IO (Either String Value)
+> interp (I.Program exp _) = (do
+>     (result, _store, _log) <- runRWST (interp' exp) defaultHaskellFFIEnv emptyStore
+>     pure $ pure $ result
 >     ) `catch` (\(MyException s) -> pure $ Left $ s)
+
+the check result is temporary. when agdt are added, the result will be
+a Value
+
+you run will run a script you have these options:
+1. run tests or not
+2. collect output -> returns a list of values for the top level
+3. print output to stdout
+the return will be Either String Value
+there is a separate wrapper to collect the values, which returns
+Either String (Value, [Value])
 
 > runChecks :: I.Program -> IO (Either String [CheckResult])
 > runChecks (I.Program _ cbs) = (do
 >     let st = map f cbs
->     (_result, _store, lg) <- runRWST (mapM interpStmt' st) defaultHaskellFFIEnv emptyStore
+>     (_result, _store, lg) <- runRWST (mapM interp' st) defaultHaskellFFIEnv emptyStore
 >     let gs = map (\x -> (blockName x, toCheckResult x)) lg
 >         gs' = partitionN gs
 >         ts = map (uncurry CheckResult) gs'
@@ -213,12 +222,6 @@ todo: move this to an in language data type
 > -- the second is just if it is a fail, it contains the failure
 > -- message
 
-
---------------------------------------
-
-> interpStmt' :: I.Stmt -> Interpreter Value
-> interpStmt' (I.LetDecl {}) = throwM $ MyException $ "unattached let decl"
-> interpStmt' (I.StExpr e) = interp' e
 
 --------------------------------------
 
@@ -290,8 +293,8 @@ instead of the other one
 
 > interp' (I.Seq (I.LetDecl nm e) b) = do
 >     v <- interp' e
->     local (extendEnv nm v) $ interpStmt' b
-> interp' (I.Seq a@(I.StExpr {}) b) = interpStmt' a >> interpStmt' b
+>     local (extendEnv nm v) $ interp' b
+> interp' (I.Seq a b) = interp' a >> interp' b
 
 > interp' (I.Box e) = do
 >     v <- interp' e

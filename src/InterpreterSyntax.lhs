@@ -5,7 +5,7 @@ The syntax which the interpreter uses
 
 > import Data.Scientific (Scientific)
 
-> data Program = Program (Maybe Stmt) [CheckBlock]
+> data Program = Program Expr [CheckBlock]
 >               deriving (Eq,Show)
 
 TODO: add provides and imports
@@ -24,23 +24,19 @@ TODO: add provides and imports
 >           | LamVoid Expr
 >           | Let String Expr Expr
 >           | AppHaskell String [Expr]
->           | Seq Stmt Stmt
+>           | Seq Expr Expr
 >           | Box Expr
 >           | SetBox String Expr
->           --  | SetVar String Expr
->           deriving (Eq,Show)
-
-> data Stmt = StExpr Expr
 >           | LetDecl String Expr
 >           deriving (Eq,Show)
-
 
 > data Selector = Num Scientific
 >               | Str String
 >               | Tuple [Expr]
+>               | VoidS
 >               deriving (Eq,Show)
 
-> data CheckBlock = CheckBlock String Stmt
+> data CheckBlock = CheckBlock String Expr
 >               deriving (Eq,Show)
 
 
