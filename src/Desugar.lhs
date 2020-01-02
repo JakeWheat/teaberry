@@ -127,6 +127,54 @@ block:
   VoidV # a check block has no value (until non top level check blocks are supported)
 end
 
+todo: a non top level check block can use something like this:
+
+expr
+check:
+...
+end
+->
+shadow tmpvar = expr
+add_tests(lam():
+   ...
+   # instead of ending with VoidV:
+   tmpvar
+end
+
+this isn't needed for nested where:, but is for a nested
+check/examples if they are at the end of a block
+or should thie be
+
+surprising behaviour in pyret:
+
+block:
+  y = 2
+  y
+  check "nested":
+    y is 2
+  end
+end
+
+runs the test and returns 2
+
+block:
+  y = 2
+  check "nested":
+    y is 2
+  end
+end
+
+this succeeds, runs the test, and outputs nothing
+
+block:
+  y = 2
+  #check "nested":
+  #  y is 2
+  #end
+end
+
+this fails with 'a block cannot end with a binding'
+
 
 > desugarStmt (S.Check nm sts) = do
 >     nm' <- case nm of
@@ -158,17 +206,16 @@ end
 an "is" test desugars to
 
 block:
-  add_test(lam():
-    shadow v0 = aexpr
-    shadow v1 = bexpr # todo: change to tuple bind to avoid shadowing capture
-    shadow name = "aexpr is bexpr"
-    if v0 == v1:
-      log_test_pass(checkblockid, name)
-    else:
-      shadow failmsg = "Values not equal:\n" + torepr(v0) + "\n" + torepr(v1)
-      log_test_fail(checkblockid, name, failmsg)
-    end
-  end)
+  shadow v0 = aexpr
+  shadow v1 = bexpr # todo: change to tuple bind to avoid bexpr
+                    # capturing the shadowed v0
+  shadow name = "aexpr is bexpr"
+  if v0 == v1:
+    log_test_pass(checkblockid, name)
+  else:
+    shadow failmsg = "Values not equal:\n" + torepr(v0) + "\n" + torepr(v1)
+    log_test_fail(checkblockid, name, failmsg)
+  end
 end
 
 > desugarIs :: String -> S.Expr -> S.Expr -> DesugarStack  S.Stmt

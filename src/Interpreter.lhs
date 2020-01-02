@@ -68,7 +68,8 @@ type is wrong
 >     [-- arithmetic
 >      ("+", \x -> case x of
 >                      [StrV a, StrV b] -> pure $ StrV (a ++ b)
->                      [NumV a, NumV b] -> pure $ NumV (a + b))
+>                      [NumV a, NumV b] -> pure $ NumV (a + b)
+>                      _ -> error $ "Interpreter: plus implementation" ++ show x)
 >     ,("-", \[NumV a, NumV b] -> pure $ NumV (a - b))
 >     ,("*", \x -> case x of
 >                      [NumV a, NumV b] -> pure $ NumV (a * b)
@@ -141,6 +142,7 @@ type is wrong
 >                              Nothing ->  show n
 > torepr (BoolV n) = StrV $ if n then "true" else "false"
 > torepr (ClosV {}) = StrV "<Function>"
+> torepr x = error $  "Interpreter: torepr implementation " ++ show x
 
 ------------------------------------------------------------------------------
 
