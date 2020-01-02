@@ -12,8 +12,9 @@
 >                    ) where
 
 > import Control.Exception.Safe (Exception, throwM, catch)
+> import Control.Monad (void, forM_, when)
 > import Control.Monad.IO.Class (liftIO)
-> import Control.Monad.Trans.RWS (RWST, runRWST, ask, get, put, local, tell)
+> import Control.Monad.Trans.RWS (RWST, runRWST, ask, get, {-put,-} local, tell, state)
 > import Data.List (partition)
 > import Data.Scientific (Scientific)
 > import Text.Show.Pretty (ppShow)
@@ -170,7 +171,8 @@ temp testing until agdt are implemented
 
 > addTest :: [Value] -> Interpreter Value
 > addTest = \[ClosV (I.LamVoid bdy) env'] -> do
->     local (const env') $ interp' bdy
+>     -- todo: gather the tests and run at the end
+>     local (updateIREnv (const env')) $ interp' bdy
 >     pure VoidV
 
 
@@ -201,7 +203,23 @@ temp testing until agdt are implemented
 
 = interpreter function
 
-> type Interpreter a = RWST Env [TestResultLog] Store IO a
+> data InterpreterReader = InterpreterReader
+>     {irEnv :: Env}
+> -- todo: use lenses?
+> updateIREnv :: (Env -> Env) -> (InterpreterReader -> InterpreterReader)
+> updateIREnv f i = i {irEnv = f (irEnv i)}
+
+> 
+> data InterpreterState = InterpreterState
+>     {isStore :: Store}
+> updateISStore :: (Store -> Store) -> (InterpreterState -> InterpreterState)
+> updateISStore f i = i {isStore = f (isStore i)}
+
+
+todo: create helper wrapper functions for the usual operations with
+ the read value and the state value stuff
+
+> type Interpreter a = RWST InterpreterReader [TestResultLog] InterpreterState IO a
 >
 
 > data MyException = MyException String
@@ -211,7 +229,10 @@ temp testing until agdt are implemented
 
 > interp :: I.Program -> IO (Either String Value)
 > interp (I.Program ex _) = (do
->     (result, _store, _log) <- runRWST (interp' ex) defaultHaskellFFIEnv emptyStore
+>     
+>     (result, _store, _log) <- runRWST (interp' ex)
+>         (InterpreterReader defaultHaskellFFIEnv)
+>         (InterpreterState emptyStore)
 >     pure $ pure $ result
 >     ) `catch` (\(MyException s) -> pure $ Left $ s)
 
@@ -229,7 +250,9 @@ Either String (Value, [Value])
 > runChecks :: I.Program -> IO (Either String [CheckResult])
 > runChecks (I.Program _ cbs) = (do
 >     let st = map f cbs
->     (_result, _store, lg) <- runRWST (mapM interp' st) defaultHaskellFFIEnv emptyStore
+>     (_result, _store, lg) <- runRWST (mapM interp' st)
+>         (InterpreterReader defaultHaskellFFIEnv)
+>         (InterpreterState emptyStore)
 >     let (blocknmsx, testresults) = partition isTestBlock lg
 >         blocknms :: [(Scientific, String)]
 >         blocknms = map (\(TestBlock nm id) -> (nm, id)) blocknmsx
@@ -283,13 +306,13 @@ todo: move this to an in language data type
 >     pure $ TupleV vs
 
 > interp' (I.Iden e) = do
->     env <- ask
+>     rd <- ask
 >     v <- maybe (throwM $ MyException $ "Identifier not found: " ++ e)
->         pure $ lookupEnv e env
+>         pure $ lookupEnv e (irEnv rd)
 >     case v of
 >         BoxV i -> do
->                   store <- get
->                   fetchStore i store
+>                   st <- get
+>                   fetchStore i (isStore st)
 >         _ -> pure v
 >   
 > interp' _x@(I.If c t e) = do
@@ -308,10 +331,10 @@ it
 >     f vs
 
 > interp' e@(I.Lam {}) = do
->     env <- ask
+>     env <- irEnv <$> ask
 >     pure $ ClosV e env
 > interp' e@(I.LamVoid {}) = do
->     env <- ask
+>     env <- irEnv <$> ask
 >     pure $ ClosV e env
 
 
@@ -323,40 +346,41 @@ instead of the other one
 >     case x of
 >         ClosV (I.Lam n bdy) env' -> do
 >              argVal <- interp' a
->              local (const $ extendEnv n argVal env') $ interp' bdy
+>              local (updateIREnv (const $ extendEnv n argVal env')) $ interp' bdy
 >         ClosV (I.LamVoid bdy) env' -> do
 >              case a of
->                  I.Sel I.VoidS -> local (const env') $ interp' bdy
+>                  I.Sel I.VoidS -> local (updateIREnv (const env')) $ interp' bdy
 >                  _ -> throwM $ MyException $ "0 arg lambda called with something other than literal void: " ++ show a
 >         ClosV ee _ -> throwM $ MyException $ "non lambda in closure expression: " ++ show ee
 >         _ -> throwM $ MyException $ "non function in app position: " ++ show x
 
 > interp' (I.Let nm v bdy) = do
 >     v' <- interp' v
->     local (extendEnv nm v') $ interp' bdy
+>     local (updateIREnv (extendEnv nm v')) $ interp' bdy
 
 > interp' (I.Seq (I.LetDecl nm e) b) = do
 >     v <- interp' e
->     local (extendEnv nm v) $ interp' b
+>     local (updateIREnv (extendEnv nm v)) $ interp' b
 > interp' (I.Seq a b) = interp' a >> interp' b
 
 > interp' (I.Box e) = do
 >     v <- interp' e
->     store <- get
->     let i = newStoreLoc store
->     put $ extendStore i v store
+>     i <- state $ \s ->
+>          let i = newStoreLoc (isStore s)
+>          in (i, updateISStore (extendStore i v) s)
 >     pure $ BoxV i
 
 > interp' (I.SetBox b v) = do
 >     b' <- do
->           env <- ask
+>           env <- irEnv <$> ask
 >           maybe (throwM $ MyException $ "Identifier not found: " ++ b)
 >               pure $ lookupEnv b env
 >     v' <- interp' v
->     store <- get
->     case b' of
->         BoxV i -> put $ extendStore i v' store
->         _ -> throwM $ MyException $ "attemped to setbox non box value: " ++ show v
+>     i <- case b' of
+>              BoxV i -> pure i
+>              _ -> throwM $ MyException $ "attemped to setbox non box value: " ++ show b'
+>     state $ \s ->
+>         ((), updateISStore (extendStore i v') s)
 >     pure v'
 
 > interp' x = error $ "interp' " ++ show x
