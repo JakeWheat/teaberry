@@ -1,4 +1,5 @@
 
+> {-# LANGUAGE TupleSections #-}
 > module Desugar (desugarProgram,desugarExpr) where
 
 > import Data.Generics.Uniplate.Data (transformBi)
@@ -64,15 +65,20 @@ when a fun or rec is seen, it will collect subsequent funs and recs
 (both) and then desugar them all together as one letrec
 
 >     -- get all the immediately following recursive defs
->     let (adddecls,ss') = spanMaybe convRec ss
+>     let (addDecls',ss') = spanMaybe convRec ss
+>         (addDecls, whrs') = unzip (s' : addDecls')
+>         whrs :: [(Maybe String, [S.Stmt])]
+>         whrs = map (\(a,b) -> (Just a, b)) $ catMaybes whrs'
 >     -- desugar them to regular let together
->     defs <- desugarRecs (s' : adddecls)
+>     defs <- desugarRecs addDecls
+>     -- do the check blocks, not sure it's right to not interleave them
+>     chks <- desugarStmts' $ map (uncurry S.Check) whrs
 >     -- desugar to interpreter syntax
 >     idecls <- desugarStmts' $ map (uncurry S.LetDecl) defs
->     (++) idecls <$> desugarStmts' ss'
+>     (++) (idecls ++ chks) <$> desugarStmts' ss'
 >   where
->     convRec (S.FunDecl nm as bdy whr) = Just (nm, (S.Lam as bdy))
->     convRec (S.RecDecl nm e) = Just (nm, e)
+>     convRec (S.FunDecl nm as bdy whr) = Just ((nm, (S.Lam as bdy)), fmap (nm,) whr)
+>     convRec (S.RecDecl nm e) = Just ((nm, e), Nothing)
 >     convRec _ = Nothing
 
 > desugarStmts' (s:ss) = (++) <$> desugarStmt s <*> desugarStmts' ss
@@ -99,16 +105,18 @@ when a fun or rec is seen, it will collect subsequent funs and recs
 
 > desugarStmt (S.LetDecl nm e) = (:[]) <$> I.LetDecl nm <$> desugarExpr' e
 
-> desugarStmt (S.FunDecl nm as bdy whr) =
->     desugarStmt (S.RecDecl nm (S.Lam as bdy))
+> desugarStmt (S.FunDecl nm as bdy whr) = do
+>     a <- desugarStmt (S.RecDecl nm (S.Lam as bdy))
+>     case whr of
+>         Nothing -> pure a
+>         Just w -> (++) a <$> desugarStmt (S.Check (Just nm) w)
+>     
 > desugarStmt (S.RecDecl nm e) = do
 >    defs <- desugarRecs [(nm,e)]
 >    desugarStmts' $ map (uncurry S.LetDecl) defs
 
 > desugarStmt (S.VarDecl n e) = (:[]) <$> (I.LetDecl n . I.Box) <$> desugarExpr' e
 > desugarStmt (S.SetVar n e) = (:[]) <$> I.SetBox n <$> desugarExpr' e
-
-
 
 desugaring check blocks:
 

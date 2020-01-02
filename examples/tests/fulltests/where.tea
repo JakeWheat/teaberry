@@ -1,0 +1,24 @@
+
+fun square(n):
+  n * n
+end
+
+fun apply_twice(f, x):
+  f(f(x))
+where:
+  apply_twice(square, 2) is 16
+  apply_twice(square, 3) is 81
+end
+
+fun g():
+  fun h():
+    5
+  where:
+    h() is 5
+  end
+end
+
+# runs the nested test twice:
+
+g()
+g()

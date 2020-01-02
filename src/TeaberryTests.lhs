@@ -61,6 +61,7 @@ wrapper to lift tests written in the language into tests for the
 >     ,"two_same_name_check.tea"
 >     ,"vars.tea"
 >     ,"tuples.tea"
+>     ,"where.tea"
 >     ,"tour.tea"
 >     ]
 
