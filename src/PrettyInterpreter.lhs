@@ -11,8 +11,8 @@
 > prettyProgram = P.prettyProgram . resugarProgram
 
 > resugarProgram :: I.Program -> S.Program
-> resugarProgram (I.Program e cs) =
->     S.Program Nothing Nothing [] (S.StExpr (resugarExpr e) : concat (map resugarCheckBlock cs))
+> resugarProgram (I.Program e) =
+>     S.Program Nothing Nothing [] [S.StExpr (resugarExpr e)]
 >
 > resugarExpr :: I.Expr -> S.Expr
 > resugarExpr (I.Sel (I.Num n)) = S.Sel (S.Num n)
@@ -41,9 +41,3 @@ adding a block here is wrong, it's a hack
 
 > resugarExpr (I.SetBox s e) =  S.Block [S.SetVar s (resugarExpr e)]
 > resugarExpr (I.LetDecl nm e) = S.Block [S.LetDecl nm (resugarExpr e)]
-
-> resugarCheckBlock :: I.CheckBlock -> [S.Stmt]
-> resugarCheckBlock (I.CheckBlock nm e) =
->     [S.Check (Just nm) [S.StExpr $ resugarExpr e]]
-
- data CheckBlock = CheckBlock String Expr

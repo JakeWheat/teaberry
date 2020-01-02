@@ -102,7 +102,7 @@ type is wrong
 >     ,("log_check_block", logCheckBlock)
 >     ,("log_test_pass", logTestPass)
 >     ,("log_test_fail", logTestFail)
->     ,("add_test", addTest)
+>     ,("add_tests", addTests)
 >      
 >     ,("tupleget", \[TupleV vs, NumV x] -> do
 >              i <- maybe (throwM $ MyException $ "expected integral, got " ++ show x)
@@ -128,7 +128,7 @@ type is wrong
 >                ,liftBinOp "log_test_pass"
 >                ,liftTriOp "log_test_fail"
 >                ,liftBinOp "log_check_block"
->                ,liftUnOp "add_test"
+>                ,liftUnOp "add_tests"
 >                ,liftBinOp "tupleget"
 >                ] emptyEnv
 >   where
@@ -169,12 +169,23 @@ temp testing until agdt are implemented
 >     tell [TestBlock i s]
 >     pure VoidV
 
-> addTest :: [Value] -> Interpreter Value
-> addTest = \[ClosV (I.LamVoid bdy) env'] -> do
->     -- todo: gather the tests and run at the end
->     local (updateIREnv (const env')) $ interp' bdy
+> addTests :: [Value] -> Interpreter Value
+> addTests = \[t@(ClosV (I.LamVoid _) _)] -> do
+>     -- save the test so it can be run at the end
+>     -- is it worth optimising this out if the tests aren't going to be run?
+>     appendTest t
 >     pure VoidV
 
+> -- runs all the tests saved in the run
+> runSavedTests :: Interpreter ()
+> runSavedTests = do
+>     ts <- (reverse . isTestsToRun) <$> get
+>     forM_ ts $ \(ClosV (I.LamVoid bdy) env') ->
+>         void $ local (updateIREnv (const env')) $ interp' bdy
+
+> appendTest :: Value -> Interpreter ()
+> appendTest t = state $ \s ->
+>     ((), s {isTestsToRun = t : isTestsToRun s})
 
 ------------------------------------------------------------------------------
 
@@ -211,13 +222,18 @@ temp testing until agdt are implemented
 
 > 
 > data InterpreterState = InterpreterState
->     {isStore :: Store}
+>     {isStore :: Store
+>     ,isTestsToRun :: [Value]
+>     }
 > updateISStore :: (Store -> Store) -> (InterpreterState -> InterpreterState)
 > updateISStore f i = i {isStore = f (isStore i)}
 
+> defaultInterpreterState :: InterpreterState
+> defaultInterpreterState = InterpreterState emptyStore []
 
 todo: create helper wrapper functions for the usual operations with
  the read value and the state value stuff
+(i.e. a wrapper for local + updateIRenv)
 
 > type Interpreter a = RWST InterpreterReader [TestResultLog] InterpreterState IO a
 >
@@ -228,57 +244,54 @@ todo: create helper wrapper functions for the usual operations with
 > instance Exception MyException
 
 > interp :: I.Program -> IO (Either String Value)
-> interp (I.Program ex _) = (do
->     
->     (result, _store, _log) <- runRWST (interp' ex)
->         (InterpreterReader defaultHaskellFFIEnv)
->         (InterpreterState emptyStore)
->     pure $ pure $ result
->     ) `catch` (\(MyException s) -> pure $ Left $ s)
-
-the check result is temporary. when agdt are added, the result will be
-a Value
-
-you run will run a script you have these options:
-1. run tests or not
-2. collect output -> returns a list of values for the top level
-3. print output to stdout
-the return will be Either String Value
-there is a separate wrapper to collect the values, which returns
-Either String (Value, [Value])
+> interp p = do
+>     x <- interpx False p
+>     pure $ fmap fst x
 
 > runChecks :: I.Program -> IO (Either String [CheckResult])
-> runChecks (I.Program _ cbs) = (do
->     let st = map f cbs
->     (_result, _store, lg) <- runRWST (mapM interp' st)
+> runChecks p = do
+>     x <- interpx True p
+>     pure $ fmap snd x
+
+
+> interpx :: Bool -> I.Program -> IO (Either String (Value, [CheckResult]))
+> interpx runChks (I.Program ex) = (do
+>     -- let st = map testStmts cbs
+>     (result, _store, lg) <-
+>         runRWST (do
+>                  x <- interp' ex
+>                  when runChks runSavedTests
+>                  pure x
+>                 )
 >         (InterpreterReader defaultHaskellFFIEnv)
->         (InterpreterState emptyStore)
->     let (blocknmsx, testresults) = partition isTestBlock lg
->         blocknms :: [(Scientific, String)]
->         blocknms = map (\(TestBlock nm id) -> (nm, id)) blocknmsx
->         gs = map (\x -> (blockID x, toCheckResult x)) testresults
->         gs' = partitionN gs
->         ts = map (\(id,nm) -> case lookup id blocknms of
->                                    Nothing -> error "internal error block id"
->                                    Just b -> CheckResult b nm) gs'
->     pure $ pure ts
+>         defaultInterpreterState
+>     let cr = if runChks
+>              then getCheckResults lg
+>              else []
+>     pure $ pure $ (result, cr)
 >     ) `catch` (\(MyException s) -> pure $ Left $ s)
 >   where
+>     getCheckResults lg =
+>         let (blocknmsx, testresults) = partition isTestBlock lg
+>             blocknms :: [(Scientific, String)]
+>             blocknms = map (\(TestBlock nm tid) -> (nm, tid)) blocknmsx
+>             gs = map (\x -> (blockID x, toCheckResult x)) testresults
+>             gs' = partitionN gs
+>             ts = map (\(tid,nm) -> case lookup tid blocknms of
+>                                        Nothing -> error "internal error block id"
+>                                        Just b -> CheckResult b nm) gs'
+>         in ts
+>     --testStmts (I.CheckBlock _ s) = s
 >     isTestBlock (TestBlock {}) = True
 >     isTestBlock _ = False
->     f (I.CheckBlock _ s) = s
 >     blockID (TestPass x _) = x
 >     blockID (TestFail x _ _) = x
+>     blockID (TestBlock {}) = error "Interpreter: testblock in wrong place"
 >     toCheckResult (TestPass _ x) = (x,Nothing)
 >     toCheckResult (TestFail _ x m) = (x,Just m)
+>     toCheckResult (TestBlock {}) = error "Interpreter: testblock in wrong place b"
 
 
- data TestResultLog = TestPass Scientific String -- check block id, test source
-                    | TestFail Scientific String String -- check block id, test source, failure message
-                    | TestBlock Scientific String
-
-
-todo: move this to an in language data type
 
 > data CheckResult = CheckResult String -- the test block name
 >                               [(String, Maybe String)]

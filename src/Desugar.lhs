@@ -26,8 +26,8 @@
 doing this weird create [I.Stmt], then seqify, doesn't seem like a
 good way to do it
 
->         (a,b) <- desugarStmts' stmts
->         pure $ I.Program (seqify a) b
+>         a <- desugarStmts' stmts
+>         pure $ I.Program (seqify a)
 
 > desugarExpr :: S.Expr -> Either String I.Expr
 > desugarExpr e =
@@ -56,7 +56,7 @@ good way to do it
 > type DesugarStack = RWST DesugarReader [()] DesugarStore (Except String)
 
 
-> desugarStmts' :: [S.Stmt] -> DesugarStack ([I.Expr], [I.CheckBlock])
+> desugarStmts' :: [S.Stmt] -> DesugarStack [I.Expr]
 > desugarStmts' (s:ss) | Just s' <- convRec s = do
 
 rules for fun and rec:
@@ -69,14 +69,14 @@ when a fun or rec is seen, it will collect subsequent funs and recs
 >     defs <- desugarRecs (s' : adddecls)
 >     -- desugar to interpreter syntax
 >     idecls <- desugarStmts' $ map (uncurry S.LetDecl) defs
->     addStuff idecls <$> desugarStmts' ss'
+>     (++) idecls <$> desugarStmts' ss'
 >   where
 >     convRec (S.FunDecl nm as bdy whr) = Just (nm, (S.Lam as bdy))
 >     convRec (S.RecDecl nm e) = Just (nm, e)
->     convRec _ = Nothing -- x = Left $ "unexpected non fun/rec decl: " ++ show x
+>     convRec _ = Nothing
 
-> desugarStmts' (s:ss) = addStuff <$> desugarStmt s <*> desugarStmts' ss
-> desugarStmts' [] = pure ([],[])
+> desugarStmts' (s:ss) = (++) <$> desugarStmt s <*> desugarStmts' ss
+> desugarStmts' [] = pure []
 
 > spanMaybe :: (t -> Maybe a) -> [t] -> ([a], [t])
 > spanMaybe _ xs@[] =  ([], xs)
@@ -84,26 +84,20 @@ when a fun or rec is seen, it will collect subsequent funs and recs
 >     Just y  -> let (ys, zs) = spanMaybe p xs' in (y : ys, zs)
 >     Nothing -> ([], xs)
 
-> addStuff :: ([a],[b]) -> ([a],[b]) -> ([a],[b])
-> addStuff (a,b) (a', b') = (a ++ a', b ++ b')
-
-> liftStmt :: I.Expr -> ([I.Expr], [I.CheckBlock])
-> liftStmt s = ([s],[])
-
-> desugarStmt :: S.Stmt -> DesugarStack ([I.Expr], [I.CheckBlock])
+> desugarStmt :: S.Stmt -> DesugarStack [I.Expr]
 
 > desugarStmt (S.StExpr x@(S.BinOp e0 "is" e1)) = do
 >   let p = P.prettyExpr x
 >   y <- desugarIs p e0 e1
 >   desugarStmt y
 > 
-> desugarStmt (S.StExpr e) = liftStmt <$> desugarExpr' e
-> desugarStmt (S.When c t) = liftStmt <$>
+> desugarStmt (S.StExpr e) = (:[]) <$> desugarExpr' e
+> desugarStmt (S.When c t) = (:[]) <$>
 >     desugarExpr' (S.If [(c, S.Block [S.StExpr t
 >                                    ,S.StExpr $ S.Iden "nothing"])]
 >                     (Just (S.Iden "nothing")))
 
-> desugarStmt (S.LetDecl nm e) = liftStmt <$> I.LetDecl nm <$> desugarExpr' e
+> desugarStmt (S.LetDecl nm e) = (:[]) <$> I.LetDecl nm <$> desugarExpr' e
 
 > desugarStmt (S.FunDecl nm as bdy whr) =
 >     desugarStmt (S.RecDecl nm (S.Lam as bdy))
@@ -111,8 +105,8 @@ when a fun or rec is seen, it will collect subsequent funs and recs
 >    defs <- desugarRecs [(nm,e)]
 >    desugarStmts' $ map (uncurry S.LetDecl) defs
 
-> desugarStmt (S.VarDecl n e) = liftStmt <$> (I.LetDecl n . I.Box) <$> desugarExpr' e
-> desugarStmt (S.SetVar n e) = liftStmt <$> I.SetBox n <$> desugarExpr' e
+> desugarStmt (S.VarDecl n e) = (:[]) <$> (I.LetDecl n . I.Box) <$> desugarExpr' e
+> desugarStmt (S.SetVar n e) = (:[]) <$> I.SetBox n <$> desugarExpr' e
 
 
 
@@ -120,7 +114,7 @@ desugaring check blocks:
 
 a check block is desugared to this:
 
-block:
+add_tests(lam():
   checkblockid = n # unique number, and the variable name checkblock id should be unique (todo)
   log_check_block(checkblockid, "blockname")
   {desuged statements in the check block}
@@ -188,27 +182,22 @@ this fails with 'a block cannot end with a binding'
 >     let checkblockidnm = "checkblockid"
 >         blockNameVal = S.Sel $ S.Str nm'
 >         checkblockidval = S.Sel $ S.Num $ fromIntegral checkblockid
+>         blk = [S.LetDecl checkblockidnm checkblockidval
+>                 ,S.StExpr $ S.App (S.Iden "log_check_block") [S.Iden checkblockidnm
+>                                                              ,blockNameVal]
+>               ] ++ sts ++ [S.StExpr $ S.Sel S.VoidS]
 >         blockWrap =
->             [{-S.StExpr $ S.App (S.Iden "print") [S.Sel $ S.Str $ "Desugar check block enter"]
->             ,-}S.LetDecl checkblockidnm checkblockidval
->             ,S.StExpr $ S.App (S.Iden "log_check_block") [S.Iden checkblockidnm
->                                                          ,blockNameVal]
->             ] ++ sts ++ [S.StExpr $ S.Sel S.VoidS]
->     
->     (sts'',x) <- local (\x -> x {inCheckBlockID = Just checkblockid}) $ desugarStmts' blockWrap
->     case x of
->         [] -> pure ()
->         _ -> throwError $ "internal error: test in desugared test"
->     let sts''' = seqify sts''
->     pure ([], [I.CheckBlock nm' (sts''')])
+>             [S.StExpr $ S.App (S.Iden "add_tests") $ [S.Lam [] $ S.Block blk]]
+>     sts' <- local (\x -> x {inCheckBlockID = Just checkblockid}) $ desugarStmts' blockWrap
+>     -- let sts''' = seqify sts''
+>     pure [seqify sts']
 >     
 
 an "is" test desugars to
 
 block:
   shadow v0 = aexpr
-  shadow v1 = bexpr # todo: change to tuple bind to avoid bexpr
-                    # capturing the shadowed v0
+  shadow v1 = bexpr # todo: change to tuple bind to avoid shadowing capture
   shadow name = "aexpr is bexpr"
   if v0 == v1:
     log_test_pass(checkblockid, name)
@@ -223,7 +212,7 @@ end
 >     x <- inCheckBlockID <$> ask
 >     checkBlockID <- maybe (throwError $ "'is' outside of checkblock")
 >                     (pure . S.Sel . S.Num . fromIntegral) x
->     let mys = S.StExpr $ S.App (S.Iden "add_test") $ [S.Lam [] $ S.Block
+>     let mys = S.StExpr $ S.Block
 >                    [{-S.StExpr $ S.App (S.Iden "print") [S.Sel $ S.Str $ "Desugar test enter"]
 >                    ,-}S.LetDecl "v0" e
 >                    ,S.LetDecl "v1" e1
@@ -234,7 +223,7 @@ end
 >                         [S.LetDecl "failmsg" (str "Values not equal:\n" `plus` app "torepr" [S.Iden "v0"]
 >                                               `plus` str "\n" `plus` app "torepr" [S.Iden "v1"])
 >                         ,S.StExpr $ S.App (S.Iden "log_test_fail")
->                          [checkBlockID, S.Iden "name", S.Iden "failmsg"]])]]
+>                          [checkBlockID, S.Iden "name", S.Iden "failmsg"]])]
 >     pure mys
 >   where
 >       plus a b = S.BinOp a "+" b
@@ -287,10 +276,7 @@ end
 >    desugarExpr' (S.Let defs ex)
 
 > desugarExpr' (S.Block ss) = do
->     (ss', x) <- desugarStmts' ss
->     case x of
->         [] -> pure ()
->         _ -> throwError "tests not at the top level are not supported"
+>     ss' <- desugarStmts' ss
 >     pure $ seqify ss'
 
 > desugarExpr' (S.Sel (S.Tuple ts)) = do
