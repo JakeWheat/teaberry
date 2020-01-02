@@ -1,4 +1,33 @@
 
+Parsing notes:
+
+there isn't a separate lexer, which isn't great
+
+in some places it lazily uses try, try should not be used for non
+single token syntax imo, because it makes the error messages bad, and
+also can affect the performance badly in some cases
+
+
+todo: issues with what is supported already
+
+doesn't deal with optional ; at end of tuple list
+let parsing isn't quite right atm
+
+you can put multiple commands on one line
+
+it doesn't require 0 whitespace between an fn and the () app parens
+this makes a lot of things which should work fail and is particularly bad
+
+doesn't require ws around binops
+
+doesn't quite support - in identifiers properly
+
+doesn't parse binops properly at the moment. I think it's mostly the
+case that it's too permissive compared with pyret. It doesn't use a
+fixity parser either
+
+
+
 > module Parse (parseExpr
 >              ,parseStmt
 >              ,parseProgram) where

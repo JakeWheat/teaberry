@@ -1,4 +1,16 @@
 
+Desugaring from the high level syntax to the interpreter syntax.
+
+The most interesting parts are:
+
+tests (check:, example:, where:)
+
+and to a lesser extent:
+
+letrec (and multiple rec/fun declarations)
+
+app with multiple args
+
 > {-# LANGUAGE TupleSections #-}
 > module Desugar (desugarProgram,desugarExpr) where
 
@@ -8,7 +20,7 @@
 > import Control.Monad.RWS (RWST(..), runRWST, ask, local,state)
 > import Control.Monad.Except (Except, runExcept, throwError)
 
-> import Debug.Trace (trace)
+> --import Debug.Trace (trace)
 
 > import qualified Syntax as S
 > import qualified InterpreterSyntax as I
@@ -29,6 +41,9 @@ good way to do it
 
 >         a <- desugarStmts' stmts
 >         pure $ I.Program (seqify a)
+
+> desugarProgram x = error $ "Desugar: desugarProgram " ++ show x
+
 
 > desugarExpr :: S.Expr -> Either String I.Expr
 > desugarExpr e =
@@ -126,7 +141,7 @@ add_tests(lam():
   checkblockid = n # unique number, and the variable name checkblock id should be unique (todo)
   log_check_block(checkblockid, "blockname")
   {desuged statements in the check block}
-  VoidV # a check block has no value (until non top level check blocks are supported)
+  VoidV # a top level check block has no value
 end
 
 todo: a non top level check block can use something like this:
@@ -197,15 +212,17 @@ this fails with 'a block cannot end with a binding'
 >         blockWrap =
 >             [S.StExpr $ S.App (S.Iden "add_tests") $ [S.Lam [] $ S.Block blk]]
 >     sts' <- local (\x -> x {inCheckBlockID = Just checkblockid}) $ desugarStmts' blockWrap
->     -- let sts''' = seqify sts''
 >     pure [seqify sts']
 >     
+
+> desugarStmt x = error $ "Desugar desugarStmt " ++ show x
 
 an "is" test desugars to
 
 block:
   shadow v0 = aexpr
-  shadow v1 = bexpr # todo: change to tuple bind to avoid shadowing capture
+  shadow v1 = bexpr # todo: change to tuple bind to avoid bexpr
+                    # capturing the shadowed v0
   shadow name = "aexpr is bexpr"
   if v0 == v1:
     log_test_pass(checkblockid, name)
