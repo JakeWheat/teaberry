@@ -29,13 +29,9 @@ using a hack sort of ffi for haskell.
 
 
 > {-# LANGUAGE ScopedTypeVariables #-}
-> module Interpreter (interp
+> module Interpreter (runProgram
 >                    ,CheckResult(..)
 >                    ,runChecks
->                    ,emptyEnv
->                    ,extendEnv
->                    ,extendsEnv
->                    ,Env
 >                    ,Value(..)
 >                    ,extractInt
 >                    ) where
@@ -147,14 +143,14 @@ todo: create helper wrapper functions for the usual operations with
 
 wrappers
 
-> interp :: I.Program -> IO (Either String Value)
-> interp p = do
->     x <- interpx False p
+> runProgram :: I.Program -> IO (Either String Value)
+> runProgram p = do
+>     x <- interpWrap False p
 >     pure $ fmap fst x
 
 > runChecks :: I.Program -> IO (Either String [CheckResult])
 > runChecks p = do
->     x <- interpx True p
+>     x <- interpWrap True p
 >     pure $ fmap snd x
 
 the main interpreter function
@@ -168,11 +164,11 @@ and it should write these values to stdout (with a flag to suppress this?)
 writing them out out matches the behaviour of pyret
 a program doesn't have a value (in this way, at least)
 
-> interpx :: Bool -> I.Program -> IO (Either String (Value, [CheckResult]))
-> interpx runChks (I.Program ex) = (do
+> interpWrap :: Bool -> I.Program -> IO (Either String (Value, [CheckResult]))
+> interpWrap runChks (I.Program ex) = (do
 >     (result, _store, lg) <-
 >         runRWST (do
->                  x <- interp' ex
+>                  x <- interp ex
 >                  when runChks runSavedTests
 >                  pure x
 >                 )
@@ -188,15 +184,15 @@ a program doesn't have a value (in this way, at least)
 
 interpreters for syntax nodes
 
-> interp' :: I.Expr -> Interpreter Value
-> interp' (I.Sel (I.Num n)) = pure $ NumV n
-> interp' (I.Sel (I.Str s)) = pure $ StrV s
-> interp' (I.Sel I.VoidS) = pure $ VoidV
-> interp' (I.Sel (I.Tuple es)) = do
->     vs <- mapM interp' es
+> interp :: I.Expr -> Interpreter Value
+> interp (I.Sel (I.Num n)) = pure $ NumV n
+> interp (I.Sel (I.Str s)) = pure $ StrV s
+> interp (I.Sel I.VoidS) = pure $ VoidV
+> interp (I.Sel (I.Tuple es)) = do
+>     vs <- mapM interp es
 >     pure $ TupleV vs
 
-> interp' (I.Iden e) = do
+> interp (I.Iden e) = do
 >     rd <- ask
 >     v <- maybe (throwM $ MyException $ "Identifier not found: " ++ e)
 >         pure $ lookupEnv e (irEnv rd)
@@ -206,64 +202,64 @@ interpreters for syntax nodes
 >                   fetchStore i (isStore st)
 >         _ -> pure v
 >   
-> interp' _x@(I.If c t e) = do
->    c' <- interp' c
+> interp _x@(I.If c t e) = do
+>    c' <- interp c
 >    case c' of
->        BoolV True -> interp' t
->        BoolV False -> interp' e
+>        BoolV True -> interp t
+>        BoolV False -> interp e
 >        _ -> throwM $ MyException $ "expected bool in if test, got " ++ show c'
 
 the AppHaskell is only used in the default ffi env, the desugarer never produces
 it
 
-> interp' (I.AppHaskell nm exps) = do
+> interp (I.AppHaskell nm exps) = do
 >     f <- maybe (throwM $ MyException $ "ffi fn not found: " ++ nm) pure $ lookup nm haskellFunImpls
->     vs <- mapM interp' exps
+>     vs <- mapM interp exps
 >     f vs
 
-> interp' e@(I.Lam {}) = do
+> interp e@(I.Lam {}) = do
 >     env <- irEnv <$> ask
 >     pure $ ClosV e env
-> interp' e@(I.LamVoid {}) = do
+> interp e@(I.LamVoid {}) = do
 >     env <- irEnv <$> ask
 >     pure $ ClosV e env
 
 
-> interp' (I.App f a) = do
->     x <- interp' f
+> interp (I.App f a) = do
+>     x <- interp f
 >     case x of
 >         ClosV (I.Lam n bdy) env' -> do
->              argVal <- interp' a
->              local (updateIREnv (const $ extendEnv n argVal env')) $ interp' bdy
+>              argVal <- interp a
+>              local (updateIREnv (const $ extendEnv n argVal env')) $ interp bdy
 >         ClosV (I.LamVoid bdy) env' -> do
 >              case a of
->                  I.Sel I.VoidS -> local (updateIREnv (const env')) $ interp' bdy
+>                  I.Sel I.VoidS -> local (updateIREnv (const env')) $ interp bdy
 >                  _ -> throwM $ MyException $ "0 arg lambda called with something other than literal void: " ++ show a
 >         ClosV ee _ -> throwM $ MyException $ "non lambda in closure expression: " ++ show ee
 >         _ -> throwM $ MyException $ "non function in app position: " ++ show x
 
-> interp' (I.Let nm v bdy) = do
->     v' <- interp' v
->     local (updateIREnv (extendEnv nm v')) $ interp' bdy
+> interp (I.Let nm v bdy) = do
+>     v' <- interp v
+>     local (updateIREnv (extendEnv nm v')) $ interp bdy
 
-> interp' (I.Seq (I.LetDecl nm e) b) = do
->     v <- interp' e
->     local (updateIREnv (extendEnv nm v)) $ interp' b
-> interp' (I.Seq a b) = interp' a >> interp' b
+> interp (I.Seq (I.LetDecl nm e) b) = do
+>     v <- interp e
+>     local (updateIREnv (extendEnv nm v)) $ interp b
+> interp (I.Seq a b) = interp a >> interp b
 
-> interp' (I.Box e) = do
->     v <- interp' e
+> interp (I.Box e) = do
+>     v <- interp e
 >     i <- state $ \s ->
 >          let i = newStoreLoc (isStore s)
 >          in (i, updateISStore (extendStore i v) s)
 >     pure $ BoxV i
 
-> interp' (I.SetBox b v) = do
+> interp (I.SetBox b v) = do
 >     b' <- do
 >           env <- irEnv <$> ask
 >           maybe (throwM $ MyException $ "Identifier not found: " ++ b)
 >               pure $ lookupEnv b env
->     v' <- interp' v
+>     v' <- interp v
 >     i <- case b' of
 >              BoxV i -> pure i
 >              _ -> throwM $ MyException $ "attemped to setbox non box value: " ++ show b'
@@ -271,7 +267,7 @@ it
 >         ((), updateISStore (extendStore i v') s)
 >     pure v'
 
-> interp' x = error $ "interp' " ++ show x
+> interp x = error $ "Interpreter: interp " ++ show x
 
 
 
@@ -321,7 +317,7 @@ this is called at the end of a script if the tests are enabled
 > runSavedTests = do
 >     ts <- (reverse . isTestsToRun) <$> get
 >     forM_ ts $ \(ClosV (I.LamVoid bdy) env') ->
->         void $ local (updateIREnv (const env')) $ interp' bdy
+>         void $ local (updateIREnv (const env')) $ interp bdy
 
 the data type which is part of the user api for testing for now
 

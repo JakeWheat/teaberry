@@ -28,7 +28,7 @@ once do imports, have an option to run all tests
 > import Pretty (prettyProgram)
 > import Parse (parseProgram)
 > import Desugar (desugarProgram)
-> import Interpreter (interp, Value(..), CheckResult(..))
+> import Interpreter (runProgram, Value(..), CheckResult(..))
 > import qualified Interpreter as I
 > import qualified InterpreterSyntax as I
 > import qualified PrettyInterpreter as I
@@ -58,7 +58,7 @@ at the moment, it's totally unreadable and useless for debugging
 > runCode src = do
 >     case compileProgram src of
 >         Left e -> pure $ Left e
->         Right p -> interp p
+>         Right p -> runProgram p
 
 > renderCheckResults :: [CheckResult] -> String
 > renderCheckResults cs =

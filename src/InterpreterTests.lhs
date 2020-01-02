@@ -25,5 +25,5 @@
 >     let s = "block:\n" ++ defs ++ "\n" ++ src ++ "\nend"
 >         ast = either error id $ parseProgram "" s
 >         iast = either error id $ desugarProgram ast
->     Right x <- I.interp iast
+>     Right x <- I.runProgram iast
 >     T.assertEqual "" ex x

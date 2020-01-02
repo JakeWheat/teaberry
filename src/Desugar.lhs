@@ -1,15 +1,11 @@
 
 Desugaring from the high level syntax to the interpreter syntax.
 
-The most interesting parts are:
+The most interesting part is the test desugaring (check:, example:,
+where:)
 
-tests (check:, example:, where:)
+and to a lesser extent letrec (and multiple rec/fun declarations)
 
-and to a lesser extent:
-
-letrec (and multiple rec/fun declarations)
-
-app with multiple args
 
 > {-# LANGUAGE TupleSections #-}
 > module Desugar (desugarProgram,desugarExpr) where
@@ -26,6 +22,9 @@ app with multiple args
 > import qualified InterpreterSyntax as I
 > import qualified Pretty as P
 
+------------------------------------------------------------------------------
+
+= api
 
 > desugarProgram :: S.Program -> Either String I.Program
 > desugarProgram (S.Program Nothing Nothing [] stmts) =
@@ -33,14 +32,12 @@ app with multiple args
 >         Left e -> Left e
 >         Right (result, _store, _log) -> Right result
 >   where
->     f :: RWST DesugarReader [()] DesugarStore (Except String) I.Program
->     f = do
 
 doing this weird create [I.Stmt], then seqify, doesn't seem like a
 good way to do it
 
->         a <- desugarStmts' stmts
->         pure $ I.Program (seqify a)
+>     f :: RWST DesugarReader [()] DesugarStore (Except String) I.Program
+>     f = (I.Program . seqify) <$> desugarStmts stmts
 
 > desugarProgram x = error $ "Desugar: desugarProgram " ++ show x
 
@@ -51,6 +48,11 @@ good way to do it
 >         Left x -> Left x
 >         Right (result, _store, _log) -> Right result
 
+------------------------------------------------------------------------------
+
+= types for the desugarer monad
+
+> type DesugarStack = RWST DesugarReader [()] DesugarStore (Except String)
 
 > data DesugarReader = DesugarReader
 >     {inCheckBlockID :: Maybe Int -- just iff in a check block
@@ -69,11 +71,15 @@ good way to do it
 > defaultDesugarStore :: DesugarStore
 > defaultDesugarStore = DesugarStore 1 0
 
-> type DesugarStack = RWST DesugarReader [()] DesugarStore (Except String)
+------------------------------------------------------------------------------
 
+desugar a block
 
-> desugarStmts' :: [S.Stmt] -> DesugarStack [I.Expr]
-> desugarStmts' (s:ss) | Just s' <- convRec s = do
+doesn't yet do the top level the way it is supposed to, pending
+research on a better letrec than the usual scheme one
+
+> desugarStmts :: [S.Stmt] -> DesugarStack [I.Expr]
+> desugarStmts (s:ss) | Just s' <- convRec s = do
 
 rules for fun and rec:
 when a fun or rec is seen, it will collect subsequent funs and recs
@@ -87,23 +93,18 @@ when a fun or rec is seen, it will collect subsequent funs and recs
 >     -- desugar them to regular let together
 >     defs <- desugarRecs addDecls
 >     -- do the check blocks, not sure it's right to not interleave them
->     chks <- desugarStmts' $ map (uncurry S.Check) whrs
+>     chks <- desugarStmts $ map (uncurry S.Check) whrs
 >     -- desugar to interpreter syntax
->     idecls <- desugarStmts' $ map (uncurry S.LetDecl) defs
->     (++) (idecls ++ chks) <$> desugarStmts' ss'
+>     idecls <- desugarStmts $ map (uncurry S.LetDecl) defs
+>     (++) (idecls ++ chks) <$> desugarStmts ss'
 >   where
 >     convRec (S.FunDecl nm as bdy whr) = Just ((nm, (S.Lam as bdy)), fmap (nm,) whr)
 >     convRec (S.RecDecl nm e) = Just ((nm, e), Nothing)
 >     convRec _ = Nothing
 
-> desugarStmts' (s:ss) = (++) <$> desugarStmt s <*> desugarStmts' ss
-> desugarStmts' [] = pure []
+> desugarStmts (s:ss) = (++) <$> desugarStmt s <*> desugarStmts ss
+> desugarStmts [] = pure []
 
-> spanMaybe :: (t -> Maybe a) -> [t] -> ([a], [t])
-> spanMaybe _ xs@[] =  ([], xs)
-> spanMaybe p xs@(x:xs') = case p x of
->     Just y  -> let (ys, zs) = spanMaybe p xs' in (y : ys, zs)
->     Nothing -> ([], xs)
 
 > desugarStmt :: S.Stmt -> DesugarStack [I.Expr]
 
@@ -128,10 +129,12 @@ when a fun or rec is seen, it will collect subsequent funs and recs
 >     
 > desugarStmt (S.RecDecl nm e) = do
 >    defs <- desugarRecs [(nm,e)]
->    desugarStmts' $ map (uncurry S.LetDecl) defs
+>    desugarStmts $ map (uncurry S.LetDecl) defs
 
 > desugarStmt (S.VarDecl n e) = (:[]) <$> (I.LetDecl n . I.Box) <$> desugarExpr' e
 > desugarStmt (S.SetVar n e) = (:[]) <$> I.SetBox n <$> desugarExpr' e
+
+------------------------------------------------------------------------------
 
 desugaring check blocks:
 
@@ -160,7 +163,6 @@ end
 
 this isn't needed for nested where:, but is for a nested
 check/examples if they are at the end of a block
-or should thie be
 
 surprising behaviour in pyret:
 
@@ -211,7 +213,7 @@ this fails with 'a block cannot end with a binding'
 >               ] ++ sts ++ [S.StExpr $ S.Sel S.VoidS]
 >         blockWrap =
 >             [S.StExpr $ S.App (S.Iden "add_tests") $ [S.Lam [] $ S.Block blk]]
->     sts' <- local (\x -> x {inCheckBlockID = Just checkblockid}) $ desugarStmts' blockWrap
+>     sts' <- local (\x -> x {inCheckBlockID = Just checkblockid}) $ desugarStmts blockWrap
 >     pure [seqify sts']
 >     
 
@@ -301,7 +303,7 @@ end
 >    desugarExpr' (S.Let defs ex)
 
 > desugarExpr' (S.Block ss) = do
->     ss' <- desugarStmts' ss
+>     ss' <- desugarStmts ss
 >     pure $ seqify ss'
 
 > desugarExpr' (S.Sel (S.Tuple ts)) = do
@@ -314,16 +316,19 @@ end
 
 > desugarExpr' x = error $ "desugarExpr': " ++ show x
 
+turn a list of expressions into a nested seq value
+
 > seqify :: [I.Expr] -> I.Expr
 > seqify [] = I.Sel I.VoidS
 > seqify [e] = e
 > seqify (e:es) = I.Seq e $ seqify es
 
+------------------------------------------------------------------------------
 
 rec in blocks:
 
-This is the canonical rewrite which I think says what works and what doesn't
-work in pyret:
+This is the canonical rewrite from scheme which I think says what
+works and what doesn't work in vanilla pyret:
 
 (letrec ([v e] ...) b...)
 ->
@@ -433,4 +438,14 @@ end
 >      patchCalls mp ids = transformBi $ \x -> case x of
 >          S.App (S.Iden fx) args | Just fx' <- lookup fx mp -> S.App (S.Iden fx') (map S.Iden ids ++ args)
 >          _ -> x
+
+------------------------------------------------------------------------------
+
+utils
+
+> spanMaybe :: (t -> Maybe a) -> [t] -> ([a], [t])
+> spanMaybe _ xs@[] =  ([], xs)
+> spanMaybe p xs@(x:xs') = case p x of
+>     Just y  -> let (ys, zs) = spanMaybe p xs' in (y : ys, zs)
+>     Nothing -> ([], xs)
 
