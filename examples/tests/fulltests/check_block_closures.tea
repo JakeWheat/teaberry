@@ -1,0 +1,26 @@
+
+
+
+var a = 1
+
+check "var update closure":
+  # the check will see the value of a after top level statements have
+  # run
+  a is 2
+end
+
+a := 2
+
+b = 2
+
+check "correct non var closure":
+  # this should pick up the correct b from the lexical closure,
+  # not the shadowed one later
+  b is 2
+end
+
+b = 3
+
+check "correct non var closure 2":
+  b is 3
+end

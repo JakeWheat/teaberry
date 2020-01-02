@@ -50,14 +50,18 @@ wrapper to lift tests written in the language into tests for the
 > sourceFiles :: [FilePath]
 > sourceFiles = map ("examples/tests/fulltests/" ++)
 >     ["trivial_is.tea"
->     ,"tuples.tea"
->     ,"arithmetic.tea"
 >     ,"comparisons.tea"
 >     ,"boolean.tea"
+>     ,"arithmetic.tea"
 >     ,"ahoy.tea"
->     ,"basics.tea"
 >     ,"empty.tea"
 >     ,"empty_check.tea"
+>     ,"check_block_closures.tea"
+>     ,"check_closure.tea"
+>     ,"two_same_name_check.tea"
+>     ,"vars.tea"
+>     ,"tuples.tea"
+>     ,"tour.tea"
 >     ]
 
 > testSourceFile :: FilePath -> IO T.TestTree

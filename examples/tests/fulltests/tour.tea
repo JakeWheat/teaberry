@@ -57,39 +57,20 @@ fun square(n):
 end
 
 check:
-  # todo: use the outer fun square
-  fun square(n):
-    n * n
-  end
   square(4) is 16
   square(2) is 4
 end
 
-fun apply-twice(f, x):
+fun apply_twice(f, x):
   f(f(x))
 where:
-  apply-twice(square, 2) is 16
-  apply-twice(square, 3) is 81
+  apply_twice(square, 2) is 16
+  apply_twice(square, 3) is 81
 end
 
 check:
-  # todo: rely on the where checker in the outer def, remove this whole check
-  fun square(n):
-    n * n
-  end
-
-  fun apply-twice(f, x):
-    f(f(x))
-  end
-
-  apply-twice(square, 2) is 16
-  apply-twice(square, 3) is 81
+  apply_twice(lam(x): x + 1 end, 10) is 12
 end
-
-# enable this when it's all working
-#check:
-#  apply-twice(lam(x): x + 1 end, 10) is 12
-#end
 
 fun fact1(n #|:: NumNonNegative|#) #|-> Number|#:
   #doc: "Returns n! = 1 * 2 * 3 ... * n"
