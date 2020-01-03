@@ -449,3 +449,65 @@ utils
 >     Just y  -> let (ys, zs) = spanMaybe p xs' in (y : ys, zs)
 >     Nothing -> ([], xs)
 
+
+
+------------------------------------------------------------------------------
+
+
+Top level design notes
+
+The top level will be desugared to a let rec
+this isn't like other implicit let recs in blocks, it doesn't need
+definitions to be next to each other - all definitions and statements
+in the entire top level will 'participate' in the same letrec
+
+rec a = ...
+
+b = ...
+
+rec c = ...
+
+a and b and c will be part of the same letrec
+
+check blocks 'participate' in the letrec, along with statements - have
+ to figure out how to make this work
+
+shadow doesn't work in a letrec for another var in the letrec:
+
+rec a = 5
+shadow rec a = 6
+or any other variation is an error
+_except_ at the top level
+
+this is to support this at the top level:
+
+a = 5
+
+...
+
+shadow a = 6
+
+are bindings the only kind of redefinition that can happen?
+
+a way to support this is roughly:
+if idens are shadowed, rename to remove the shadowing
+then, move the declarations first and the statements second
+then it should all work
+problem is, if a closure refers to a var and it gets updated
+  this is ok for check blocks, but what about other things?
+  will it work out ok?
+  if var updates get moved to the bottom
+  and all the non decl statements keep their relative order
+  will everything work out?
+
+
+this is only important for learning, an industrial only language
+_could_ disallow this too, but if we want the top level to double
+time as a script/implicit block and a top level for a more structured
+program, this is a viable compromise (another one would be to have a
+flag to switch which - e.g top level desugaring works like blocks,
+shadow allowed for top level scripts, or top level works like a
+regular letrec for not script-y programs, and shadow is not allowed
+at the top level at all
+
+
