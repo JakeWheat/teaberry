@@ -1,0 +1,47 @@
+
+check:
+  f = lam(x): x + 1 end
+  f(1) is 2
+
+  fun g(x): x + 2 end
+  g(2) is 4
+
+  h = lam(x,y): x - y end
+  h(3,6) is -3
+
+  j = lam(): 5 end
+  j() is 5
+
+  fun f1(a):
+    b = a
+    b + 1
+  end
+
+  f1(4) is 5
+
+  rec fact = lam(x):
+    if x == 0: 1
+    else: x * fact(x - 1)
+    end
+  end
+  fact(5) is 120
+
+  fun addeven4(x): if x == 0: 0 else: x + addodd4(x - 1) end end
+  fun addodd4(x):  if x == 0: 0 else: x + addeven4(x - 1) end end
+  addeven4(6) is 21
+  
+  rec addeven4 = lam(x): if x == 0: 0 else: x + addodd4(x - 1) end end
+  rec addodd = lam(x): if x == 0: 0 else: x + addeven4(x - 1) end end
+  addeven4(6) is 21
+
+  fun addeven4(x): if x == 0: 0 else: x + addodd4(x - 1) end end
+  rec addodd4 = lam(x): if x == 0: 0 else: x + addeven4(x - 1) end end
+  addeven4(6) is 21
+  
+  rec addeven4 = lam(x) : if x == 0: 0 else: x + addodd4(x - 1) end end
+  fun addodd4(x): if x == 0: 0 else: x + addeven4(x - 1) end end
+  addeven4(6) is 21
+
+  
+  
+end

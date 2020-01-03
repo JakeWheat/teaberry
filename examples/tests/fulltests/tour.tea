@@ -19,14 +19,13 @@ check "vars":
   x is 15
 end
 
+double = lam(x): x + x end
+quad = lam(x): double(double(x)) end
+const5 = lam(_): 5 end
+f4 = lam(x): if x: 1 else: 0 end end
+add2 = lam(a): a + 2 end
+
 check "idens, lambdas":
-  double = lam(x): x + x end
-  quad = lam(x): double(double(x)) end
-  const5 = lam(_): 5 end
-  f4 = lam(x): if x: 1 else: 0 end end
-  add2 = lam(a): a + 2 end
-  myVar = 1
-  
   add2(1) is 3
   5 + quad(3) is 17
   const5(3) * 4 is 20
@@ -126,93 +125,88 @@ check:
   # these were previously run in the haskell tests
   # try to make it more idiomatic
 
-  block:
-    fun addeven4(x): if x == 0: 0 else: x + addodd4(x - 1) end end
-    rec addodd4 = lam(x) : if x == 0: 0 else: x + addeven4(x - 1) end end
-    addeven4(6) # is 21 # todo: this is a bug
-  end is 21
+  fun addeven4(x): if x == 0: 0 else: x + addodd4(x - 1) end end
+  fun addodd4(x): if x == 0: 0 else: x + addeven4(x - 1) end end
+  addeven4(6) is 21
+end
+
+check:
+  a = 4
+  a + 3 is 7
+end
   
-  block:
-    rec addeven4 = lam(x) : if x == 0: 0 else: x + addodd4(x - 1) end end
-    fun addodd4(x): if x == 0: 0 else: x + addeven4(x - 1) end end
-    addeven4(6)
-  end is 21
+check:
+  a = 4
+  b = 5
+  a + b is 9
+end
   
+check:
+  f1 = lam(factx,x): if x == 0: 1 else: x * factx(factx,x - 1) end end
+  fact = lam(y): f1(f1,y) end
+  fact(1) is 1
+end
   
-  block:
-    a = 4
-    a + 3
-  end is 7
+check:
+  var a = 5
+  a is 5
+end
   
-  block:
-    a = 4
-    b = 5
-    a + b
-  end is 9
+check:
+  var a = 5
+  a := 6
+  a is 6
+end
   
-  block:
-    f1 = lam(factx,x): if x == 0: 1 else: x * factx(factx,x - 1) end end
-    fact = lam(y): f1(f1,y) end
-    fact(1)
-  end is 1
-  
-  block:
-    var a = 5
-    a
-  end is 5
-  
-  block:
-    var a = 5
-    a := 6
-    a
-  end is 6
-  
-  block:
-    var a = 5
-    a := a + 1
-    a
-  end is 6
- 
-  block:
-    fun mk-counter():
-      var ctr = 0
-      lam(): block:
-          ctr := ctr + 1
-          ctr
-        end
-      end
+check:
+  var a = 5
+  a := a + 1
+  a is 6
+end
+
+
+fun mk-counter():
+  var ctr = 0
+  lam(): block:
+      ctr := ctr + 1
+      ctr
     end
-    x = mk-counter()
-    y = mk-counter()
-    y()
-    y()
-    x()
-  end is 1
-  
-  block:
-    fun fact(x):
-      if x == 0: 1
-      else: x * fact(x - 1)
-      end
+  end
+end
+
+check:
+  x = mk-counter()
+  y = mk-counter()
+  y() is 1
+  y() is 2
+  x() is 1
+  y() is 3
+end
+
+check:
+  fun fact(x):
+    if x == 0: 1
+    else: x * fact(x - 1)
     end
-    fact(5)
-  end is 120
+  end
+  fact(5) is 120
+end
   
-  block:
-    rec fact = lam(x):
-      if x == 0: 1
-      else: x * fact(x - 1)
-      end
+check:
+  rec fact = lam(x):
+    if x == 0: 1
+    else: x * fact(x - 1)
     end
-    fact(5)
-  end is 120
-  
+  end
+  fact(5) is 120
+end
+
+check:
   letrec 
     addeven = lam(x) : if x == 0: 0 else: x + addodd(x - 1) end end,
     addodd = lam(x) : if x == 0: 0 else: x + addeven(x - 1) end end:
     addeven(6)
   end is 21
-  
 end
 
 check:
@@ -247,21 +241,4 @@ check:
   o2.y is "original-y"
   o2.z is "new-z"
 end
-
-ask:
-  | x == 0 then: 1
-  | x > 0 then: x
-  | otherwise: x * -1
-end
-
-#is equivalent to
-
-if x == 0:
-  1
-else if x > 0:
-  x
-else:
-  x * -1
-end
-
-|#
+ |#

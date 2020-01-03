@@ -49,19 +49,30 @@ wrapper to lift tests written in the language into tests for the
 > -- then hoist the tests into Tasty
 > sourceFiles :: [FilePath]
 > sourceFiles = map ("examples/tests/fulltests/" ++)
->     ["trivial_is.tea"
+>     ["ahoy.tea"
+
+>     ,"binding.tea"
+>     ,"let.tea"
+>     ,"functions.tea"
+>     ,"if_ask.tea"
+>     ,"blocks.tea"
+>     ,"when.tea"
+
 >     ,"comparisons.tea"
 >     ,"boolean.tea"
 >     ,"arithmetic.tea"
->     ,"ahoy.tea"
+> 
+>     ,"vars.tea"
+>     ,"tuples.tea"
+
 >     ,"empty.tea"
 >     ,"empty_check.tea"
+>     ,"trivial_is.tea"
 >     ,"check_block_closures.tea"
 >     ,"check_closure.tea"
 >     ,"two_same_name_check.tea"
->     ,"vars.tea"
->     ,"tuples.tea"
 >     ,"where.tea"
+
 >     ,"tour.tea"
 >     ]
 

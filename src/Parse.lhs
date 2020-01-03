@@ -296,8 +296,8 @@ todo: remove the trys by implementing a proper lexer or a lexer style
 >            <*> (expr <* keyword_ "end")
 >            
 
-> explicitLet :: Parser Expr
-> explicitLet = keyword_ "let" *> letBody Let
+> expressionLet :: Parser Expr
+> expressionLet = keyword_ "let" *> letBody Let
 >
 > letBody :: ([(String, Expr)] -> Expr -> Expr) -> Parser Expr
 > letBody ctor = ctor <$> commaSep1 bind
@@ -306,8 +306,8 @@ todo: remove the trys by implementing a proper lexer or a lexer style
 >         bind = (,) <$> identifier
 >                    <*> (symbol_ "=" *> expr)
 
-> explicitLetRec :: Parser Expr
-> explicitLetRec = keyword_ "letrec" *> letBody LetRec
+> expressionLetRec :: Parser Expr
+> expressionLetRec = keyword_ "letrec" *> letBody LetRec
 
 
 > ifE :: Parser Expr
@@ -374,8 +374,8 @@ put all the parsers which start with a keyword first
 > term :: Parser Expr
 > term = choice [unaryMinus
 >               ,lamE
->               ,explicitLetRec
->               ,explicitLet
+>               ,expressionLetRec
+>               ,expressionLet
 >               ,ifE
 >               ,ask
 >               ,block

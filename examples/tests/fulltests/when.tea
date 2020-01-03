@@ -1,0 +1,22 @@
+
+
+check:
+
+  # multiple bugs:
+  # 1 when should be an implicit block?
+  # 2 with the block it gives a weird error instead of working
+  #|
+  var a = 1
+  when 1 == 2: block:
+    a := 2
+  end end
+  a is 1
+
+  when 2 == 2: block:
+    a := 3
+  end end
+  a is 4
+
+  |#
+  
+end
