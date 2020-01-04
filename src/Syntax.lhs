@@ -58,7 +58,13 @@ The high level syntax which the parser produces
 >           | Check (Maybe String) [Stmt]
 >           deriving (Eq,Show,Data,Typeable,Generic) 
 
-> data Binding = Binding Shadow Pat Expr
+> data Binding = Binding Pat Expr
+>           deriving (Eq,Show,Data,Typeable,Generic) 
+
+> data Pat = IdenP Shadow String
+>          | CtorP String [Pat]
+>          | TupleP [Pat]
+>          | AsP Pat String
 >           deriving (Eq,Show,Data,Typeable,Generic) 
 
 > data Shadow = NoShadow | Shadow
@@ -83,11 +89,6 @@ The high level syntax which the parser produces
 >           | Block [Stmt]
 >           deriving (Eq,Show,Data,Typeable,Generic) 
 
-> data Pat = IdenP String
->          | CtorP String [Pat]
->          | TupleP [Pat]
->          | AsP Pat String
->           deriving (Eq,Show,Data,Typeable,Generic) 
 
 > data Selector = Num Scientific
 >               | Str String

@@ -307,19 +307,8 @@ todo: remove the trys by implementing a proper lexer or a lexer style
 >                    <*> (symbol_ ":" *> expr <* keyword_ "end")
 
 > binding :: Parser Binding
-> binding = Binding <$> option NoShadow (Shadow <$ keyword_ "shadow")
->                        <*> pat
+> binding = Binding <$> pat
 >                        <*> (symbol_ "=" *> expr)
-
-variant that only parses a binding with a shadow, use for parsing
-statements correctly
-
-> shadowBinding :: Parser Binding
-> shadowBinding = Binding <$> (Shadow <$ keyword_ "shadow")
->                        <*> pat
->                        <*> (symbol_ "=" *> expr)
-
-
 
 > expressionLetRec :: Parser Expr
 > expressionLetRec = keyword_ "letrec" *> letBody LetRec
@@ -375,7 +364,8 @@ statements correctly
 
 > pat :: Parser Pat
 > pat = choice
->       [(IdenP <$> identifier) <**> option id ctorPSuffix
+>       [(IdenP <$> option NoShadow (Shadow <$ keyword_ "shadow")
+>               <*> identifier) <**> option id ctorPSuffix
 >       ,TupleP <$> (symbol_ "{" *> xSep ';' pat <* symbol_ "}")]
 >       <**> option id asPatSuffix
 
@@ -385,7 +375,7 @@ statements correctly
 > ctorPSuffix :: Parser (Pat -> Pat)
 > ctorPSuffix = do
 >     x <- parens (commaSep pat)
->     pure (\(IdenP y) -> CtorP y x)
+>     pure (\(IdenP NoShadow y) -> CtorP y x)
 
 
 put all the parsers which start with a keyword first
@@ -427,7 +417,6 @@ put all the parsers which start with a keyword first
 >     ,dataDecl
 >     ,checkBlock
 >     ,setVarStmt
->     ,shadowLetDecl
 
 did all this hard work, but still ended up needing the try ...
 need to change pat to patOrExpression
@@ -459,7 +448,7 @@ then can just use the pattern syntax here. do that until it no longer
 works
 
 > patternSyntaxToExpr :: Pat -> Expr
-> patternSyntaxToExpr (IdenP s) = Iden s
+> patternSyntaxToExpr (IdenP NoShadow s) = Iden s
 > patternSyntaxToExpr (CtorP s p) = App (Iden s) $ map patternSyntaxToExpr p
 > patternSyntaxToExpr (TupleP es) = Sel $ Tuple $ map patternSyntaxToExpr es
 > --patternSyntaxToExpr (AsP {}) = Nothing
@@ -512,15 +501,10 @@ works
 >               <$> (symbol_ "|" *> identifier)
 >               <*> option [] (parens (commaSep identifier))
 
-> shadowLetDecl :: Parser Stmt
-> shadowLetDecl = LetDecl <$> shadowBinding
->   
-
-
 > letDecl :: Parser (Pat -> Stmt)
 > letDecl = f <$> (symbol_ "=" *> expr)
 >    where
->        f y x = LetDecl (Binding NoShadow x y)
+>        f y x = LetDecl (Binding x y)
 
 -----------------------------------------
 

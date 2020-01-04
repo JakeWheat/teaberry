@@ -87,15 +87,15 @@
 >     mf (p, e1) = text "|" <+> pat p <+> text "=>" <+> expr e1
 
 > binding :: Binding -> Doc
-> binding (Binding s n e) =
->     (case s of
->          NoShadow -> empty
->          Shadow -> text "shadow")
->     <+> pat n <+> text "=" <+> nest 2 (expr e)
+> binding (Binding n e) =
+>     pat n <+> text "=" <+> nest 2 (expr e)
 
 
 > pat :: Pat -> Doc
-> pat (IdenP p) = text p
+> pat (IdenP s p) = (case s of
+>                        NoShadow -> empty
+>                        Shadow -> text "shadow")
+>                   <+> text p
 > pat (CtorP c ps) = text c <> parens (commaSep $ map pat ps)
 > pat (TupleP ps) = text "{" <> (xSep ";" $ map pat ps) <> text "}"
 > pat (AsP p nm) = pat p <+> text "as" <+> text nm
