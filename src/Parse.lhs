@@ -42,7 +42,7 @@ fixity parser either
 >                        ,choice
 >                        ,option
 >                        ,(<?>)
->                        ,manyTill
+>                        --,manyTill
 >                        ,takeWhileP
 >                        ,takeWhile1P
 >                        ,try
@@ -63,7 +63,7 @@ fixity parser either
 >                             )
 
 > import Control.Applicative ((<**>))
-> import Control.Monad (guard)
+> import Control.Monad (guard, void)
 
 > import Text.Megaparsec (satisfy, anySingle)
 
@@ -118,11 +118,12 @@ fixity parser either
 > lineComment :: Parser ()
 > lineComment = () <$ try (string "#" <?> "") <* takeWhileP Nothing (/='\n')
 
-todo: remove the try
-make it parse nested block comments correctly
-
 > blockComment :: Parser ()
-> blockComment = () <$ try (string "#|" <?> "") <* manyTill anySingle (try (string "|#"))
+> blockComment = startComment *> ctu
+>   where
+>     startComment = void $ try (string "#|")
+>     endComment = void $ try (string "|#")
+>     ctu = endComment <|> ((blockComment <|> void anySingle) *> ctu)
 
 > lexeme :: Parser a -> Parser a
 > lexeme f = f <* whiteSpace
