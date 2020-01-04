@@ -1,10 +1,13 @@
 check:
   a = true
+
+  # todo: pyret rejects this
   if a : 3 end is 3
-  #|shadow|# a = false
+  
+  shadow a = false
   if a : 4 else: 5 end is 5
 
-  #|shadow|# a = 4
+  shadow a = 4
   if a == 2: 1
   else if a == 3: 2
   else if a == 4: 3

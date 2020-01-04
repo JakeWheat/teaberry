@@ -95,11 +95,11 @@ when a fun or rec is seen, it will collect subsequent funs and recs
 >     -- do the check blocks, not sure it's right to not interleave them
 >     chks <- desugarStmts $ map (uncurry S.Check) whrs
 >     -- desugar to interpreter syntax
->     idecls <- desugarStmts $ map (uncurry S.LetDecl) defs
+>     idecls <- desugarStmts $ map S.LetDecl defs
 >     (++) (idecls ++ chks) <$> desugarStmts ss'
 >   where
->     convRec (S.FunDecl nm as bdy whr) = Just ((nm, (S.Lam as bdy)), fmap (nm,) whr)
->     convRec (S.RecDecl nm e) = Just ((nm, e), Nothing)
+>     convRec (S.FunDecl nm as bdy whr) = Just (S.Binding S.NoShadow nm (S.Lam as bdy), fmap (nm,) whr)
+>     convRec (S.RecDecl b) = Just (b, Nothing)
 >     convRec _ = Nothing
 
 > desugarStmts (s:ss) = (++) <$> desugarStmt s <*> desugarStmts ss
@@ -119,19 +119,19 @@ when a fun or rec is seen, it will collect subsequent funs and recs
 >                                    ,S.StExpr $ S.Iden "nothing"])]
 >                     (Just (S.Iden "nothing")))
 
-> desugarStmt (S.LetDecl nm e) = (:[]) <$> I.LetDecl nm <$> desugarExpr' e
+> desugarStmt (S.LetDecl (S.Binding _ nm e)) = (:[]) <$> I.LetDecl nm <$> desugarExpr' e
 
 > desugarStmt (S.FunDecl nm as bdy whr) = do
->     a <- desugarStmt (S.RecDecl nm (S.Lam as bdy))
+>     a <- desugarStmt (S.RecDecl (S.Binding S.NoShadow nm (S.Lam as bdy)))
 >     case whr of
 >         Nothing -> pure a
 >         Just w -> (++) a <$> desugarStmt (S.Check (Just nm) w)
 >     
-> desugarStmt (S.RecDecl nm e) = do
->    defs <- desugarRecs [(nm,e)]
->    desugarStmts $ map (uncurry S.LetDecl) defs
+> desugarStmt (S.RecDecl b) = do
+>    defs <- desugarRecs [b]
+>    desugarStmts $ map S.LetDecl defs
 
-> desugarStmt (S.VarDecl n e) = (:[]) <$> (I.LetDecl n . I.Box) <$> desugarExpr' e
+> desugarStmt (S.VarDecl (S.Binding _ n e)) = (:[]) <$> (I.LetDecl n . I.Box) <$> desugarExpr' e
 > desugarStmt (S.SetVar n e) = (:[]) <$> I.SetBox n <$> desugarExpr' e
 
 ------------------------------------------------------------------------------
@@ -207,7 +207,7 @@ this fails with 'a block cannot end with a binding'
 >     let checkblockidnm = "checkblockid"
 >         blockNameVal = S.Sel $ S.Str nm'
 >         checkblockidval = S.Sel $ S.Num $ fromIntegral checkblockid
->         blk = [S.LetDecl checkblockidnm checkblockidval
+>         blk = [S.LetDecl (S.Binding S.NoShadow checkblockidnm checkblockidval)
 >                 ,S.StExpr $ S.App (S.Iden "log_check_block") [S.Iden checkblockidnm
 >                                                              ,blockNameVal]
 >               ] ++ sts ++ [S.StExpr $ S.Sel S.VoidS]
@@ -234,21 +234,22 @@ block:
   end
 end
 
-> desugarIs :: String -> S.Expr -> S.Expr -> DesugarStack  S.Stmt
+> desugarIs :: String -> S.Expr -> S.Expr -> DesugarStack S.Stmt
 > desugarIs syn e e1 = do
 >     x <- inCheckBlockID <$> ask
 >     checkBlockID <- maybe (throwError $ "'is' outside of checkblock")
 >                     (pure . S.Sel . S.Num . fromIntegral) x
 >     let mys = S.StExpr $ S.Block
 >                    [{-S.StExpr $ S.App (S.Iden "print") [S.Sel $ S.Str $ "Desugar test enter"]
->                    ,-}S.LetDecl "v0" e
->                    ,S.LetDecl "v1" e1
->                    ,S.LetDecl "name" $ S.Sel $ S.Str syn
+>                    ,-}S.LetDecl (S.Binding S.Shadow "v0" e)
+>                    ,S.LetDecl (S.Binding S.Shadow "v1" e1)
+>                    ,S.LetDecl (S.Binding S.Shadow"name" $ S.Sel $ S.Str syn)
 >                    ,S.StExpr $ S.If [(S.App (S.Iden "==") [S.Iden "v0", S.Iden "v1"]
 >                                    ,S.App (S.Iden "log_test_pass") [checkBlockID, S.Iden "name"])]
 >                        (Just $ S.Block
->                         [S.LetDecl "failmsg" (str "Values not equal:\n" `plus` app "torepr" [S.Iden "v0"]
->                                               `plus` str "\n" `plus` app "torepr" [S.Iden "v1"])
+>                         [S.LetDecl (S.Binding S.Shadow "failmsg"
+>                                     (str "Values not equal:\n" `plus` app "torepr" [S.Iden "v0"]
+>                                               `plus` str "\n" `plus` app "torepr" [S.Iden "v1"]))
 >                         ,S.StExpr $ S.App (S.Iden "log_test_fail")
 >                          [checkBlockID, S.Iden "name", S.Iden "failmsg"]])]
 >     pure mys
@@ -290,7 +291,7 @@ end
 > desugarExpr' (S.Lam (x:xs) bdy) = I.Lam x <$> desugarExpr' (S.Lam xs bdy)
 
 > desugarExpr' (S.Let [] bdy) = desugarExpr' bdy
-> desugarExpr' (S.Let ((n,lbdy):ls) bdy) = do
+> desugarExpr' (S.Let (S.Binding _ n lbdy : ls) bdy) = do
 >     bdy' <- desugarExpr' (S.Let ls bdy)
 >     lbdy' <- desugarExpr' lbdy
 >     pure $ I.Let n lbdy' bdy'
@@ -413,22 +414,22 @@ let
 end
 
 
-> desugarRecs :: [(String,S.Expr)] -> DesugarStack [(String,S.Expr)]
+> desugarRecs :: [S.Binding] -> DesugarStack [S.Binding]
 > desugarRecs rs =
 >     let
 >         recnms = flip mapMaybe rs (\r -> case r of
->                                           (f, S.Lam {}) -> Just f
+>                                           S.Binding _ f (S.Lam {}) -> Just f
 >                                           _ -> Nothing)
 >         recmap = zip recnms recnms
 >         recnms' = map (++ "XXX") recnms
 >         recmap' = zip recnms recnms'
->         mkrec (f,S.Lam as bdy) =
+>         mkrec (S.Binding s f (S.Lam as bdy)) =
 >             let f' = f ++ "XXX"
 >                 bdy' = patchCalls recmap recnms bdy
->             in (Just (f', S.Lam (recnms ++ as) bdy')
->                ,Just (f, S.Lam as (S.App (S.Iden f') (map S.Iden (recnms' ++ as)))))
->         mkrec (f,e) = (Nothing
->                       ,Just (f, patchCalls recmap' recnms' e))
+>             in (Just (S.Binding S.NoShadow f' (S.Lam (recnms ++ as) bdy'))
+>                ,Just (S.Binding s f (S.Lam as (S.App (S.Iden f') (map S.Iden (recnms' ++ as))))))
+>         mkrec (S.Binding s f e) = (Nothing
+>                                   ,Just (S.Binding s f (patchCalls recmap' recnms' e)))
 >         (a,b) = unzip $ map mkrec rs
 >         x = catMaybes (a ++ b)
 >     in pure x

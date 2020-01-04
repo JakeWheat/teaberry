@@ -11,6 +11,8 @@
 > import qualified Test.Tasty.HUnit as T
 
 > import Syntax (Stmt(..), Expr(..), Selector(..), VariantDecl(..), Pat(..)
+>               ,Shadow(..)
+>               ,Binding(..)
 >               ,Program(..)
 >               ,Provide(..)
 >               ,ProvideTypes(..)
@@ -64,18 +66,31 @@
 todo: review all the whitespace rules that are being ignored
 
 >     ,("let x=3,y=4: x + y end"
->      , Let [("x", num 3)
->            ,("y", num 4)]
+>      , Let [Binding NoShadow "x" (num 3)
+>            ,Binding NoShadow "y" (num 4)]
 >          (BinOp (Iden "x") "+" (Iden "y")))
 >     ,("let x=3: x + 4 end"
->      ,Let [("x", num 3)]
+>      ,Let [Binding NoShadow "x" (num 3)]
 >          (BinOp (Iden "x") "+" (num 4)))
+
+>     ,("let shadow x = 3: x end"
+>      ,Let [Binding Shadow "x" (num 3)] (Iden "x"))
+
+>     ,("let shadow a = 5, shadow b = 6: a end"
+>      ,Let [Binding Shadow "a" (num 5)
+>           ,Binding Shadow "b" (num 6)] (Iden "a"))
+
+>     ,("letrec shadow a = 5: a end"
+>      ,LetRec [Binding Shadow "a" (num 5)] (Iden "a"))
+
+
+
 
 >     ,("f()", App (Iden "f") [])
 
 
 >     ,("let x = f(): x end"
->      ,Let [("x", App (Iden "f") [])]
+>      ,Let [Binding NoShadow "x" (App (Iden "f") [])]
 >          (Iden "x"))
 
 >     ,("block:\n\
@@ -89,7 +104,7 @@ todo: review all the whitespace rules that are being ignored
 >       \  a = 1\n\
 >       \  a + 1\n\
 >       \end\n\
->       \end", Block[FunDecl "f" ["a"] (Block [LetDecl "a" (num 1)
+>       \end", Block[FunDecl "f" ["a"] (Block [LetDecl (Binding NoShadow "a" (num 1))
 >                                             ,StExpr $ BinOp (Iden "a") "+" (num 1)]) Nothing])
 
 
@@ -124,7 +139,7 @@ todo: review all the whitespace rules that are being ignored
 >     ,("block:\n\
 >       \a = 5\n\
 >       \a + 3 end"
->      ,Block [LetDecl "a" (num 5.0)
+>      ,Block [LetDecl (Binding NoShadow "a" (num 5.0))
 >             ,StExpr (BinOp (Iden "a") "+" (num 3))])
 
 >     ,("lam() : 1 end", Lam [] (num 1))
@@ -139,10 +154,10 @@ todo: review all the whitespace rules that are being ignored
 >       \  fact(5)\n\
 >       \end"
 
->      ,Block [RecDecl "fact"
+>      ,Block [RecDecl (Binding NoShadow "fact"
 >             $ Lam ["x"] $
 >                     If [(BinOp (Iden "x") "==" (num 0), num 1)]
->                     (Just (BinOp (Iden "x") "*" (App (Iden "fact") [BinOp (Iden "x") "-" (num 1)])))
+>                     (Just (BinOp (Iden "x") "*" (App (Iden "fact") [BinOp (Iden "x") "-" (num 1)]))))
 >             ,StExpr (App (Iden "fact") [num 5])])
 
 
@@ -203,7 +218,7 @@ todo: review all the whitespace rules that are being ignored
 > parseStmtExamples =
 >     [("when x == 3: 4 end"
 >      ,When (BinOp (Iden "x") "==" (Sel $ Num 3)) (Sel $ Num 4))
->     ,("var a = 5", VarDecl "a" (num 5))
+>     ,("var a = 5", VarDecl (Binding NoShadow "a" (num 5)))
 >     ,("a := 6", SetVar "a" (num 6))
 >     ,("data BTree:\n\
 >       \  | node(value, left, right)\n\
@@ -287,7 +302,7 @@ todo: review all the whitespace rules that are being ignored
 >       \  is_Point(a_pt) is true\n\
 >       \end"
 >      ,DataDecl "Point" [VariantDecl "pt" ["x", "y"]]
->       (Just [LetDecl "a_pt" (App (Iden "pt") [num 1, num 2])
+>       (Just [LetDecl (Binding NoShadow "a_pt" (App (Iden "pt") [num 1, num 2]))
 >             ,StExpr $ BinOp (App (Iden "is_Point") [Iden "a_pt"]) "is" (Iden "true")]))
 >
 >     ,("fun double(n):\n\
@@ -300,6 +315,13 @@ todo: review all the whitespace rules that are being ignored
 >       (Just [StExpr $ BinOp (App (Iden "double") [num 10]) "is" (num 20)
 >            ,StExpr $ BinOp (App (Iden "double") [num 15]) "is" (num 30)]))
 
+>     ,("shadow a = 1"
+>      ,LetDecl (Binding Shadow "a" (num 1)))
+>     ,("rec shadow a = 1"
+>      ,RecDecl (Binding Shadow "a" (num 1)))
+
+>     ,("var shadow a = 1"
+>      ,VarDecl (Binding Shadow "a" (num 1)))
 
 >     ]
 >  where

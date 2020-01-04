@@ -16,9 +16,13 @@ fun g():
   where:
     h() is 5
   end
+  # todo: the code still runs without true here, and it shouldn't
+  true
 end
 
 # runs the nested test twice:
+# todo: pyret makes these two blocks different instead of
+# combining them into one, two is better
 
 g()
 g()

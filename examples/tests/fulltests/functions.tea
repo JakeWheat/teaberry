@@ -26,22 +26,29 @@ check:
   end
   fact(5) is 120
 
-  fun addeven4(x): if x == 0: 0 else: x + addodd4(x - 1) end end
-  fun addodd4(x):  if x == 0: 0 else: x + addeven4(x - 1) end end
-  addeven4(6) is 21
-  
-  rec addeven4 = lam(x): if x == 0: 0 else: x + addodd4(x - 1) end end
-  rec addodd = lam(x): if x == 0: 0 else: x + addeven4(x - 1) end end
-  addeven4(6) is 21
+  block:
+    fun addeven(x): if x == 0: 0 else: x + addodd(x - 1) end end
+    fun addodd(x):  if x == 0: 0 else: x + addeven(x - 1) end end
+    addeven(6) is 21
+  end
 
-  fun addeven4(x): if x == 0: 0 else: x + addodd4(x - 1) end end
-  rec addodd4 = lam(x): if x == 0: 0 else: x + addeven4(x - 1) end end
-  addeven4(6) is 21
-  
-  rec addeven4 = lam(x) : if x == 0: 0 else: x + addodd4(x - 1) end end
-  fun addodd4(x): if x == 0: 0 else: x + addeven4(x - 1) end end
-  addeven4(6) is 21
+  block:
+    rec addeven = lam(x): if x == 0: 0 else: x + addodd(x - 1) end end
+    rec addodd = lam(x): if x == 0: 0 else: x + addeven(x - 1) end end
+    addeven(6) is 21
+  end
 
+  block:
+    fun addeven(x): if x == 0: 0 else: x + addodd(x - 1) end end
+    rec addodd = lam(x): if x == 0: 0 else: x + addeven(x - 1) end end
+    addeven(6) is 21
+  end
+
+  block:
+    rec addeven = lam(x) : if x == 0: 0 else: x + addodd(x - 1) end end
+    fun addodd(x): if x == 0: 0 else: x + addeven(x - 1) end end
+    addeven(6) is 21
+  end
   
   
 end

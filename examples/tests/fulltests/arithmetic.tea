@@ -8,4 +8,8 @@ check:
   0 - 1 is -1
   # this is a parsing bug:
   # -1 is 0 - 1
+  # I think the issue is that the parser behaves as is unary - has
+  # lower precendence than 'is'
+  # so it tries to parse this as -(1 is (0 - 1))
+  # which fails with 'is' operator not recognised
 end

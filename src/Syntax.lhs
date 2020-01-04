@@ -4,6 +4,8 @@ The high level syntax which the parser produces
 
 > {-# LANGUAGE DeriveDataTypeable,DeriveGeneric, ScopedTypeVariables #-}
 > module Syntax (Stmt(..)
+>               ,Shadow(..)
+>               ,Binding(..)
 >               ,Expr(..)
 >               ,Selector(..)
 >               ,VariantDecl(..)
@@ -45,15 +47,21 @@ The high level syntax which the parser produces
 
 > data Stmt = StExpr Expr
 >           | When Expr Expr
->           | LetDecl String Expr
->           | RecDecl String Expr
+>           | LetDecl Binding
+>           | RecDecl Binding
 >           | FunDecl String [String] Expr (Maybe [Stmt])
->           | VarDecl String Expr
+>           | VarDecl Binding
 >           | SetVar String Expr
 >           | DataDecl String [VariantDecl] (Maybe [Stmt])
 >           | TPred Expr String Expr Expr -- is%, is-not%
 >           | TPostfixOp Expr String --- does-not-raise
 >           | Check (Maybe String) [Stmt]
+>           deriving (Eq,Show,Data,Typeable,Generic) 
+
+> data Binding = Binding Shadow String Expr
+>           deriving (Eq,Show,Data,Typeable,Generic) 
+
+> data Shadow = NoShadow | Shadow
 >           deriving (Eq,Show,Data,Typeable,Generic) 
 
 
@@ -70,8 +78,8 @@ The high level syntax which the parser produces
 >           | UnaryMinus Expr
 >           | BinOp Expr String Expr
 >           | Lam [String] Expr
->           | Let [(String,Expr)] Expr
->           | LetRec [(String,Expr)] Expr
+>           | Let [Binding] Expr
+>           | LetRec [Binding] Expr
 >           | Block [Stmt]
 >           deriving (Eq,Show,Data,Typeable,Generic) 
 

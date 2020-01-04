@@ -13,14 +13,15 @@ a := 2
 
 b = 2
 
-check "correct non var closure":
+check "b 2 non var closure":
   # this should pick up the correct b from the lexical closure,
   # not the shadowed one later
+  # this is a deliberate difference from the official pyret implementation
   b is 2
 end
 
-b = 3
+shadow b = 3
 
-check "correct non var closure 2":
+check "b 3 non var closure":
   b is 3
 end

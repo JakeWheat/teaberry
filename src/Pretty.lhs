@@ -12,6 +12,8 @@
 >                          {-braces, ($$), ($+$),-} vcat)
 
 > import Syntax (Stmt(..), Expr(..), Selector(..), VariantDecl(..), Pat(..), Stmt(..)
+>               ,Binding(..)
+>               ,Shadow(..)
 >               ,Program(..)
 >               ,Provide(..)
 >               ,ProvideTypes(..)
@@ -64,14 +66,10 @@
 > expr (BinOp a op b) = expr a <+> text op <+> expr b
 > expr (Lam ps e) = text "lam" <> parens (commaSep $ map text ps)
 >     <> text ":" <+> nest 2 (expr e) <+> text "end"
-> expr (Let bs e) = text "let" <+> nest 2 (commaSep $ map f bs)
+> expr (Let bs e) = text "let" <+> nest 2 (commaSep $ map binding bs)
 >     <> text ":" <+> nest 2 (expr e) <+> text "end"
->   where
->     f (n,ne) = text n <+> text "=" <+> nest 2 (expr ne)
-> expr (LetRec bs e) = text "letrec" <+> nest 2 (commaSep $ map f bs)
+> expr (LetRec bs e) = text "letrec" <+> nest 2 (commaSep $ map binding bs)
 >     <> text ":" <+> nest 2 (expr e) <+> text "end"
->   where
->     f (n,ne) = text n <+> text "=" <+> nest 2 (expr ne)
 > expr (Block ss) = vcat [text "block:", nest 2 (stmts ss), text "end"]
 
 > expr (Construct e as) = text "[" <> expr e <> text ":" <+> nest 2 (commaSep $ map expr as) <> text "]"
@@ -87,6 +85,14 @@
 >   where
 >     mf (p, e1) = text "|" <+> pat p <+> text "=>" <+> expr e1
 
+> binding :: Binding -> Doc
+> binding (Binding s n e) =
+>     (case s of
+>          NoShadow -> empty
+>          Shadow -> text "shadow")
+>     <+> text n <+> text "=" <+> nest 2 (expr e)
+
+
 > pat :: Pat -> Doc
 > pat (IdenP p) = text p
 > pat (CtorP c ps) = text c <> parens (commaSep $ map pat ps)
@@ -96,12 +102,12 @@
 > stmt (StExpr e) = expr e
 > stmt (When c t) = text "when" <+> expr c <> text ":" <+> nest 2 (expr t) <+> text "end"
 
-> stmt (LetDecl n e) = text n <+> text "=" <+> nest 2 (expr e)
+> stmt (LetDecl b) = binding b
 
-> stmt (VarDecl n e) = text "var" <+> text n <+> text "=" <+> nest 2 (expr e)
+> stmt (VarDecl b) = text "var" <+> binding b
 > stmt (SetVar n e) = text n <+> text ":=" <+> nest 2 (expr e)
 
-> stmt (RecDecl n e) = text "rec" <+> text n <+> text "=" <+> nest 2 (expr e)
+> stmt (RecDecl b) = text "rec" <+> binding b
 > stmt (FunDecl n as e w) =
 >      text "fun" <+> text n <+> parens (commaSep $ map text as) <+> text ":"
 >      <+> nest 2 (expr e)

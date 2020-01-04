@@ -27,7 +27,7 @@ case that it's too permissive compared with pyret. It doesn't use a
 fixity parser either
 
 
-
+> {-# LANGUAGE TupleSections #-}
 > module Parse (parseExpr
 >              ,parseStmt
 >              ,parseProgram) where
@@ -73,6 +73,8 @@ fixity parser either
 
 
 > import Syntax (Stmt(..), Expr(..), Selector(..), VariantDecl(..)
+>               ,Shadow(..)
+>               ,Binding(..)
 >               , Pat(..)
 >               ,Program(..)
 >               ,Provide(..)
@@ -179,7 +181,7 @@ the can get rid of more trys
 >     ,"otherwise", "block", "cases", "when", "var", "check"
 >     ,"where", "fun", "rec", "data"
 >     ,"import", "provide", "provide-types"
->     ,"from", "and", "or"
+>     ,"from", "and", "or", "shadow"
 >     ]
 
 > identifierX :: Parser String
@@ -299,12 +301,24 @@ todo: remove the trys by implementing a proper lexer or a lexer style
 > expressionLet :: Parser Expr
 > expressionLet = keyword_ "let" *> letBody Let
 >
-> letBody :: ([(String, Expr)] -> Expr -> Expr) -> Parser Expr
-> letBody ctor = ctor <$> commaSep1 bind
+> letBody :: ([Binding] -> Expr -> Expr) -> Parser Expr
+> letBody ctor = ctor <$> commaSep1 binding
 >                    <*> (symbol_ ":" *> expr <* keyword_ "end")
->     where
->         bind = (,) <$> identifier
->                    <*> (symbol_ "=" *> expr)
+
+> binding :: Parser Binding
+> binding = Binding <$> option NoShadow (Shadow <$ keyword_ "shadow")
+>                        <*> identifier
+>                        <*> (symbol_ "=" *> expr)
+
+variant that only parses a binding with a shadow, use for parsing
+statements correctly
+
+> shadowBinding :: Parser Binding
+> shadowBinding = Binding <$> (Shadow <$ keyword_ "shadow")
+>                        <*> identifier
+>                        <*> (symbol_ "=" *> expr)
+
+
 
 > expressionLetRec :: Parser Expr
 > expressionLetRec = keyword_ "letrec" *> letBody LetRec
@@ -401,7 +415,14 @@ put all the parsers which start with a keyword first
 >     ,dataDecl
 >     ,checkBlock
 >     ,setVarStmt
->     ,expr <**> option StExpr (choice [letDecl, testPost])
+>     ,shadowLetDecl
+
+todo figure out how to 'branch' into expr if letdecl fails
+to avoid the use of try, although it's not a terrible use of try
+because it only reparses a single token if it fails
+
+>     ,try (identifier <**> letDecl)
+>     ,expr <**> option StExpr testPost
 >     ]
 
 > whenStmt :: Parser Stmt
@@ -409,8 +430,7 @@ put all the parsers which start with a keyword first
 >            <*> (symbol_ ":" *> expr <* keyword_ "end")
 
 > varDecl :: Parser Stmt
-> varDecl = VarDecl <$> (keyword_ "var" *> identifier)
->            <*> (symbol_ "=" *> expr)
+> varDecl = VarDecl <$> (keyword_ "var" *> binding)
 
 > setVarStmt :: Parser Stmt
 > setVarStmt = try (SetVar <$> identifier
@@ -436,9 +456,7 @@ put all the parsers which start with a keyword first
 >       unwrapSingle x = x
 
 > recDecl :: Parser Stmt
-> recDecl = RecDecl
->     <$> (keyword_ "rec" *> identifier)
->     <*> (symbol_ "=" *> expr)
+> recDecl = RecDecl <$> (keyword_ "rec" *> binding)
 
 > dataDecl :: Parser Stmt
 > dataDecl = DataDecl
@@ -452,11 +470,15 @@ put all the parsers which start with a keyword first
 >               <$> (symbol_ "|" *> identifier)
 >               <*> option [] (parens (commaSep identifier))
 
-> letDecl :: Parser (Expr -> Stmt)
+> shadowLetDecl :: Parser Stmt
+> shadowLetDecl = LetDecl <$> shadowBinding
+>   
+
+
+> letDecl :: Parser (String -> Stmt)
 > letDecl = f <$> (symbol_ "=" *> expr)
 >    where
->        f y (Iden x) = LetDecl x y
->        --f _ x = fail ("bad pattern: " ++ show x)
+>        f y  x = LetDecl (Binding NoShadow x y)
 
 -----------------------------------------
 
