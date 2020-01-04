@@ -284,6 +284,17 @@ end
 
 > desugarExpr' (S.UnaryMinus e) = desugarExpr' (S.App (S.Iden "*") [S.Sel $ S.Num (-1), e])
 
+"short circuiting" and and or
+
+> desugarExpr' (S.BinOp a "and" b) =
+>     desugarExpr' (S.If [(S.App (S.Iden "==") [a, S.Iden "true"], b)]
+>                   (Just $ S.Iden "false"))
+
+> desugarExpr' (S.BinOp a "or" b) =
+>     desugarExpr' (S.If [(S.App (S.Iden "==") [a, S.Iden "true"], S.Iden "true")]
+>                      (Just b))
+
+
 > desugarExpr' (S.BinOp a op b) = desugarExpr' (S.App (S.Iden op) [a,b])
 
 > desugarExpr' (S.Lam [] bdy) = I.LamVoid <$> desugarExpr' bdy
