@@ -28,7 +28,7 @@ The system comes with a small standard lib (really small) implemented
 using a hack sort of ffi for haskell.
 
 
-> {-# LANGUAGE ScopedTypeVariables #-}
+> {-# LANGUAGE ScopedTypeVariables,TupleSections #-}
 > module Interpreter (runProgram
 >                    ,CheckResult(..)
 >                    ,runChecks
@@ -54,9 +54,11 @@ using a hack sort of ffi for haskell.
 > data Value = NumV Scientific
 >            | BoolV Bool
 >            | StrV String
->            | TupleV [Value] -- todo use variant, which is also used for plain records
 >            | ClosV I.Expr Env
->            | VariantV String String [(String,Value)]
+>            | VariantV String -- type name? is this needed
+>                       String -- ctor name
+>                       [(String,Value)] -- fields, is it better to not include the names,
+>                                        -- the desugarer will handle?
 >            | BoxV Int
 >            | VoidV
 >            deriving (Eq,Show)
@@ -188,9 +190,9 @@ interpreters for syntax nodes
 > interp (I.Sel (I.Num n)) = pure $ NumV n
 > interp (I.Sel (I.Str s)) = pure $ StrV s
 > interp (I.Sel I.VoidS) = pure $ VoidV
-> interp (I.Sel (I.Tuple es)) = do
->     vs <- mapM interp es
->     pure $ TupleV vs
+> interp (I.Sel (I.Variant ty nm es)) = do
+>     vs <- mapM (\(n,e) -> (n,) <$> interp e) es
+>     pure $ VariantV ty nm vs
 
 > interp (I.Iden e) = do
 >     rd <- ask
@@ -401,6 +403,7 @@ type is wrong
 >     ,("raise", \[StrV s] -> throwM $ MyException s)
 >     ,("print", \[xx@(StrV x)] -> liftIO (putStrLn x) >> pure xx)
 >     ,("torepr", \[x] -> pure $ torepr x)
+>     ,("to-repr", \[x] -> pure $ torepr x)
 >
 >      -- some internals
 >     ,("log-check-block", logCheckBlock)
@@ -408,10 +411,11 @@ type is wrong
 >     ,("log-test-fail", logTestFail)
 >     ,("add-tests", addTests)
 >      
->     ,("tupleget", \[TupleV vs, NumV x] -> do
->              i <- maybe (throwM $ MyException $ "expected integral, got " ++ show x)
->                         pure (extractInt x)
->              pure $ vs !! i)
+>     ,("variant-field-get", \[v@(VariantV _ _ fs), StrV x] -> do
+>              maybe (error $ "variant field not found " ++ x ++ ": " ++ show v)
+>                         pure
+>                         $ lookup x fs)
+
 >     ]
 
 > defaultHaskellFFIEnv :: Env
@@ -429,11 +433,12 @@ type is wrong
 >                ,liftUnOp "raise"
 >                ,liftUnOp "print"
 >                ,liftUnOp "torepr"
+>                ,liftUnOp "to-repr"
 >                ,liftBinOp "log-test-pass"
 >                ,liftTriOp "log-test-fail"
 >                ,liftBinOp "log-check-block"
 >                ,liftUnOp "add-tests"
->                ,liftBinOp "tupleget"
+>                ,liftBinOp "variant-field-get"
 >                ] emptyEnv
 >   where
 >      liftUnOp f = (f, ClosV (I.Lam "a" (I.AppHaskell f [I.Iden "a"])) emptyEnv)

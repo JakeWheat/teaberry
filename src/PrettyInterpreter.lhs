@@ -17,7 +17,7 @@
 > resugarExpr :: I.Expr -> S.Expr
 > resugarExpr (I.Sel (I.Num n)) = S.Sel (S.Num n)
 > resugarExpr (I.Sel (I.Str s)) = S.Sel (S.Str s)
-> resugarExpr (I.Sel (I.Tuple s)) = S.Sel (S.Tuple $ map resugarExpr s)
+> resugarExpr (I.Sel (I.Variant _ nm s)) = S.App (S.Iden nm) $ map (resugarExpr . snd) s
 > resugarExpr (I.Sel I.VoidS) = S.Sel S.VoidS
 
 > resugarExpr (I.Iden s) = S.Iden s

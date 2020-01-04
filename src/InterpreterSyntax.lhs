@@ -31,6 +31,6 @@ TODO: add provides and imports
 
 > data Selector = Num Scientific
 >               | Str String
->               | Tuple [Expr]
+>               | Variant String String [(String,Expr)]
 >               | VoidS
 >               deriving (Eq,Show)
