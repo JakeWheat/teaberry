@@ -37,9 +37,9 @@ using a hack sort of ffi for haskell.
 >                    ) where
 
 > import Control.Exception.Safe (Exception, throwM, catch)
-> import Control.Monad (void, forM_, when)
+> import Control.Monad (void, forM_{-, when-})
 > import Control.Monad.IO.Class (liftIO)
-> import Control.Monad.Trans.RWS (RWST, runRWST, ask, get, {-put,-} local, tell, state)
+> import Control.Monad.Trans.RWS (RWST, runRWST, ask, get, {-put,-} local, {-tell,-} state)
 > import Data.List (partition, intercalate)
 > import Data.Scientific (Scientific)
 > import Text.Show.Pretty (ppShow)
@@ -67,7 +67,7 @@ using a hack sort of ffi for haskell.
 
 = data types and support for the interpreter monad
 
-> type Interpreter = RWST InterpreterReader [TestResultLog] InterpreterState IO
+> type Interpreter = RWST InterpreterReader [()] InterpreterState IO
 
 
 quick exceptions, can come back to this
@@ -128,12 +128,19 @@ the store holds variable values
 > data InterpreterState = InterpreterState
 >     {isStore :: Store
 >     ,isTestsToRun :: [Value]
+>     ,isSavedTestResults :: [TestResultLog]
 >     }
 > updateISStore :: (Store -> Store) -> (InterpreterState -> InterpreterState)
 > updateISStore f i = i {isStore = f (isStore i)}
 
+> appendTestResults :: TestResultLog -> Interpreter ()
+> appendTestResults lg =
+>     state $ \s ->
+>       ((), s {isSavedTestResults = lg : isSavedTestResults s})
+
+
 > defaultInterpreterState :: InterpreterState
-> defaultInterpreterState = InterpreterState emptyStore []
+> defaultInterpreterState = InterpreterState emptyStore [] []
 
 todo: create helper wrapper functions for the usual operations with
  the read value and the state value stuff
@@ -168,18 +175,19 @@ a program doesn't have a value (in this way, at least)
 
 > interpWrap :: Bool -> I.Program -> IO (Either String (Value, [CheckResult]))
 > interpWrap runChks (I.Program ex) = (do
->     (result, _store, lg) <-
+>     (result, _store, _lg) <-
 >         runRWST (do
 >                  x <- interp ex
->                  when runChks runSavedTests
->                  pure x
+>                  cr <- if runChks
+>                        then do
+>                            lg <- runSavedTests
+>                            getCheckResults lg
+>                        else pure []
+>                  pure (x, cr)
 >                 )
 >         (InterpreterReader defaultHaskellFFIEnv)
 >         defaultInterpreterState
->     let cr = if runChks
->              then getCheckResults lg
->              else []
->     pure $ pure $ (result, cr)
+>     pure $ pure $ result
 >     ) `catch` (\(MyException s) -> pure $ Left $ s)
 
 --------------------------------------
@@ -289,17 +297,17 @@ they are in language functions
 
 > logTestPass :: [Value] -> Interpreter Value
 > logTestPass = \[NumV n, StrV t] -> do
->     tell [TestPass n t]
+>     appendTestResults (TestPass n t)
 >     pure VoidV
 
 > logTestFail :: [Value] -> Interpreter Value
 > logTestFail = \[NumV n, StrV t, StrV m] -> do
->     tell [TestFail n t m]
+>     appendTestResults (TestFail n t m)
 >     pure VoidV
 
 > logCheckBlock :: [Value] -> Interpreter Value
 > logCheckBlock = \[NumV i, StrV s] -> do
->     tell [TestBlock i s]
+>     appendTestResults (TestBlock i s)
 >     pure VoidV
 
 > addTests :: [Value] -> Interpreter Value
@@ -317,11 +325,13 @@ they are in language functions
 this is called at the end of a script if the tests are enabled
 
 > -- runs all the tests saved in the run
-> runSavedTests :: Interpreter ()
+> runSavedTests :: Interpreter [TestResultLog]
 > runSavedTests = do
 >     ts <- (reverse . isTestsToRun) <$> get
 >     forM_ ts $ \(ClosV (I.LamVoid bdy) env') ->
 >         void $ local (updateIREnv (const env')) $ interp bdy
+>     isSavedTestResults <$> get
+>     
 
 the data type which is part of the user api for testing for now
 
@@ -333,26 +343,26 @@ supported
 > -- the second is just if it is a fail, it contains the failure
 > -- message
 
-> getCheckResults :: [TestResultLog] -> [CheckResult]
-> getCheckResults lg =
+> getCheckResults :: [TestResultLog] -> Interpreter [CheckResult]
+> getCheckResults lg = do
 >         let (blocknmsx, testresults) = partition isTestBlock lg
 >             blocknms :: [(Scientific, String)]
 >             blocknms = map (\(TestBlock nm tid) -> (nm, tid)) blocknmsx
->             gs = map (\x -> (blockID x, toCheckResult x)) testresults
->             gs' = partitionN gs
->             ts = map (\(tid,nm) -> case lookup tid blocknms of
->                                        Nothing -> error "internal error block id"
->                                        Just b -> CheckResult b nm) gs'
->         in ts
+>         gs <- mapM (\x -> (,) <$> blockID x <*> toCheckResult x) testresults
+>         let  gs' = partitionN gs
+>         ts <- mapM (\(tid,nm) -> case lookup tid blocknms of
+>                                        Nothing -> throwM $ MyException $ "internal error block id"
+>                                        Just b -> pure $ CheckResult b nm) gs'
+>         pure ts
 >   where
 >     isTestBlock (TestBlock {}) = True
 >     isTestBlock _ = False
->     blockID (TestPass x _) = x
->     blockID (TestFail x _ _) = x
->     blockID (TestBlock {}) = error "Interpreter: testblock in wrong place"
->     toCheckResult (TestPass _ x) = (x,Nothing)
->     toCheckResult (TestFail _ x m) = (x,Just m)
->     toCheckResult (TestBlock {}) = error "Interpreter: testblock in wrong place b"
+>     blockID (TestPass x _) = pure x
+>     blockID (TestFail x _ _) = pure x
+>     blockID (TestBlock {}) = throwM $ MyException $ "Interpreter: testblock in wrong place"
+>     toCheckResult (TestPass _ x) = pure (x,Nothing)
+>     toCheckResult (TestFail _ x m) = pure (x,Just m)
+>     toCheckResult (TestBlock {}) = throwM $ MyException $ "Interpreter: testblock in wrong place b"
 
 > partitionN :: Eq a => [(a,b)] -> [(a,[b])]
 > partitionN [] = []
@@ -378,7 +388,7 @@ type is wrong
 >      ("+", \x -> case x of
 >                      [StrV a, StrV b] -> pure $ StrV (a ++ b)
 >                      [NumV a, NumV b] -> pure $ NumV (a + b)
->                      _ -> error $ "Interpreter: plus implementation" ++ show x)
+>                      _ -> throwM $ MyException $ "Interpreter: plus implementation" ++ show x)
 >     ,("-", \[NumV a, NumV b] -> pure $ NumV (a - b))
 >     ,("*", \x -> case x of
 >                      [NumV a, NumV b] -> pure $ NumV (a * b)
@@ -414,7 +424,7 @@ type is wrong
 >     ,("add-tests", addTests)
 >      
 >     ,("variant-field-get", \[v@(VariantV _ _ fs), StrV x] -> do
->              maybe (error $ "variant field not found " ++ x ++ ": " ++ show v)
+>              maybe (throwM $ MyException $ "variant field not found " ++ x ++ ": " ++ show v)
 >                         pure
 >                         $ lookup x fs)
 
