@@ -242,7 +242,9 @@ it
 
 > interp (I.Let nm v bdy) = do
 >     v' <- interp v
->     local (updateIREnv (extendEnv nm v')) $ interp bdy
+>     case nm of
+>         "_" -> interp bdy
+>         _ -> local (updateIREnv (extendEnv nm v')) $ interp bdy
 
 > interp (I.Seq (I.LetDecl nm e) b) = do
 >     v <- interp e

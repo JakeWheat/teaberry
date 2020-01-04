@@ -291,6 +291,7 @@ end
 > desugarExpr' (S.Sel (S.Num n)) = pure $ I.Sel (I.Num n)
 > desugarExpr' (S.Sel (S.Str s)) = pure $ I.Sel (I.Str s)
 > desugarExpr' (S.Sel S.VoidS) = pure $ I.Sel I.VoidS
+> desugarExpr' (S.Iden "_") = throwError "'_' in expression context"
 > desugarExpr' (S.Iden i) = pure $ I.Iden i
 > desugarExpr' (S.Parens e) = desugarExpr' e
 > desugarExpr' (S.Ask b e) = desugarExpr' (S.If b e)

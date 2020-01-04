@@ -3,3 +3,29 @@ check:
   a = 5
   a is 5
 end
+
+
+fun mk-counter():
+  var ctr = 0
+  lam(): block:
+      ctr := ctr + 1
+      ctr
+    end
+  end
+end
+
+  f = mk-counter()
+
+check:
+
+  f() is 1
+
+  _ = f()
+  
+  f() is 3
+
+  x = {3;4;5}
+  {_;y;_} = x
+  y is 4
+  
+end
