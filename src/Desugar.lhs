@@ -98,7 +98,7 @@ when a fun or rec is seen, it will collect subsequent funs and recs
 >     idecls <- desugarStmts $ map S.LetDecl defs
 >     (++) (idecls ++ chks) <$> desugarStmts ss'
 >   where
->     convRec (S.FunDecl nm as bdy whr) = Just (S.Binding S.NoShadow nm (S.Lam as bdy), fmap (nm,) whr)
+>     convRec (S.FunDecl nm as bdy whr) = Just (S.Binding S.NoShadow (S.IdenP nm) (S.Lam as bdy), fmap (nm,) whr)
 >     convRec (S.RecDecl b) = Just (b, Nothing)
 >     convRec _ = Nothing
 
@@ -119,10 +119,10 @@ when a fun or rec is seen, it will collect subsequent funs and recs
 >                                    ,S.StExpr $ S.Iden "nothing"])]
 >                     (Just (S.Iden "nothing")))
 
-> desugarStmt (S.LetDecl (S.Binding _ nm e)) = (:[]) <$> I.LetDecl nm <$> desugarExpr' e
+> desugarStmt (S.LetDecl (S.Binding _ (S.IdenP nm) e)) = (:[]) <$> I.LetDecl nm <$> desugarExpr' e
 
 > desugarStmt (S.FunDecl nm as bdy whr) = do
->     a <- desugarStmt (S.RecDecl (S.Binding S.NoShadow nm (S.Lam as bdy)))
+>     a <- desugarStmt (S.RecDecl (S.Binding S.NoShadow (S.IdenP nm) (S.Lam as bdy)))
 >     case whr of
 >         Nothing -> pure a
 >         Just w -> (++) a <$> desugarStmt (S.Check (Just nm) w)
@@ -131,7 +131,7 @@ when a fun or rec is seen, it will collect subsequent funs and recs
 >    defs <- desugarRecs [b]
 >    desugarStmts $ map S.LetDecl defs
 
-> desugarStmt (S.VarDecl (S.Binding _ n e)) = (:[]) <$> (I.LetDecl n . I.Box) <$> desugarExpr' e
+> desugarStmt (S.VarDecl (S.Binding _ (S.IdenP n) e)) = (:[]) <$> (I.LetDecl n . I.Box) <$> desugarExpr' e
 > desugarStmt (S.SetVar n e) = (:[]) <$> I.SetBox n <$> desugarExpr' e
 
 ------------------------------------------------------------------------------
@@ -207,7 +207,7 @@ this fails with 'a block cannot end with a binding'
 >     let checkblockidnm = "checkblockid"
 >         blockNameVal = S.Sel $ S.Str nm'
 >         checkblockidval = S.Sel $ S.Num $ fromIntegral checkblockid
->         blk = [S.LetDecl (S.Binding S.NoShadow checkblockidnm checkblockidval)
+>         blk = [S.LetDecl (S.Binding S.NoShadow (S.IdenP checkblockidnm) checkblockidval)
 >                 ,S.StExpr $ S.App (S.Iden "log-check-block") [S.Iden checkblockidnm
 >                                                              ,blockNameVal]
 >               ] ++ sts ++ [S.StExpr $ S.Sel S.VoidS]
@@ -241,13 +241,13 @@ end
 >                     (pure . S.Sel . S.Num . fromIntegral) x
 >     let mys = S.StExpr $ S.Block
 >                    [{-S.StExpr $ S.App (S.Iden "print") [S.Sel $ S.Str $ "Desugar test enter"]
->                    ,-}S.LetDecl (S.Binding S.Shadow "v0" e)
->                    ,S.LetDecl (S.Binding S.Shadow "v1" e1)
->                    ,S.LetDecl (S.Binding S.Shadow"name" $ S.Sel $ S.Str syn)
+>                    ,-}S.LetDecl (S.Binding S.Shadow (S.IdenP "v0") e)
+>                    ,S.LetDecl (S.Binding S.Shadow (S.IdenP "v1") e1)
+>                    ,S.LetDecl (S.Binding S.Shadow (S.IdenP "name") $ S.Sel $ S.Str syn)
 >                    ,S.StExpr $ S.If [(S.App (S.Iden "==") [S.Iden "v0", S.Iden "v1"]
 >                                    ,S.App (S.Iden "log-test-pass") [checkBlockID, S.Iden "name"])]
 >                        (Just $ S.Block
->                         [S.LetDecl (S.Binding S.Shadow "failmsg"
+>                         [S.LetDecl (S.Binding S.Shadow (S.IdenP "failmsg")
 >                                     (str "Values not equal:\n" `plus` app "torepr" [S.Iden "v0"]
 >                                               `plus` str "\n" `plus` app "torepr" [S.Iden "v1"]))
 >                         ,S.StExpr $ S.App (S.Iden "log-test-fail")
@@ -302,7 +302,7 @@ end
 > desugarExpr' (S.Lam (x:xs) bdy) = I.Lam x <$> desugarExpr' (S.Lam xs bdy)
 
 > desugarExpr' (S.Let [] bdy) = desugarExpr' bdy
-> desugarExpr' (S.Let (S.Binding _ n lbdy : ls) bdy) = do
+> desugarExpr' (S.Let (S.Binding _ (S.IdenP n) lbdy : ls) bdy) = do
 >     bdy' <- desugarExpr' (S.Let ls bdy)
 >     lbdy' <- desugarExpr' lbdy
 >     pure $ I.Let n lbdy' bdy'
@@ -429,16 +429,16 @@ end
 > desugarRecs rs =
 >     let
 >         recnms = flip mapMaybe rs (\r -> case r of
->                                           S.Binding _ f (S.Lam {}) -> Just f
+>                                           S.Binding _ (S.IdenP f) (S.Lam {}) -> Just f
 >                                           _ -> Nothing)
 >         recmap = zip recnms recnms
 >         recnms' = map (++ "XXX") recnms
 >         recmap' = zip recnms recnms'
->         mkrec (S.Binding s f (S.Lam as bdy)) =
+>         mkrec (S.Binding s (S.IdenP f) (S.Lam as bdy)) =
 >             let f' = f ++ "XXX"
 >                 bdy' = patchCalls recmap recnms bdy
->             in (Just (S.Binding S.NoShadow f' (S.Lam (recnms ++ as) bdy'))
->                ,Just (S.Binding s f (S.Lam as (S.App (S.Iden f') (map S.Iden (recnms' ++ as))))))
+>             in (Just (S.Binding S.NoShadow (S.IdenP f') (S.Lam (recnms ++ as) bdy'))
+>                ,Just (S.Binding s (S.IdenP f) (S.Lam as (S.App (S.Iden f') (map S.Iden (recnms' ++ as))))))
 >         mkrec (S.Binding s f e) = (Nothing
 >                                   ,Just (S.Binding s f (patchCalls recmap' recnms' e)))
 >         (a,b) = unzip $ map mkrec rs

@@ -58,7 +58,7 @@ The high level syntax which the parser produces
 >           | Check (Maybe String) [Stmt]
 >           deriving (Eq,Show,Data,Typeable,Generic) 
 
-> data Binding = Binding Shadow String Expr
+> data Binding = Binding Shadow Pat Expr
 >           deriving (Eq,Show,Data,Typeable,Generic) 
 
 > data Shadow = NoShadow | Shadow

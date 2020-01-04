@@ -308,7 +308,7 @@ todo: remove the trys by implementing a proper lexer or a lexer style
 
 > binding :: Parser Binding
 > binding = Binding <$> option NoShadow (Shadow <$ keyword_ "shadow")
->                        <*> identifier
+>                        <*> pat
 >                        <*> (symbol_ "=" *> expr)
 
 variant that only parses a binding with a shadow, use for parsing
@@ -316,7 +316,7 @@ statements correctly
 
 > shadowBinding :: Parser Binding
 > shadowBinding = Binding <$> (Shadow <$ keyword_ "shadow")
->                        <*> identifier
+>                        <*> pat
 >                        <*> (symbol_ "=" *> expr)
 
 
@@ -482,7 +482,7 @@ because it only reparses a single token if it fails
 > letDecl :: Parser (String -> Stmt)
 > letDecl = f <$> (symbol_ "=" *> expr)
 >    where
->        f y  x = LetDecl (Binding NoShadow x y)
+>        f y x = LetDecl (Binding NoShadow (IdenP x) y)
 
 -----------------------------------------
 

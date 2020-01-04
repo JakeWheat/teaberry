@@ -28,7 +28,7 @@ todo: resugaring multiple arg apps and lams has a key readability benefit
 > resugarExpr (I.App e e1) = S.App (resugarExpr e) [resugarExpr e1]
 > resugarExpr (I.Lam nm e) = S.Lam [nm] $ resugarExpr e
 > resugarExpr (I.LamVoid e) = S.Lam [] $ resugarExpr e
-> resugarExpr (I.Let nm v e) = S.Let [S.Binding S.NoShadow nm $ resugarExpr v] (resugarExpr e)
+> resugarExpr (I.Let nm v e) = S.Let [S.Binding S.NoShadow (S.IdenP nm) $ resugarExpr v] (resugarExpr e)
 > resugarExpr (I.AppHaskell nm e) = S.App (S.Iden nm) $ map resugarExpr e
 
 
@@ -40,4 +40,4 @@ todo: try to convert a sequence of seqs to a flat block
 adding a block here is wrong, it's a hack
 
 > resugarExpr (I.SetBox s e) =  S.Block [S.SetVar s (resugarExpr e)]
-> resugarExpr (I.LetDecl nm e) = S.Block [S.LetDecl $ S.Binding S.NoShadow nm (resugarExpr e)]
+> resugarExpr (I.LetDecl nm e) = S.Block [S.LetDecl $ S.Binding S.NoShadow (S.IdenP nm) (resugarExpr e)]

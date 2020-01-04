@@ -90,7 +90,7 @@
 >     (case s of
 >          NoShadow -> empty
 >          Shadow -> text "shadow")
->     <+> text n <+> text "=" <+> nest 2 (expr e)
+>     <+> pat n <+> text "=" <+> nest 2 (expr e)
 
 
 > pat :: Pat -> Doc
