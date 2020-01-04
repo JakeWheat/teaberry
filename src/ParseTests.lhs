@@ -172,6 +172,11 @@ todo: review all the whitespace rules that are being ignored
 >     -- ,("{1; 2;}", Sel $ Tuple [num 1, num 2])
 >     ,("{1; 2}", Sel $ Tuple [num 1, num 2])
 
+>     ,("{a: \"one\", b : 2, c : x }"
+>      ,Sel $ Record [("a", Sel $ Str "one")
+>                    ,("b", num 2)
+>                    ,("c", Iden "x")])
+
 >     ,("[list: {\"a\"; 1}, {\"b\"; 2}, {\"c\"; 3}]"
 >      ,Construct (Iden "list") [Sel $ Tuple [Sel $ Str "a",num 1]
 >                               ,Sel $ Tuple [Sel $ Str "b",num 2]

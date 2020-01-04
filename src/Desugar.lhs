@@ -348,12 +348,21 @@ end
 
 > desugarExpr' (S.Sel (S.Tuple ts)) = do
 >     ts' <- mapM desugarExpr' ts
->     pure $ I.Sel $ I.Variant "tuple" "tuple" (zip nms ts')
+>     pure $ I.Sel $ I.Variant "tuple" (zip nms ts')
 >   where
 >     nms = map show [(0::Int)..]
 
+> desugarExpr' (S.Sel (S.Record ts)) = do
+>     ts' <- mapM (\(a,b) -> (a,) <$> desugarExpr' b) ts
+>     pure $ I.Sel $ I.Variant "record" ts'
+
+
 > desugarExpr' (S.TupleGet e i) = do
 >     desugarExpr' (S.App (S.Iden "variant-field-get") [e, S.Sel $ S.Str $ show i])
+
+> desugarExpr' (S.DotExpr e f) = do
+>     desugarExpr' (S.App (S.Iden "variant-field-get") [e, S.Sel $ S.Str f])
+
 
 
 > desugarExpr' x = error $ "desugarExpr': " ++ show x

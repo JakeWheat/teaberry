@@ -343,8 +343,14 @@ todo: remove the trys by implementing a proper lexer or a lexer style
 >             <*> (commaSep expr <* symbol_ "]")
 >
 > -- optional here doesn't work, need to refactor it
-> tuple :: Parser Expr
-> tuple = (Sel . Tuple) <$> (symbol_ "{" *> xSep ';' expr <* optional (symbol_ ";") <* symbol_ "}")
+> -- also should left factor this, especially the try
+> -- as used here will make the error messages worse
+> tupleOrRecord :: Parser Expr
+> tupleOrRecord =
+>     choice [try ((Sel . Tuple) <$> (symbol_ "{" *> xSep ';' expr <* optional (symbol_ ";") <* symbol_ "}"))
+>            ,(Sel . Record) <$> (symbol_ "{" *> commaSep fld <* symbol_ "}")]
+>   where
+>     fld = (,) <$> (identifier <* symbol_ ":") <*> expr
 
 
 > dotSuffix :: Parser (Expr -> Expr)
@@ -394,7 +400,7 @@ put all the parsers which start with a keyword first
 >               ,stringE
 >               ,parensE
 >               ,construct
->               ,tuple
+>               ,tupleOrRecord
 >               ] <**> option id (appSuffix <|> dotSuffix)
 
 

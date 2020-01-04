@@ -55,8 +55,7 @@ using a hack sort of ffi for haskell.
 >            | BoolV Bool
 >            | StrV String
 >            | ClosV I.Expr Env
->            | VariantV String -- type name? is this needed
->                       String -- ctor name
+>            | VariantV String -- ctor name
 >                       [(String,Value)] -- fields, is it better to not include the names,
 >                                        -- the desugarer will handle?
 >            | BoxV Int
@@ -198,9 +197,9 @@ interpreters for syntax nodes
 > interp (I.Sel (I.Num n)) = pure $ NumV n
 > interp (I.Sel (I.Str s)) = pure $ StrV s
 > interp (I.Sel I.VoidS) = pure $ VoidV
-> interp (I.Sel (I.Variant ty nm es)) = do
+> interp (I.Sel (I.Variant nm es)) = do
 >     vs <- mapM (\(n,e) -> (n,) <$> interp e) es
->     pure $ VariantV ty nm vs
+>     pure $ VariantV nm vs
 
 > interp (I.Iden e) = do
 >     rd <- ask
@@ -423,7 +422,7 @@ type is wrong
 >     ,("log-test-fail", logTestFail)
 >     ,("add-tests", addTests)
 >      
->     ,("variant-field-get", \[v@(VariantV _ _ fs), StrV x] -> do
+>     ,("variant-field-get", \[v@(VariantV _ fs), StrV x] -> do
 >              maybe (throwM $ MyException $ "variant field not found " ++ x ++ ": " ++ show v)
 >                         pure
 >                         $ lookup x fs)
@@ -467,7 +466,7 @@ type is wrong
 >                              Nothing ->  show n
 > torepr' (BoolV n) = if n then "true" else "false"
 > torepr' (ClosV {}) = "<Function>"
-> torepr' (VariantV "tuple" "tuple" fs) =
+> torepr' (VariantV "tuple" fs) =
 >     "{" ++ intercalate ";" (map (torepr' . snd) fs) ++ "}"
 
 > torepr' x = error $  "Interpreter: torepr implementation " ++ show x

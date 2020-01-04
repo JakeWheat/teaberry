@@ -38,6 +38,9 @@
 >                              Nothing ->  show n
 > expr (Sel (Str s)) = doubleQuotes (text s)
 > expr (Sel (Tuple es)) = text "{" <> nest 2 (xSep ";" (map expr es) <> text "}")
+> expr (Sel (Record flds)) = text "{" <> nest 2 (commaSep (map fld flds) <> text "}")
+>   where
+>     fld (n,e) = text n <> text ":" <+> expr e
 > expr (Sel VoidS) = text "()"
 > 
 > expr (Iden n) = text n

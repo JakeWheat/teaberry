@@ -93,6 +93,7 @@ The high level syntax which the parser produces
 > data Selector = Num Scientific
 >               | Str String
 >               | Tuple [Expr]
+>               | Record [(String,Expr)]
 >               | VoidS
 >               deriving (Eq,Show,Data,Typeable,Generic) 
 
