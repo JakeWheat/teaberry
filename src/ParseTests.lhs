@@ -270,40 +270,40 @@ todo: review all the whitespace rules that are being ignored
 
 >     ,("check \"all test syntax\":\n\
 >       \  expr1 is expr2\n\
->       \  expr1 is_not expr2\n\
+>       \  expr1 is-not expr2\n\
 >       \  expr1 is%(pred) expr2\n\
->       \  expr1 is_not%(pred) expr2\n\
+>       \  expr1 is-not%(pred) expr2\n\
 >       \  expr satisfies pred\n\
 >       \  expr violates pred\n\
->       \  expr raises \"exn_string\"\n\
->       \  expr raises_other_than \"exn_string\"\n\
->       \  expr does_not_raise\n\
->       \  expr raises_satisfies pred\n\
->       \  expr raises_violates pred\n\
+>       \  expr raises \"exn-string\"\n\
+>       \  expr raises-other-than \"exn-string\"\n\
+>       \  expr does-not-raise\n\
+>       \  expr raises-satisfies pred\n\
+>       \  expr raises-violates pred\n\
 >       \end"
 >      ,Check (Just "all test syntax")
 >       [StExpr $ BinOp (Iden "expr1") "is" (Iden "expr2")
->       ,StExpr $ BinOp (Iden "expr1") "is_not" (Iden "expr2")
+>       ,StExpr $ BinOp (Iden "expr1") "is-not" (Iden "expr2")
 >       ,TPred (Iden "expr1") "is%" (Iden "pred") (Iden "expr2")
->       ,TPred (Iden "expr1") "is_not%" (Iden "pred") (Iden "expr2")
+>       ,TPred (Iden "expr1") "is-not%" (Iden "pred") (Iden "expr2")
 >       ,StExpr $ BinOp (Iden "expr") "satisfies" (Iden "pred")
 >       ,StExpr $ BinOp (Iden "expr") "violates" (Iden "pred")
->       ,StExpr $ BinOp (Iden "expr") "raises" (Sel $ Str "exn_string")
->       ,StExpr $ BinOp (Iden "expr") "raises_other_than" (Sel $ Str "exn_string")
->       ,TPostfixOp (Iden "expr") "does_not_raise"
->       ,StExpr $ BinOp (Iden "expr") "raises_satisfies" (Iden "pred")
->       ,StExpr $ BinOp (Iden "expr") "raises_violates" (Iden "pred")
+>       ,StExpr $ BinOp (Iden "expr") "raises" (Sel $ Str "exn-string")
+>       ,StExpr $ BinOp (Iden "expr") "raises-other-than" (Sel $ Str "exn-string")
+>       ,TPostfixOp (Iden "expr") "does-not-raise"
+>       ,StExpr $ BinOp (Iden "expr") "raises-satisfies" (Iden "pred")
+>       ,StExpr $ BinOp (Iden "expr") "raises-violates" (Iden "pred")
 >       ])
 
 >     ,("data Point:\n\
 >       \  | pt(x, y)\n\
 >       \where:\n\
->       \  a_pt = pt(1,2)\n\
->       \  is_Point(a_pt) is true\n\
+>       \  a-pt = pt(1,2)\n\
+>       \  is-Point(a-pt) is true\n\
 >       \end"
 >      ,DataDecl "Point" [VariantDecl "pt" ["x", "y"]]
->       (Just [LetDecl (Binding NoShadow "a_pt" (App (Iden "pt") [num 1, num 2]))
->             ,StExpr $ BinOp (App (Iden "is_Point") [Iden "a_pt"]) "is" (Iden "true")]))
+>       (Just [LetDecl (Binding NoShadow "a-pt" (App (Iden "pt") [num 1, num 2]))
+>             ,StExpr $ BinOp (App (Iden "is-Point") [Iden "a-pt"]) "is" (Iden "true")]))
 >
 >     ,("fun double(n):\n\
 >       \  n + n\n\
@@ -355,7 +355,7 @@ todo: review all the whitespace rules that are being ignored
 >       Nothing [] [StExpr $ Sel $ Num 5])
 
 
->     ,("provide_types {\n\
+>     ,("provide-types {\n\
 >       \  Foo:: Foo,\n\
 >       \  FooBar:: FooBar\n\
 >       \}\n\
@@ -363,13 +363,13 @@ todo: review all the whitespace rules that are being ignored
 >      ,Program Nothing
 >       (Just $ ProvideTypes [("Foo", "Foo"),("FooBar", "FooBar")]) [] [StExpr $ Sel $ Num 5])
 
->     ,("provide_types *\n\
+>     ,("provide-types *\n\
 >       \5"
 >      ,Program Nothing
 >       (Just ProvideTypesAll) [] [StExpr $ Sel $ Num 5])
 
 >     ,("provide *\n\
->       \provide_types *\n\
+>       \provide-types *\n\
 >       \5"
 >      ,Program (Just ProvideAll)
 >       (Just ProvideTypesAll) [] [StExpr $ Sel $ Num 5])
@@ -380,16 +380,16 @@ todo: review all the whitespace rules that are being ignored
 >       [Import (ImportSpecial "file" ["./pyret/main2.arr"]) "_"]
 >       [StExpr $ Sel $ Num 5])
 
->     ,("import s_exp as S\n\
+>     ,("import s-exp as S\n\
 >       \5"
 >      ,Program Nothing Nothing
->       [Import (ImportName "s_exp") "S"]
+>       [Import (ImportName "s-exp") "S"]
 >       [StExpr $ Sel $ Num 5])
 
->     ,("import is_invalid_array_index from error\n\
+>     ,("import is-invalid-array-index from error\n\
 >       \5"
 >      ,Program Nothing Nothing
->       [ImportFrom ["is_invalid_array_index"] (ImportName "error")]
+>       [ImportFrom ["is-invalid-array-index"] (ImportName "error")]
 >       [StExpr $ Sel $ Num 5])
 
 >     ,("import \"./tests/test-strings.arr\" as _\n\
@@ -406,13 +406,13 @@ todo: review all the whitespace rules that are being ignored
 
 
 >     ,("provide *\n\
->       \provide_types *\n\
+>       \provide-types *\n\
 >       \import file(\"./pyret/main2.arr\") as _\n\
->       \import s_exp as S\n\
+>       \import s-exp as S\n\
 >       \5"
 >      ,Program (Just ProvideAll) (Just ProvideTypesAll)
 >       [Import (ImportSpecial "file" ["./pyret/main2.arr"]) "_"
->       ,Import (ImportName "s_exp") "S"]
+>       ,Import (ImportName "s-exp") "S"]
 >       [StExpr $ Sel $ Num 5])
 
 >     ]

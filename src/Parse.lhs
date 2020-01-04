@@ -437,8 +437,11 @@ because it only reparses a single token if it fails
 >            <*> (symbol_ ":=" *> expr))
 
 > checkBlock :: Parser Stmt
-> checkBlock = Check <$> (keyword "check" *> optional stringRaw <* symbol_ ":")
->    <*> (many stmt <* keyword_ "end")
+> checkBlock = Check
+>      <$> (keyword "check" *> optional checkName <* symbol_ ":")
+>      <*> (many stmt <* keyword_ "end")
+>   where
+>     checkName = stringRaw <?> "check block name"
 
 > whereBlock :: Parser [Stmt]
 > whereBlock = keyword_ "where" *> symbol_ ":" *> many stmt
@@ -486,19 +489,19 @@ because it only reparses a single token if it fails
 > testPost = choice [isPred, postOp, inf]
 >   where
 >       isPred = do
->           t <- keyword "is%" <|> keyword "is_not%"
+>           t <- keyword "is%" <|> keyword "is-not%"
 >           p <- parens expr
 >           e2 <- expr
 >           pure (\x -> TPred x t p e2)
 >       postOp = do
->           keyword_ "does_not_raise"
->           pure (flip TPostfixOp "does_not_raise")
+>           keyword_ "does-not-raise"
+>           pure (flip TPostfixOp "does-not-raise")
 >       inf = do
 >           k <- choice $ map keyword tks
 >           e <- expr
 >           pure (\x -> StExpr $ BinOp x k e)
->       tks = ["is_not", "is"
->             ,"raises_other_than", "raises_satisfies", "raises_violates"
+>       tks = ["is-not", "is"
+>             ,"raises-other-than", "raises-satisfies", "raises-violates"
 >             ,"satisfies", "violates", "raises"]
 
 > program :: Parser Program
@@ -512,7 +515,7 @@ because it only reparses a single token if it fails
 >     p = (,) <$> identifier <*> (symbol_ ":" *> identifier)
 
 > provideTypes :: Parser ProvideTypes
-> provideTypes = keyword_ "provide_types" *> choice
+> provideTypes = keyword_ "provide-types" *> choice
 >     [ProvideTypes <$> (symbol_ "{" *> commaSep p <* symbol_ "}")
 >     ,ProvideTypesAll <$ symbol_ "*"] 
 >   where

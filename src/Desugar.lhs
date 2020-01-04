@@ -140,9 +140,9 @@ desugaring check blocks:
 
 a check block is desugared to this:
 
-add_tests(lam():
+add-tests(lam():
   checkblockid = n # unique number, and the variable name checkblock id should be unique (todo)
-  log_check_block(checkblockid, "blockname")
+  log-check-block(checkblockid, "blockname")
   {desuged statements in the check block}
   VoidV # a top level check block has no value
 end
@@ -155,7 +155,7 @@ check:
 end
 ->
 shadow tmpvar = expr
-add_tests(lam():
+add-tests(lam():
    ...
    # instead of ending with VoidV:
    tmpvar
@@ -208,11 +208,11 @@ this fails with 'a block cannot end with a binding'
 >         blockNameVal = S.Sel $ S.Str nm'
 >         checkblockidval = S.Sel $ S.Num $ fromIntegral checkblockid
 >         blk = [S.LetDecl (S.Binding S.NoShadow checkblockidnm checkblockidval)
->                 ,S.StExpr $ S.App (S.Iden "log_check_block") [S.Iden checkblockidnm
+>                 ,S.StExpr $ S.App (S.Iden "log-check-block") [S.Iden checkblockidnm
 >                                                              ,blockNameVal]
 >               ] ++ sts ++ [S.StExpr $ S.Sel S.VoidS]
 >         blockWrap =
->             [S.StExpr $ S.App (S.Iden "add_tests") $ [S.Lam [] $ S.Block blk]]
+>             [S.StExpr $ S.App (S.Iden "add-tests") $ [S.Lam [] $ S.Block blk]]
 >     sts' <- local (\x -> x {inCheckBlockID = Just checkblockid}) $ desugarStmts blockWrap
 >     pure [seqify sts']
 >     
@@ -227,10 +227,10 @@ block:
                     # capturing the shadowed v0
   shadow name = "aexpr is bexpr"
   if v0 == v1:
-    log_test_pass(checkblockid, name)
+    log-test-pass(checkblockid, name)
   else:
     shadow failmsg = "Values not equal:\n" + torepr(v0) + "\n" + torepr(v1)
-    log_test_fail(checkblockid, name, failmsg)
+    log-test-fail(checkblockid, name, failmsg)
   end
 end
 
@@ -245,12 +245,12 @@ end
 >                    ,S.LetDecl (S.Binding S.Shadow "v1" e1)
 >                    ,S.LetDecl (S.Binding S.Shadow"name" $ S.Sel $ S.Str syn)
 >                    ,S.StExpr $ S.If [(S.App (S.Iden "==") [S.Iden "v0", S.Iden "v1"]
->                                    ,S.App (S.Iden "log_test_pass") [checkBlockID, S.Iden "name"])]
+>                                    ,S.App (S.Iden "log-test-pass") [checkBlockID, S.Iden "name"])]
 >                        (Just $ S.Block
 >                         [S.LetDecl (S.Binding S.Shadow "failmsg"
 >                                     (str "Values not equal:\n" `plus` app "torepr" [S.Iden "v0"]
 >                                               `plus` str "\n" `plus` app "torepr" [S.Iden "v1"]))
->                         ,S.StExpr $ S.App (S.Iden "log_test_fail")
+>                         ,S.StExpr $ S.App (S.Iden "log-test-fail")
 >                          [checkBlockID, S.Iden "name", S.Iden "failmsg"]])]
 >     pure mys
 >   where

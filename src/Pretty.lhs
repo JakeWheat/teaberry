@@ -159,9 +159,9 @@
 >     p (a,b) = text a <+> text ":" <+> text b
 
 > provideTypes :: ProvideTypes -> Doc
-> provideTypes (ProvideTypesAll) = text "provide_types" <+> text "*"
+> provideTypes (ProvideTypesAll) = text "provide-types" <+> text "*"
 > provideTypes (ProvideTypes ps) =
->     text "provide_types" <+> text "{" <+> nest 2 (commaSep $ map p ps) <+> text "}"
+>     text "provide-types" <+> text "{" <+> nest 2 (commaSep $ map p ps) <+> text "}"
 >   where
 >     p (a,b) = text a <+> text "::" <+> text b
 

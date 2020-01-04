@@ -403,10 +403,10 @@ type is wrong
 >     ,("torepr", \[x] -> pure $ torepr x)
 >
 >      -- some internals
->     ,("log_check_block", logCheckBlock)
->     ,("log_test_pass", logTestPass)
->     ,("log_test_fail", logTestFail)
->     ,("add_tests", addTests)
+>     ,("log-check-block", logCheckBlock)
+>     ,("log-test-pass", logTestPass)
+>     ,("log-test-fail", logTestFail)
+>     ,("add-tests", addTests)
 >      
 >     ,("tupleget", \[TupleV vs, NumV x] -> do
 >              i <- maybe (throwM $ MyException $ "expected integral, got " ++ show x)
@@ -429,10 +429,10 @@ type is wrong
 >                ,liftUnOp "raise"
 >                ,liftUnOp "print"
 >                ,liftUnOp "torepr"
->                ,liftBinOp "log_test_pass"
->                ,liftTriOp "log_test_fail"
->                ,liftBinOp "log_check_block"
->                ,liftUnOp "add_tests"
+>                ,liftBinOp "log-test-pass"
+>                ,liftTriOp "log-test-fail"
+>                ,liftBinOp "log-check-block"
+>                ,liftUnOp "add-tests"
 >                ,liftBinOp "tupleget"
 >                ] emptyEnv
 >   where

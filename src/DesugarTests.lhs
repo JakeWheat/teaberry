@@ -92,51 +92,6 @@ is-pt = lam(x): I.AppHaskell "DataType" [x] == "Point" && I.AppHaskell "VariantT
 >       binop a op b = App (App (Iden op) a) b
 >       num = Sel . Num
 
-
-5 is 6
-->
-block:
-  tst = "5 is 6"
-  v0 = 5
-  v1 = 6
-  if v0 == v1:
-    log_test_pass(tst)
-  else:
-    log_test_failure(tst, "Values not equal:\n" + torepr(v0) + "\n" + torepr(v1))
-  end
-  false
-end
-
-> {-desugarStmtsExamples :: [(String, Program)]
-> desugarStmtsExamples =
->     [{-("check \"a first block\":\n\
->       \  5 is 5\n\
->       \end"
->      ,Program Nothing [CheckBlock "a first block"
->            $ p2d "block:\n\
->                 \  bn = \"unknown\"\n\
->                 \  tst = \"5 is 5\"\n\
->                 \  v0 = 5\n\
->                 \  v1 = 5\n\
->                 \  if v0 == v1:\n\
->                 \    log_test_pass(bn, tst)\n\
->                 \  else:\n\
->                 \    log_test_fail(bn, tst, \"Values not equal:\n\" + torepr(v0) + \"\n\" + torepr(v1))\n\
->                 \  end\n\
->                 \  false\n\
->                 \end"])-}
->     ]
->    where
->      --app2 op a b = App (App (Iden op) a) b
->      --binop a op b = app2 op a b
->      --str = Sel . Str
->      --num = Sel . Num
->      {-p2d s = either error id $ do
->          x <- parseStmts "" s
->          y <- desugarStmts x
->          pure $ (\(Program (Just z) _) -> z) y-}-}
-
-
 > testDesugarExpr :: (String,Expr) -> T.TestTree
 > testDesugarExpr (src, ex) = T.testCase ("desugar " ++ src) $
 >     either error (T.assertEqual "" ex) $

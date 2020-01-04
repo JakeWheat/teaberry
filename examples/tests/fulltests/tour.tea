@@ -60,15 +60,15 @@ check:
   square(2) is 4
 end
 
-fun apply_twice(f, x):
+fun apply-twice(f, x):
   f(f(x))
 where:
-  apply_twice(square, 2) is 16
-  apply_twice(square, 3) is 81
+  apply-twice(square, 2) is 16
+  apply-twice(square, 3) is 81
 end
 
 check:
-  apply_twice(lam(x): x + 1 end, 10) is 12
+  apply-twice(lam(x): x + 1 end, 10) is 12
 end
 
 fun fact1(n #|:: NumNonNegative|#) #|-> Number|#:

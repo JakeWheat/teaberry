@@ -52,6 +52,7 @@ wrapper to lift tests written in the language into tests for the
 >     ["ahoy.tea"
 
 >     ,"binding.tea"
+>     ,"identifiers.tea"
 >     ,"let.tea"
 >     ,"functions.tea"
 >     ,"if_ask.tea"
