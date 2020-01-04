@@ -490,24 +490,25 @@ end
 
 
 > desugarRecs :: [S.Binding] -> DesugarStack [S.Binding]
-> desugarRecs rs =
+> desugarRecs rs = do
 >     let
 >         recnms = flip mapMaybe rs (\r -> case r of
 >                                           S.Binding (S.IdenP _ f) (S.Lam {}) -> Just f
 >                                           _ -> Nothing)
 >         recmap = zip recnms recnms
->         recnms' = map (++ "XXX") recnms
->         recmap' = zip recnms recnms'
->         mkrec (S.Binding (S.IdenP s f) (S.Lam as bdy)) =
->             let f' = f ++ "XXX"
->                 bdy' = patchCalls recmap recnms bdy
->             in (Just (S.Binding (S.IdenP S.NoShadow f') (S.Lam (recnms ++ as) bdy'))
+>     recnms' <- mapM getUnique recnms
+>     let recmap' = zip recnms recnms'
+>         mkrec :: S.Binding -> DesugarStack (Maybe S.Binding, Maybe S.Binding)
+>         mkrec (S.Binding (S.IdenP s f) (S.Lam as bdy)) = do
+>             f' <- maybe (throwError $ "Desugarer: internal error, didn't find just generated matching unique id " ++ f)
+>                      pure $ lookup f recmap'
+>             let bdy' = patchCalls recmap recnms bdy
+>             pure (Just (S.Binding (S.IdenP S.NoShadow f') (S.Lam (recnms ++ as) bdy'))
 >                ,Just (S.Binding (S.IdenP s f) (S.Lam as (S.App (S.Iden f') (map S.Iden (recnms' ++ as))))))
->         mkrec (S.Binding f e) = (Nothing
->                                   ,Just (S.Binding f (patchCalls recmap' recnms' e)))
->         (a,b) = unzip $ map mkrec rs
->         x = catMaybes (a ++ b)
->     in pure x
+>         mkrec (S.Binding f e) = pure (Nothing
+>                                      ,Just (S.Binding f (patchCalls recmap' recnms' e)))
+>     (a,b) <- unzip <$> mapM mkrec rs
+>     pure $ catMaybes (a ++ b)
 >  where
 >      --showit :: [(String, S.Expr)] -> String
 >      --showit ss = intercalate "\n" $ map (\(a,b) -> a ++ " = " ++ prettyExpr b) ss

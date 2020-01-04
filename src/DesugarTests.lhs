@@ -54,13 +54,13 @@
 >       \end"
 >      ,(App (Iden "raise") (Sel $ Str "no branches matched")))
 >
->     ,("letrec f = lam(a): f(a) end:\n\
+>     {-,("letrec f = lam(a): f(a) end:\n\
 >       \  f('stuff')\n\
 >       \end"
 >      ,p2d "let fXXX = lam(f,a): f(f,a) end,\n\
 >           \    f = lam(a): fXXX(fXXX,a) end:\n\
 >           \f('stuff')\n\
->           \end")
+>           \end")-}
 >     ,("block: a + b\n\
 >       \  c + d\n\
 >       \end"
@@ -88,7 +88,7 @@ is-pt = lam(x): I.AppHaskell "DataType" [x] == "Point" && I.AppHaskell "VariantT
 
 >                 ]
 >   where
->       p2d s = either error id (desugarExpr =<< parseExpr "" s)
+>       --p2d s = either error id (desugarExpr =<< parseExpr "" s)
 >       binop a op b = App (App (Iden op) a) b
 >       num = Sel . Num
 
