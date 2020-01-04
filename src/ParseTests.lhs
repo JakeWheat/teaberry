@@ -166,9 +166,9 @@ todo: review all the whitespace rules that are being ignored
 >     ,("[list: ]", Construct (Iden "list") [])
 
 >     --,("let {x; y}: {1; 2} in x + y end"
->     -- ,Let [(TuplePat ["x","y"], Tuple [num 1, num 2])] (BinOp (Iden "x" "+" (Iden "y"))))
+>     -- ,Let [(TupleP [IdenP "x",IdenP "y"], Tuple [num 1, num 2])] (BinOp (Iden "x" "+" (Iden "y"))))
 
->     -- needs some work in the parser
+>     -- needs some work in the parser to ignore the trailing ;
 >     -- ,("{1; 2;}", Sel $ Tuple [num 1, num 2])
 >     ,("{1; 2}", Sel $ Tuple [num 1, num 2])
 
@@ -223,7 +223,16 @@ todo: review all the whitespace rules that are being ignored
 >     ,("{x; y} = {1; 2}"
 >      ,LetDecl (Binding NoShadow (TupleP [IdenP "x", IdenP "y"])
 >       (Sel $ Tuple [num 1, num 2])))
-> 
+
+>     ,("{{w; x}; {y; z}} = x"
+>      ,LetDecl (Binding NoShadow
+>                (TupleP [TupleP [IdenP "w", IdenP "x"]
+>                        ,TupleP [IdenP "y", IdenP "z"]])
+>                (Iden "x")))
+>
+>     ,("{w; x} as wx = z"
+>      ,LetDecl (Binding NoShadow (AsP (TupleP [IdenP "w", IdenP "x"]) "wx")
+>       (Iden "z")))
 >     ,("data BTree:\n\
 >       \  | node(value, left, right)\n\
 >       \  | leaf(value)\n\

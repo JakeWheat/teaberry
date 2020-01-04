@@ -40,7 +40,7 @@ using a hack sort of ffi for haskell.
 > import Control.Monad (void, forM_, when)
 > import Control.Monad.IO.Class (liftIO)
 > import Control.Monad.Trans.RWS (RWST, runRWST, ask, get, {-put,-} local, tell, state)
-> import Data.List (partition)
+> import Data.List (partition, intercalate)
 > import Data.Scientific (Scientific)
 > import Text.Show.Pretty (ppShow)
 
@@ -447,9 +447,15 @@ type is wrong
 >                         (I.AppHaskell f [I.Iden "a", I.Iden "b", I.Iden "c"])))) emptyEnv)
 
 > torepr :: Value -> Value
-> torepr (NumV n) = StrV $ case extractInt n of
+> torepr = StrV . torepr'
+ 
+> torepr' :: Value -> String
+> torepr' (NumV n) = case extractInt n of
 >                              Just x -> show x
 >                              Nothing ->  show n
-> torepr (BoolV n) = StrV $ if n then "true" else "false"
-> torepr (ClosV {}) = StrV "<Function>"
-> torepr x = error $  "Interpreter: torepr implementation " ++ show x
+> torepr' (BoolV n) = if n then "true" else "false"
+> torepr' (ClosV {}) = "<Function>"
+> torepr' (VariantV "tuple" "tuple" fs) =
+>     "{" ++ intercalate ";" (map (torepr' . snd) fs) ++ "}"
+
+> torepr' x = error $  "Interpreter: torepr implementation " ++ show x

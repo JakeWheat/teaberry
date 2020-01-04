@@ -86,6 +86,7 @@ The high level syntax which the parser produces
 > data Pat = IdenP String
 >          | CtorP String [Pat]
 >          | TupleP [Pat]
+>          | AsP Pat String
 >           deriving (Eq,Show,Data,Typeable,Generic) 
 
 > data Selector = Num Scientific

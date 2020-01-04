@@ -15,7 +15,7 @@ and to a lesser extent letrec (and multiple rec/fun declarations)
 
 > import Control.Monad.RWS (RWST(..), runRWST, ask, local,state)
 > import Control.Monad.Except (Except, runExcept, throwError)
-> import Control.Monad (forM)
+> import Control.Monad (forM, zipWithM)
 
 > --import Debug.Trace (trace)
 
@@ -66,11 +66,28 @@ good way to do it
 > data DesugarStore = DesugarStore
 >     {nextCheckBlockNameID :: Int -- the id for the next anonymous check block name
 >     ,nextCheckBlockID :: Int
+>     ,cheapoUnique :: Int
 >     }
 >     deriving (Eq,Show)
 
 > defaultDesugarStore :: DesugarStore
-> defaultDesugarStore = DesugarStore 1 0
+> defaultDesugarStore = DesugarStore 1 0 0
+
+a slightly improved hack to keep moving without getting stuck doing
+ this properly yet:
+
+> getUnique :: String -> DesugarStack String
+> getUnique prefix = do
+>     i <- state $ \s ->
+>             let i = cheapoUnique s
+>             in (i, s {cheapoUnique = cheapoUnique s + 1})
+>     return $ prefix ++ "-deffoUnique" ++ show i
+>                   
+
+the full plan is to find a pseudo random generator that can put in the
+pure monad state, and also track envs like in the interpreter (without values),
+and then can implement this and other things properly
+ 
 
 ------------------------------------------------------------------------------
 
@@ -208,8 +225,8 @@ this fails with 'a block cannot end with a binding'
 >                       pure $ "check-block-" ++ show i
 >     checkblockid <- state (\st -> (nextCheckBlockID st
 >                                   ,st {nextCheckBlockID  = nextCheckBlockID st + 1}))
->     let checkblockidnm = "checkblockid"
->         blockNameVal = S.Sel $ S.Str nm'
+>     checkblockidnm <- getUnique "checkblockid"
+>     let blockNameVal = S.Sel $ S.Str nm'
 >         checkblockidval = S.Sel $ S.Num $ fromIntegral checkblockid
 >         blk = [S.LetDecl (S.Binding S.NoShadow (S.IdenP checkblockidnm) checkblockidval)
 >                 ,S.StExpr $ S.App (S.Iden "log-check-block") [S.Iden checkblockidnm
@@ -243,19 +260,23 @@ end
 >     x <- inCheckBlockID <$> ask
 >     checkBlockID <- maybe (throwError $ "'is' outside of checkblock")
 >                     (pure . S.Sel . S.Num . fromIntegral) x
+>     v0 <- getUnique "isv0"
+>     v1 <- getUnique "isv1"
+>     nameit <- getUnique "isname"
+>     failmsg <- getUnique "isfailmsg"
 >     let mys = S.StExpr $ S.Block
 >                    [{-S.StExpr $ S.App (S.Iden "print") [S.Sel $ S.Str $ "Desugar test enter"]
->                    ,-}S.LetDecl (S.Binding S.Shadow (S.IdenP "v0") e)
->                    ,S.LetDecl (S.Binding S.Shadow (S.IdenP "v1") e1)
->                    ,S.LetDecl (S.Binding S.Shadow (S.IdenP "name") $ S.Sel $ S.Str syn)
->                    ,S.StExpr $ S.If [(S.App (S.Iden "==") [S.Iden "v0", S.Iden "v1"]
->                                    ,S.App (S.Iden "log-test-pass") [checkBlockID, S.Iden "name"])]
+>                    ,-}S.LetDecl (S.Binding S.Shadow (S.IdenP v0) e)
+>                    ,S.LetDecl (S.Binding S.Shadow (S.IdenP v1) e1)
+>                    ,S.LetDecl (S.Binding S.Shadow (S.IdenP nameit) $ S.Sel $ S.Str syn)
+>                    ,S.StExpr $ S.If [(S.App (S.Iden "==") [S.Iden v0, S.Iden v1]
+>                                    ,S.App (S.Iden "log-test-pass") [checkBlockID, S.Iden nameit])]
 >                        (Just $ S.Block
->                         [S.LetDecl (S.Binding S.Shadow (S.IdenP "failmsg")
->                                     (str "Values not equal:\n" `plus` app "torepr" [S.Iden "v0"]
->                                               `plus` str "\n" `plus` app "torepr" [S.Iden "v1"]))
+>                         [S.LetDecl (S.Binding S.Shadow (S.IdenP failmsg)
+>                                     (str "Values not equal:\n" `plus` app "torepr" [S.Iden v0]
+>                                               `plus` str "\n" `plus` app "torepr" [S.Iden v1]))
 >                         ,S.StExpr $ S.App (S.Iden "log-test-fail")
->                          [checkBlockID, S.Iden "name", S.Iden "failmsg"]])]
+>                          [checkBlockID, S.Iden nameit, S.Iden failmsg]])]
 >     pure mys
 >   where
 >       plus a b = S.BinOp a "+" b
@@ -359,10 +380,19 @@ tmp = {1; 2}
 x = tmp.{0}
 y = tmp.{1}
 
-> desugarPatternBinding (S.Binding _ (S.TupleP ps) e) = do
->     let tmp = (S.NoShadow, "tmp", e)    -- todo: unique name
->         fs = zipWith (\(S.IdenP nm) f -> (S.NoShadow, nm, S.TupleGet (S.Iden "tmp") f)) ps [0..]
->     pure (tmp : fs)
+> desugarPatternBinding (S.Binding s (S.TupleP ps) e) = do
+>     tmpNm <- getUnique "tmpAs"
+>     desugarPatternBinding (S.Binding s (S.AsP (S.TupleP ps) tmpNm) e)
+
+> desugarPatternBinding (S.Binding _ (S.AsP (S.TupleP ps) anm) e) = do
+>     let tmp = (S.NoShadow, anm, e)
+>     let expandIt p f =
+>             desugarPatternBinding
+>                 (S.Binding S.NoShadow p (S.TupleGet (S.Iden anm) f))
+>     fs <- zipWithM expandIt ps [0..]
+>     pure (tmp : concat fs)
+> 
+
 
 > desugarPatternBinding x = error $ "desugar: unsupported type of pattern binding: " ++ show x
 

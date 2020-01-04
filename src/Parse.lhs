@@ -182,7 +182,7 @@ the can get rid of more trys
 >     ,"otherwise", "block", "cases", "when", "var", "check"
 >     ,"where", "fun", "rec", "data"
 >     ,"import", "provide", "provide-types"
->     ,"from", "and", "or", "shadow"
+>     ,"from", "and", "or", "shadow", "as"
 >     ]
 
 > identifierX :: Parser String
@@ -377,6 +377,10 @@ statements correctly
 > pat = choice
 >       [(IdenP <$> identifier) <**> option id ctorPSuffix
 >       ,TupleP <$> (symbol_ "{" *> xSep ';' pat <* symbol_ "}")]
+>       <**> option id asPatSuffix
+
+> asPatSuffix :: Parser (Pat -> Pat)
+> asPatSuffix = flip AsP <$> (keyword_ "as" *> identifier)
 
 > ctorPSuffix :: Parser (Pat -> Pat)
 > ctorPSuffix = do
@@ -458,6 +462,7 @@ works
 > patternSyntaxToExpr (IdenP s) = Iden s
 > patternSyntaxToExpr (CtorP s p) = App (Iden s) $ map patternSyntaxToExpr p
 > patternSyntaxToExpr (TupleP es) = Sel $ Tuple $ map patternSyntaxToExpr es
+> --patternSyntaxToExpr (AsP {}) = Nothing
 
 > whenStmt :: Parser Stmt
 > whenStmt = When <$> (keyword_ "when" *> expr)

@@ -17,11 +17,19 @@ check:
   y is 2
 end
 
+check:
+  {x; y} as z = {1; 2}
+  x is 1
+  y is 2
+  z is {1;2}
+end
+
+
 
 # fix: shadow is on the iden, not the binding
 # {shadow x; y} = {1; 2}
 
-#|
+
 check:
   {{w; x}; {y; z}} = {{5; true}; {"hello"; 4}}
   w is 5
@@ -40,7 +48,7 @@ check:
   yz is {"hello"; 4}
   wxyz is {wx; yz}
 end
-|#
+
 #|
 
 check:
