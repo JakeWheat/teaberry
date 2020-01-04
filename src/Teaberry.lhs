@@ -42,30 +42,30 @@ possibly run tests quietly and exit more noisily if there is a failure
 >         [] -> help
 >         ["-x"] -> runX
 >         ["-h"] -> help
->         ["-c", cmd] -> runc cmd
+>         ["-c", cmd] -> runc "" cmd
 >         ["-f", fn] -> do
 >             cmd <- readFile fn
->             runc cmd
+>             runc fn cmd
 >         ["-g", fn] -> do
 >             cmd <- readFile fn
->             runt cmd
+>             runt fn cmd
 >         ["-r", fn] -> do
 >             cmd <- readFile fn
->             putStrLn $ either id id $ compileReport cmd
+>             putStrLn $ either id id $ compileReport fn cmd
 >         ["-p", fn] -> do
 >             cmd <- readFile fn
->             putStrLn $ either id id $ format cmd
+>             putStrLn $ either id id $ format fn cmd
 >         _ -> help
 >     --let cmd = "a = 5\nprint(a + 4)\na"
 >   where
->       runc cmd = do
->           v <- runCode cmd
+>       runc fn cmd = do
+>           v <- runCode fn cmd
 >           case v of
 >               Left e -> error e -- todo exit with error code
 >               Right VoidV -> pure ()
 >               Right v' -> putStrLn $ show v'
->       runt cmd = do
->           v <- runChecks cmd
+>       runt fn cmd = do
+>           v <- runChecks fn cmd
 >           case v of
 >               Left e -> error e -- todo exit with error code
 >               Right v1 -> putStrLn $ renderCheckResults v1

@@ -33,9 +33,9 @@ once do imports, have an option to run all tests
 > import qualified InterpreterSyntax as I
 > import qualified PrettyInterpreter as I
 
-> compileProgram :: String -> Either String I.Program
-> compileProgram src = do
->     ast <- parseProgram "" src
+> compileProgram :: FilePath -> String -> Either String I.Program
+> compileProgram fn src = do
+>     ast <- parseProgram fn src
 >     desugarProgram ast
 
 
@@ -45,18 +45,18 @@ what would make this actually useful, is to be able to pretty print
  the interpreter syntax as concrete syntax
 at the moment, it's totally unreadable and useless for debugging
 
-> compileReport :: String -> Either String String
-> compileReport src = do
->     ast <- parseProgram "" src
+> compileReport :: FilePath -> String -> Either String String
+> compileReport fn src = do
+>     ast <- parseProgram fn src
 >     iast <- desugarProgram ast
 >     pure (ppShow ast ++ "\n==============================\n"
 >           ++ ppShow iast ++ "\n==============================\n"
 >           ++ I.prettyProgram iast)
 
 
-> runCode :: String -> IO (Either String Value)
-> runCode src = do
->     case compileProgram src of
+> runCode :: FilePath -> String -> IO (Either String Value)
+> runCode fn src = do
+>     case compileProgram fn src of
 >         Left e -> pure $ Left e
 >         Right p -> runProgram p
 
@@ -93,14 +93,14 @@ at the moment, it's totally unreadable and useless for debugging
 >            
 >            
 
-> runChecks :: String -> IO (Either String [CheckResult])
-> runChecks src =
->     case compileProgram src of
+> runChecks :: FilePath -> String -> IO (Either String [CheckResult])
+> runChecks fn src =
+>     case compileProgram fn src of
 >         Left e -> pure $ Left e
 >         Right p -> I.runChecks p
 
-> format :: String -> Either String String
-> format src = do
->     ast <- parseProgram "" src
+> format :: FilePath -> String -> Either String String
+> format fn src = do
+>     ast <- parseProgram fn src
 >     pure $ prettyProgram ast
 
