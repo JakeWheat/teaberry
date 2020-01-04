@@ -15,6 +15,7 @@ and to a lesser extent letrec (and multiple rec/fun declarations)
 
 > import Control.Monad.RWS (RWST(..), runRWST, ask, local,state)
 > import Control.Monad.Except (Except, runExcept, throwError)
+> import Control.Monad (forM)
 
 > --import Debug.Trace (trace)
 
@@ -119,7 +120,9 @@ when a fun or rec is seen, it will collect subsequent funs and recs
 >                                    ,S.StExpr $ S.Iden "nothing"])]
 >                     (Just (S.Iden "nothing")))
 
-> desugarStmt (S.LetDecl (S.Binding _ (S.IdenP nm) e)) = (:[]) <$> I.LetDecl nm <$> desugarExpr' e
+> desugarStmt (S.LetDecl b) = do
+>     bs <- desugarPatternBinding b
+>     forM bs $ \(_,nm,e) -> I.LetDecl nm <$> desugarExpr' e
 
 > desugarStmt (S.FunDecl nm as bdy whr) = do
 >     a <- desugarStmt (S.RecDecl (S.Binding S.NoShadow (S.IdenP nm) (S.Lam as bdy)))
@@ -132,6 +135,7 @@ when a fun or rec is seen, it will collect subsequent funs and recs
 >    desugarStmts $ map S.LetDecl defs
 
 > desugarStmt (S.VarDecl (S.Binding _ (S.IdenP n) e)) = (:[]) <$> (I.LetDecl n . I.Box) <$> desugarExpr' e
+> desugarStmt (S.VarDecl (S.Binding _ p _)) = throwError $ "var binding must be name, got " ++ show p
 > desugarStmt (S.SetVar n e) = (:[]) <$> I.SetBox n <$> desugarExpr' e
 
 ------------------------------------------------------------------------------
@@ -301,12 +305,14 @@ end
 > desugarExpr' (S.Lam [x] bdy) = I.Lam x <$> desugarExpr' bdy
 > desugarExpr' (S.Lam (x:xs) bdy) = I.Lam x <$> desugarExpr' (S.Lam xs bdy)
 
-> desugarExpr' (S.Let [] bdy) = desugarExpr' bdy
-> desugarExpr' (S.Let (S.Binding _ (S.IdenP n) lbdy : ls) bdy) = do
->     bdy' <- desugarExpr' (S.Let ls bdy)
->     lbdy' <- desugarExpr' lbdy
->     pure $ I.Let n lbdy' bdy'
-
+> desugarExpr' (S.Let ps bdy) = do
+>     ps' <- concat <$> mapM desugarPatternBinding ps
+>     f ps'
+>   where
+>     f [] = desugarExpr' bdy
+>     f ((_, n, lbdy) : ls) = do
+>         lbdy' <- desugarExpr' lbdy
+>         I.Let n lbdy' <$> f ls
 
 
 > desugarExpr' (S.LetRec fs ex) = do
@@ -336,6 +342,32 @@ turn a list of expressions into a nested seq value
 > seqify [] = I.Sel I.VoidS
 > seqify [e] = e
 > seqify (e:es) = I.Seq e $ seqify es
+
+
+
+------------------------------------------------------------------------------
+
+desugar pattern binding
+
+> desugarPatternBinding :: S.Binding -> DesugarStack [(S.Shadow, String, S.Expr)]
+> desugarPatternBinding (S.Binding s (S.IdenP nm) e) =
+>     pure [(s,nm,e)]
+
+{x; y} = {1; 2}
+->
+tmp = {1; 2}
+x = tmp.{0}
+y = tmp.{1}
+
+> desugarPatternBinding (S.Binding _ (S.TupleP ps) e) = do
+>     let tmp = (S.NoShadow, "tmp", e)    -- todo: unique name
+>         fs = zipWith (\(S.IdenP nm) f -> (S.NoShadow, nm, S.TupleGet (S.Iden "tmp") f)) ps [0..]
+>     pure (tmp : fs)
+
+> desugarPatternBinding x = error $ "desugar: unsupported type of pattern binding: " ++ show x
+
+
+
 
 ------------------------------------------------------------------------------
 
