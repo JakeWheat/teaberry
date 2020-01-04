@@ -220,6 +220,10 @@ todo: review all the whitespace rules that are being ignored
 >      ,When (BinOp (Iden "x") "==" (Sel $ Num 3)) (Sel $ Num 4))
 >     ,("var a = 5", VarDecl (Binding NoShadow (IdenP "a") (num 5)))
 >     ,("a := 6", SetVar "a" (num 6))
+>     ,("{x; y} = {1; 2}"
+>      ,LetDecl (Binding NoShadow (TupleP [IdenP "x", IdenP "y"])
+>       (Sel $ Tuple [num 1, num 2])))
+> 
 >     ,("data BTree:\n\
 >       \  | node(value, left, right)\n\
 >       \  | leaf(value)\n\

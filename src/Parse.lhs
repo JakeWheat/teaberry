@@ -27,7 +27,7 @@ case that it's too permissive compared with pyret. It doesn't use a
 fixity parser either
 
 
-> {-# LANGUAGE TupleSections #-}
+> {-# LANGUAGE TupleSections,ScopedTypeVariables #-}
 > module Parse (parseExpr
 >              ,parseStmt
 >              ,parseProgram) where
@@ -75,7 +75,7 @@ fixity parser either
 > import Syntax (Stmt(..), Expr(..), Selector(..), VariantDecl(..)
 >               ,Shadow(..)
 >               ,Binding(..)
->               , Pat(..)
+>               ,Pat(..)
 >               ,Program(..)
 >               ,Provide(..)
 >               ,ProvideTypes(..)
@@ -403,6 +403,13 @@ put all the parsers which start with a keyword first
 >               ,tuple
 >               ] <**> option id (appSuffix <|> dotSuffix)
 
+
+> exprSuffix :: Parser (Expr -> Expr)
+> exprSuffix = do
+>     x <- option id (appSuffix <|> dotSuffix)
+>     y <- option id binOpSuffix
+>     pure (y . x)
+
 ------------------------------------------------------------------------------
 
 = statements
@@ -418,13 +425,39 @@ put all the parsers which start with a keyword first
 >     ,setVarStmt
 >     ,shadowLetDecl
 
-todo figure out how to 'branch' into expr if letdecl fails
-to avoid the use of try, although it's not a terrible use of try
-because it only reparses a single token if it fails
+did all this hard work, but still ended up needing the try ...
+need to change pat to patOrExpression
+  so it can parse stuff that starts like a pattern
+  but then can only be an expression after that
 
->     ,try (identifier <**> letDecl)
+>     ,try pat <**> choice [letDecl
+>                          ,do
+>                           es <- option id exprSuffix
+>                           bb <- option StExpr testPost
+>                           pure $ bb . es . patternSyntaxToExpr
+>                          ]
 >     ,expr <**> option StExpr testPost
 >     ]
+
+parsing let decls:
+
+a lot of patterns before a =, look just like expressions. we can't
+tell which one it is until later. to avoid massive use of try, left
+factor this,
+
+so there is a 'pattern or expression' parser which can then become
+either depending on what follows. this means having to maintain an
+extra data type just for the parsing here that has to be kept in sync
+with the syntax (the parser itself has to be kept in sync also)
+
+if there are no patterns that can't be expressions also,
+then can just use the pattern syntax here. do that until it no longer
+works
+
+> patternSyntaxToExpr :: Pat -> Expr
+> patternSyntaxToExpr (IdenP s) = Iden s
+> patternSyntaxToExpr (CtorP s p) = App (Iden s) $ map patternSyntaxToExpr p
+> patternSyntaxToExpr (TupleP es) = Sel $ Tuple $ map patternSyntaxToExpr es
 
 > whenStmt :: Parser Stmt
 > whenStmt = When <$> (keyword_ "when" *> expr)
@@ -479,10 +512,10 @@ because it only reparses a single token if it fails
 >   
 
 
-> letDecl :: Parser (String -> Stmt)
+> letDecl :: Parser (Pat -> Stmt)
 > letDecl = f <$> (symbol_ "=" *> expr)
 >    where
->        f y x = LetDecl (Binding NoShadow (IdenP x) y)
+>        f y x = LetDecl (Binding NoShadow x y)
 
 -----------------------------------------
 
