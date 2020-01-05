@@ -295,7 +295,7 @@ todo: remove the trys by implementing a proper lexer or a lexer style
 > unaryMinus = UnaryMinus <$> (symbol "-" *> term)
 
 > lamE :: Parser Expr
-> lamE = Lam <$> (keyword_ "lam" *> parens (commaSep identifier) <* symbol_ ":")
+> lamE = Lam <$> (keyword_ "lam" *> parens (commaSep pat) <* symbol_ ":")
 >            <*> (expr <* keyword_ "end")
 >            
 
@@ -483,7 +483,7 @@ works
 > funDecl :: Parser Stmt
 > funDecl = FunDecl
 >     <$> (keyword "fun" *> identifier)
->     <*> parens (commaSep identifier)
+>     <*> parens (commaSep pat)
 >     <*> (symbol_ ":" *> (unwrapSingle <$>
 >          (Block <$> some stmt)))
 >     <*> (optional whereBlock <* keyword_ "end")

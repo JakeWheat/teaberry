@@ -54,13 +54,13 @@
 
 >     ,("(a)", Parens (Iden "a"))
 
->     ,("lam(x): x + 1 end", Lam ["x"] (BinOp (Iden "x") "+" (num 1)))
+>     ,("lam(x): x + 1 end", Lam [IdenP NoShadow "x"] (BinOp (Iden "x") "+" (num 1)))
 
 >     ,("lam(x, y): x - y end"
->      ,Lam ["x","y"] (BinOp (Iden "x") "-" (Iden "y")))
+>      ,Lam [IdenP NoShadow "x",IdenP NoShadow "y"] (BinOp (Iden "x") "-" (Iden "y")))
 
 >     ,("lam(x, y): x - y end(1,2)"
->      ,App (Lam ["x","y"] (BinOp (Iden "x") "-" (Iden "y")))
+>      ,App (Lam [IdenP NoShadow "x",IdenP NoShadow "y"] (BinOp (Iden "x") "-" (Iden "y")))
 >       [num 1, num 2])
 
 todo: review all the whitespace rules that are being ignored
@@ -96,7 +96,7 @@ todo: review all the whitespace rules that are being ignored
 >     ,("block:\n\
 >       \  fun f(a): a + 1 end\n\
 >       \end"
->      ,Block[FunDecl "f" ["a"] (BinOp (Iden "a") "+" (num 1)) Nothing])
+>      ,Block[FunDecl "f" [IdenP NoShadow "a"] (BinOp (Iden "a") "+" (num 1)) Nothing])
 
 
 >     ,("block:\n\
@@ -104,7 +104,7 @@ todo: review all the whitespace rules that are being ignored
 >       \  a = 1\n\
 >       \  a + 1\n\
 >       \end\n\
->       \end", Block[FunDecl "f" ["a"] (Block [LetDecl (Binding (IdenP NoShadow "a") (num 1))
+>       \end", Block[FunDecl "f" [IdenP NoShadow "a"] (Block [LetDecl (Binding (IdenP NoShadow "a") (num 1))
 >                                             ,StExpr $ BinOp (Iden "a") "+" (num 1)]) Nothing])
 
 
@@ -155,7 +155,7 @@ todo: review all the whitespace rules that are being ignored
 >       \end"
 
 >      ,Block [RecDecl (Binding (IdenP NoShadow "fact")
->             $ Lam ["x"] $
+>             $ Lam [IdenP NoShadow "x"] $
 >                     If [(BinOp (Iden "x") "==" (num 0), num 1)]
 >                     (Just (BinOp (Iden "x") "*" (App (Iden "fact") [BinOp (Iden "x") "-" (num 1)]))))
 >             ,StExpr (App (Iden "fact") [num 5])])
@@ -329,7 +329,7 @@ todo: review all the whitespace rules that are being ignored
 >       \  double(10) is 20\n\
 >       \  double(15) is 30\n\
 >       \end"
->      ,FunDecl "double" ["n"] (BinOp (Iden "n") "+" (Iden "n"))
+>      ,FunDecl "double" [IdenP NoShadow "n"] (BinOp (Iden "n") "+" (Iden "n"))
 >       (Just [StExpr $ BinOp (App (Iden "double") [num 10]) "is" (num 20)
 >            ,StExpr $ BinOp (App (Iden "double") [num 15]) "is" (num 30)]))
 

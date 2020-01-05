@@ -49,7 +49,7 @@ The high level syntax which the parser produces
 >           | When Expr Expr
 >           | LetDecl Binding
 >           | RecDecl Binding
->           | FunDecl String [String] Expr (Maybe [Stmt])
+>           | FunDecl String [Pat] Expr (Maybe [Stmt])
 >           | VarDecl Binding
 >           | SetVar String Expr
 >           | DataDecl String [VariantDecl] (Maybe [Stmt])
@@ -83,7 +83,7 @@ The high level syntax which the parser produces
 >           | App Expr [Expr]
 >           | UnaryMinus Expr
 >           | BinOp Expr String Expr
->           | Lam [String] Expr
+>           | Lam [Pat] Expr
 >           | Let [Binding] Expr
 >           | LetRec [Binding] Expr
 >           | Block [Stmt]

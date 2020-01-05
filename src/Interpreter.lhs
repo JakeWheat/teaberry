@@ -380,6 +380,7 @@ system
 
 todo: make this better: do better wrapping + error messages when the
 type is wrong
+haskellfunimpls and default env duplicates a bunch of stuff
 
 > haskellFunImpls :: [(String, [Value] -> Interpreter Value)]
 > haskellFunImpls =

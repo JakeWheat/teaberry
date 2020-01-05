@@ -68,7 +68,7 @@
 > expr (App e es) = expr e <> parens (commaSep $ map expr es)
 > expr (UnaryMinus e) = text "-" <> expr e
 > expr (BinOp a op b) = expr a <+> text op <+> expr b
-> expr (Lam ps e) = text "lam" <> parens (commaSep $ map text ps)
+> expr (Lam bs e) = text "lam" <> parens (commaSep $ map pat bs)
 >     <> text ":" <+> nest 2 (expr e) <+> text "end"
 > expr (Let bs e) = text "let" <+> nest 2 (commaSep $ map binding bs)
 >     <> text ":" <+> nest 2 (expr e) <+> text "end"
@@ -114,7 +114,7 @@
 
 > stmt (RecDecl b) = text "rec" <+> binding b
 > stmt (FunDecl n as e w) =
->      text "fun" <+> text n <+> parens (commaSep $ map text as) <+> text ":"
+>      text "fun" <+> text n <+> parens (commaSep $ map pat as) <+> text ":"
 >      <+> nest 2 (expr e)
 >      <+> maybe empty whereBlock w
 >      <+> text "end"

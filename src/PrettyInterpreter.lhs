@@ -26,7 +26,7 @@
 todo: resugaring multiple arg apps and lams has a key readability benefit
 
 > resugarExpr (I.App e e1) = S.App (resugarExpr e) [resugarExpr e1]
-> resugarExpr (I.Lam nm e) = S.Lam [nm] $ resugarExpr e
+> resugarExpr (I.Lam nm e) = S.Lam [S.IdenP S.NoShadow nm] $ resugarExpr e
 > resugarExpr (I.LamVoid e) = S.Lam [] $ resugarExpr e
 > resugarExpr (I.Let nm v e) = S.Let [S.Binding (S.IdenP S.NoShadow nm) $ resugarExpr v] (resugarExpr e)
 > resugarExpr (I.AppHaskell nm e) = S.App (S.Iden nm) $ map resugarExpr e

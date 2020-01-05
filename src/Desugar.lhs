@@ -1,10 +1,12 @@
 
 Desugaring from the high level syntax to the interpreter syntax.
 
-The most interesting part is the test desugaring (check:, example:,
-where:)
+The non trivial parts are
 
-and to a lesser extent letrec (and multiple rec/fun declarations)
+the test (check:, example:, where:)
+data decls
+pattern desugaring
+letrec
 
 
 > {-# LANGUAGE TupleSections #-}
@@ -116,7 +118,11 @@ when a fun or rec is seen, it will collect subsequent funs and recs
 >     idecls <- desugarStmts $ map S.LetDecl defs
 >     (++) (idecls ++ chks) <$> desugarStmts ss'
 >   where
->     convRec (S.FunDecl nm as bdy whr) = Just (S.Binding (S.IdenP S.NoShadow nm) (S.Lam as bdy), fmap (nm,) whr)
+>     convRec (S.FunDecl nm as bdy whr) =
+>         Just (S.Binding
+>               (S.IdenP S.NoShadow nm)
+>               (S.Lam as bdy)
+>              ,fmap (nm,) whr)
 >     convRec (S.RecDecl b) = Just (b, Nothing)
 >     convRec _ = Nothing
 
@@ -324,8 +330,8 @@ end
 > desugarExpr' (S.BinOp a op b) = desugarExpr' (S.App (S.Iden op) [a,b])
 
 > desugarExpr' (S.Lam [] bdy) = I.LamVoid <$> desugarExpr' bdy
-> desugarExpr' (S.Lam [x] bdy) = I.Lam x <$> desugarExpr' bdy
-> desugarExpr' (S.Lam (x:xs) bdy) = I.Lam x <$> desugarExpr' (S.Lam xs bdy)
+> desugarExpr' (S.Lam [S.IdenP _ x] bdy) = I.Lam x <$> desugarExpr' bdy
+> desugarExpr' (S.Lam (S.IdenP _ x:xs) bdy) = I.Lam x <$> desugarExpr' (S.Lam xs bdy)
 
 > desugarExpr' (S.Let ps bdy) = do
 >     ps' <- concat <$> mapM desugarPatternBinding ps
@@ -513,8 +519,8 @@ end
 >             f' <- maybe (throwError $ "Desugarer: internal error, didn't find just generated matching unique id " ++ f)
 >                      pure $ lookup f recmap'
 >             let bdy' = patchCalls recmap recnms bdy
->             pure (Just (S.Binding (S.IdenP S.NoShadow f') (S.Lam (recnms ++ as) bdy'))
->                ,Just (S.Binding (S.IdenP s f) (S.Lam as (S.App (S.Iden f') (map S.Iden (recnms' ++ as))))))
+>             pure (Just (S.Binding (S.IdenP S.NoShadow f') (S.Lam (map (S.IdenP S.Shadow) recnms ++ as) bdy'))
+>                  ,Just (S.Binding (S.IdenP s f) (S.Lam as (S.App (S.Iden f') (map S.Iden (recnms' ++ map (\(S.IdenP _ x) -> x) as))))))
 >         mkrec (S.Binding f e) = pure (Nothing
 >                                      ,Just (S.Binding f (patchCalls recmap' recnms' e)))
 >     (a,b) <- unzip <$> mapM mkrec rs
