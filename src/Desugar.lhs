@@ -157,6 +157,51 @@ when a fun or rec is seen, it will collect subsequent funs and recs
 >    defs <- desugarRecs [b]
 >    desugarStmts $ map S.LetDecl defs
 
+> desugarStmt (S.DataDecl typenm vs whr) = do
+>     -- is-typenm
+>     let variantNames = map (\(S.VariantDecl nm _) -> nm) vs
+>         vnofx = S.App (S.Iden "variant-name") [S.Iden "x"]
+>         eqVariants = map (\n -> S.App (S.Iden "==") [S.Iden "vn", S.Sel $ S.Str n]) variantNames
+>         
+>         isT = S.LetDecl (S.Binding (S.IdenP S.NoShadow ("is-" ++ typenm))
+>               $ S.Lam [S.IdenP S.Shadow "x"] (S.Let [S.Binding (S.IdenP S.Shadow "vn") vnofx]
+>                        (foldr orEm (S.Iden "false") eqVariants)))
+>     -- variant constructors
+>         mkC :: String -> [String] -> S.Stmt
+>         mkC ctnm fs = S.LetDecl (S.Binding (S.IdenP S.NoShadow ctnm)
+>                                  $ S.Lam (map (S.IdenP S.Shadow) fs) $ S.App
+>              (S.Iden "make-variant")
+>              [S.Sel (S.Str ctnm)
+>              ,mkListSel $ map (\a -> S.Sel $ S.Tuple [S.Sel $ S.Str a, S.Iden a]) fs])
+>         ctors = map (\(S.VariantDecl nm fs) -> mkC nm fs) vs
+>     -- is-ctor fns
+>         mkIsCt ctnm = S.LetDecl (S.Binding (S.IdenP S.NoShadow ("is-" ++ ctnm))
+>                                $ S.Lam [S.IdenP S.Shadow "x"] $ S.BinOp (S.App (S.Iden "variant-name") [S.Iden "x"])
+>                                "==" (S.Sel $ S.Str ctnm))
+>         isCtors = map (\(S.VariantDecl nm _) -> mkIsCt nm) vs
+>     -- where block
+>         w = case whr of
+>              Nothing -> []
+>              Just w' -> [S.Check (Just typenm) w']
+>     desugarStmts $ [isT] ++ ctors ++ isCtors ++ w
+>   where
+>     orEm a b = S.BinOp a "or" b
+>     mkListSel = S.Construct (S.Iden "list")
+
+desugaring a data decl:
+
+data Point:
+  | pt(x, y)
+end
+
+->
+
+is-Point = lam(x): let vn = I.App "variant-name" [x]
+                   in vn == "pt" (or vn == ..)
+pt = lam (x,y): I.App "make-variant" ["pt",[list: {"x",x},{"y",y}]]
+is-pt = lam(x): I.App "variant-name" [x] == "pt"
+
+
 > desugarStmt (S.VarDecl (S.Binding (S.IdenP _ n) e)) = (:[]) <$> (I.LetDecl n . I.Box) <$> desugarExpr' e
 > desugarStmt (S.VarDecl (S.Binding p _)) = throwError $ "var binding must be name, got " ++ show p
 > desugarStmt (S.SetVar n e) = (:[]) <$> I.SetBox n <$> desugarExpr' e

@@ -430,6 +430,8 @@ haskellfunimpls and default env duplicates a bunch of stuff
 >     ,("add-tests", addTests)
 >
 >
+>     ,("make-variant", makeVariant)
+>     ,("variant-name", variantName)
 >     ,("variant-field-get", \[v@(VariantV _ fs), StrV x] -> do
 >              maybe (throwM $ MyException $ "variant field not found " ++ x ++ ": " ++ show v)
 >                         pure
@@ -465,6 +467,8 @@ haskellfunimpls and default env duplicates a bunch of stuff
 >     ,liftUnOp "is-empty"
 >     ,liftUnOp "is-link"
 >     ,liftUnOp "is-list"
+>     ,liftUnOp "variant-name"
+>     ,liftBinOp "make-variant"
 >     ] emptyEnv
 >   where
 >      liftUnOp f = (f, ClosV (I.Lam "a" (I.AppHaskell f [I.Iden "a"])) emptyEnv)
@@ -513,3 +517,23 @@ haskellfunimpls and default env duplicates a bunch of stuff
 > listIsList [VariantV x _] | x `elem` ["empty", "link"] = pure $ BoolV True
 > listIsList [_] = pure $ BoolV False
 > listIsList x = throwM $ MyException $ "is-list called on " ++ show (length x) ++ " args, should be 1"
+
+> variantName :: [Value] -> Interpreter Value
+> variantName [VariantV x _] = pure $ StrV x
+> variantName [_] = pure $ StrV "nowt"
+> variantName x = throwM $ MyException $ "variant-name called on " ++ show (length x) ++ " args, should be 1"
+
+> makeVariant :: [Value] -> Interpreter Value
+> makeVariant [StrV ctor, listargs] = do
+>     vs <- listToHaskList listargs
+>     cd <- mapM unpackTuple vs
+>     pure $ VariantV ctor cd
+>   where
+>     unpackTuple (VariantV "tuple" [(_,StrV nm),(_,v)]) = pure (nm,v)
+>     unpackTuple x = throwM $ MyException $ "value in list in make-variant, expected tuple of name and val, got " ++ show x
+> makeVariant x = throwM $ MyException $ "make-variant called on " ++ show (length x) ++ " args, should be 2"
+
+> listToHaskList :: Value -> Interpreter [Value]
+> listToHaskList (VariantV "empty" []) = pure []
+> listToHaskList (VariantV "link" [("first",v),("rest",x)]) = (v:) <$> listToHaskList x
+> listToHaskList x = throwM $ MyException $ "interpreter: listToHaskList: " ++ show x

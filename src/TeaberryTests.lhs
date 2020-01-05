@@ -68,6 +68,8 @@ wrapper to lift tests written in the language into tests for the
 >     ,"tuples.tea"
 >     ,"records.tea"
 >     ,"lists.tea"
+>     ,"agdt.tea"
+>     --,"ref.tea"
 
 >     ,"empty.tea"
 >     ,"empty_check.tea"
