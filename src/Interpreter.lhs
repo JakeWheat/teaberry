@@ -84,8 +84,7 @@ these and variables, not sure there is a good reason to do this
 >            deriving (Eq,Show)
 
 > emptyEnv :: Env
-> emptyEnv = Env [("true", BoolV True)
->                ,("false", BoolV False)]
+> emptyEnv = Env []
 
 > extendEnv :: String -> Value -> Env -> Env
 > extendEnv n v (Env e) = Env ((n,v):e)
@@ -184,7 +183,7 @@ a program doesn't have a value (in this way, at least)
 >                        else pure []
 >                  pure (x, cr)
 >                 )
->         (InterpreterReader defaultHaskellFFIEnv)
+>         (InterpreterReader defaultEnv)
 >         defaultInterpreterState
 >     pure $ pure $ result
 >     ) `catch` (\(MyException s) -> pure $ Left $ s)
@@ -430,28 +429,31 @@ haskellfunimpls and default env duplicates a bunch of stuff
 
 >     ]
 
-> defaultHaskellFFIEnv :: Env
-> defaultHaskellFFIEnv = 
->     extendsEnv [liftBinOp "*"
->                ,liftBinOp "/"
->                ,liftBinOp "+"
->                ,liftBinOp "-"
->                ,liftBinOp "=="
->                ,liftBinOp "<"
->                ,liftBinOp ">"
->                ,liftBinOp "and"
->                ,liftBinOp "or"
->                ,liftUnOp "not"
->                ,liftUnOp "raise"
->                ,liftUnOp "print"
->                ,liftUnOp "torepr"
->                ,liftUnOp "to-repr"
->                ,liftBinOp "log-test-pass"
->                ,liftTriOp "log-test-fail"
->                ,liftBinOp "log-check-block"
->                ,liftUnOp "add-tests"
->                ,liftBinOp "variant-field-get"
->                ] emptyEnv
+> defaultEnv :: Env
+> defaultEnv = extendsEnv
+>     [("true", BoolV True)
+>     ,("false", BoolV False)
+>     ,("empty", VariantV "empty" [])
+>     ,liftBinOp "*"
+>     ,liftBinOp "/"
+>     ,liftBinOp "+"
+>     ,liftBinOp "-"
+>     ,liftBinOp "=="
+>     ,liftBinOp "<"
+>     ,liftBinOp ">"
+>     ,liftBinOp "and"
+>     ,liftBinOp "or"
+>     ,liftUnOp "not"
+>     ,liftUnOp "raise"
+>     ,liftUnOp "print"
+>     ,liftUnOp "torepr"
+>     ,liftUnOp "to-repr"
+>     ,liftBinOp "log-test-pass"
+>     ,liftTriOp "log-test-fail"
+>     ,liftBinOp "log-check-block"
+>     ,liftUnOp "add-tests"
+>     ,liftBinOp "variant-field-get"
+>     ] emptyEnv
 >   where
 >      liftUnOp f = (f, ClosV (I.Lam "a" (I.AppHaskell f [I.Iden "a"])) emptyEnv)
 >      liftBinOp f = (f, ClosV (I.Lam "a" (I.Lam "b" (I.AppHaskell f [I.Iden "a", I.Iden "b"]))) emptyEnv)
@@ -470,4 +472,4 @@ haskellfunimpls and default env duplicates a bunch of stuff
 > torepr' (VariantV "tuple" fs) =
 >     "{" ++ intercalate ";" (map (torepr' . snd) fs) ++ "}"
 
-> torepr' x = error $  "Interpreter: torepr implementation " ++ show x
+> torepr' x = error $ "Interpreter: torepr implementation " ++ show x
