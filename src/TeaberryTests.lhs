@@ -67,6 +67,7 @@ wrapper to lift tests written in the language into tests for the
 >     ,"vars.tea"
 >     ,"tuples.tea"
 >     ,"records.tea"
+>     ,"lists.tea"
 
 >     ,"empty.tea"
 >     ,"empty_check.tea"

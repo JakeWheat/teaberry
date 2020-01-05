@@ -416,12 +416,20 @@ haskellfunimpls and default env duplicates a bunch of stuff
 >     ,("torepr", \[x] -> pure $ torepr x)
 >     ,("to-repr", \[x] -> pure $ torepr x)
 >
+>      -- lists hardcoded into the system to bootstrap since it needs them
+>      -- to be able to create agdt in the implementation used
+>     ,("link", listLink)
+>     ,("is-empty", listIsEmpty)
+>     ,("is-link", listIsLink)
+>     ,("is-list", listIsList)
+
 >      -- some internals
 >     ,("log-check-block", logCheckBlock)
 >     ,("log-test-pass", logTestPass)
 >     ,("log-test-fail", logTestFail)
 >     ,("add-tests", addTests)
->      
+>
+>
 >     ,("variant-field-get", \[v@(VariantV _ fs), StrV x] -> do
 >              maybe (throwM $ MyException $ "variant field not found " ++ x ++ ": " ++ show v)
 >                         pure
@@ -453,6 +461,10 @@ haskellfunimpls and default env duplicates a bunch of stuff
 >     ,liftBinOp "log-check-block"
 >     ,liftUnOp "add-tests"
 >     ,liftBinOp "variant-field-get"
+>     ,liftBinOp "link"
+>     ,liftUnOp "is-empty"
+>     ,liftUnOp "is-link"
+>     ,liftUnOp "is-list"
 >     ] emptyEnv
 >   where
 >      liftUnOp f = (f, ClosV (I.Lam "a" (I.AppHaskell f [I.Iden "a"])) emptyEnv)
@@ -471,5 +483,33 @@ haskellfunimpls and default env duplicates a bunch of stuff
 > torepr' (ClosV {}) = "<Function>"
 > torepr' (VariantV "tuple" fs) =
 >     "{" ++ intercalate ";" (map (torepr' . snd) fs) ++ "}"
+> torepr' (VariantV "link" xs) | Just vs <- mapM getList xs =
+>     "[list: " ++ intercalate "," (map torepr' vs) ++ "]"
+>   where
+>     getList _ = Nothing -- (VariantV "list" (x:xs))
+>   
+> torepr' (VariantV "empty" []) = "empty"
+> torepr' (VariantV "link" [("first",x),("rest",xs)]) =
+>     "link(" ++ torepr' x ++ ", " ++ torepr' xs ++ ")"
 
 > torepr' x = error $ "Interpreter: torepr implementation " ++ show x
+
+> listLink :: [Value] -> Interpreter Value
+> listLink [v1, v2] = pure $ VariantV "link" [("first", v1)
+>                                            ,("rest", v2)]
+> listLink x = throwM $ MyException $ "link called on " ++ show (length x) ++ " args, should be 2"
+
+> listIsEmpty :: [Value] -> Interpreter Value
+> listIsEmpty [VariantV "empty" []] = pure $ BoolV True
+> listIsEmpty [_] = pure $ BoolV False
+> listIsEmpty x = throwM $ MyException $ "is-empty called on " ++ show (length x) ++ " args, should be 1"
+
+> listIsLink :: [Value] -> Interpreter Value
+> listIsLink [VariantV "link" _] = pure $ BoolV True
+> listIsLink [_] = pure $ BoolV False
+> listIsLink x = throwM $ MyException $ "is-link called on " ++ show (length x) ++ " args, should be 1"
+
+> listIsList :: [Value] -> Interpreter Value
+> listIsList [VariantV x _] | x `elem` ["empty", "link"] = pure $ BoolV True
+> listIsList [_] = pure $ BoolV False
+> listIsList x = throwM $ MyException $ "is-list called on " ++ show (length x) ++ " args, should be 1"

@@ -1,0 +1,68 @@
+
+
+check:
+  empty is [list:]
+  link(1, empty) is [list: 1]
+  link(1, link(2, empty)) is [list: 1,2]
+
+end
+
+check:
+  l1 = [list: 1]
+  mt = empty
+  is-empty(mt) is true
+  is-empty(l1) is false
+  is-link(mt) is false
+  is-link(l1) is true
+
+  is-list(l1) is true
+  is-list(mt) is true
+end
+
+check:
+  l1 = [list: 1,2,3]
+  l1.first is 1
+  l1.rest is [list: 2,3]
+end
+
+check:
+  list1 = [list: 2,3]
+  list2 = link(1, list1)
+  list2 is [list: 1,2,3]
+
+  [list: 1,2,3].first is 1
+  [list: 1,2,3].rest  is [list: 2,3]
+end
+
+check:
+  empty is [list:]
+  link(1, empty) is [list: 1]
+  link(1, link(2, empty)) is [list: 1,2]
+  link(empty, link(empty, [list: ])) is [list: [list:],[list:]]
+end
+
+#|
+fun my-is-empty(l):
+  cases(List) l:
+    | empty => true
+    | else => false
+  end
+end
+
+fun length(l):
+  cases(List) l:
+    | empty => 0
+    | link(f, r) => 1 + length(r)
+  end
+end
+
+check:
+  l1 = empty
+  l2 = [list: 1,2,3]
+  my-is-empty(l1) is true
+  my-is-empty(l2) is false
+
+  length(l1) is 0
+  length(l2) is 2
+end
+|#

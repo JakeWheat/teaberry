@@ -369,7 +369,17 @@ end
 > desugarExpr' (S.DotExpr e f) = do
 >     desugarExpr' (S.App (S.Iden "variant-field-get") [e, S.Sel $ S.Str f])
 
+special case for lists and bootstrapping, the desugar knows the
+implementation of list "construct" (which is not a haskell constructor)
+todo: think some more about construct, selector, haskell constructors,
+variant 'tags'? and jargon used in this system#
+does pyret have a consistent set that can be used here?
 
+> desugarExpr' (S.Construct (S.Iden "list") vs) =
+>     desugarExpr' $ f vs
+>   where
+>     f [] = S.Iden "empty"
+>     f (v:vs') = S.App (S.Iden "link") [v,f vs']
 
 > desugarExpr' x = error $ "desugarExpr': " ++ show x
 
