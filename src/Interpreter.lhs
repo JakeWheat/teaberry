@@ -412,7 +412,11 @@ haskellfunimpls and default env duplicates a bunch of stuff
 
 >     -- misc
 >     ,("raise", \[StrV s] -> throwM $ MyException s)
->     ,("print", \[xx@(StrV x)] -> liftIO (putStrLn x) >> pure xx)
+>     ,("print", \[x] ->
+>              let s = case x of
+>                          StrV v -> v
+>                          _ -> torepr' x
+>              in liftIO (putStrLn s) >> pure (StrV s))
 >     ,("torepr", \[x] -> pure $ torepr x)
 >     ,("to-repr", \[x] -> pure $ torepr x)
 >
