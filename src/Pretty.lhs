@@ -70,8 +70,10 @@
 > expr (App e es) = expr e <> parens (commaSep $ map expr es)
 > expr (UnaryMinus e) = text "-" <> expr e
 > expr (BinOp a op b) = expr a <+> text op <+> expr b
-> expr (Lam bs e) = text "lam" <> parens (commaSep $ map pat bs)
->     <> text ":" <+> nest 2 (expr e) <+> text "end"
+> expr (Lam bs e) = vcat
+>     [text "lam" <> parens (commaSep $ map pat bs) <> text ":"
+>     ,nest 2 (expr e)
+>     ,text "end"]
 > expr (Let bs e) =
 >     vcat [text "let" <+> nest 2 bs' <> text ":"
 >          ,nest 2 (expr e)
@@ -79,8 +81,10 @@
 >   where
 >     bs' | [b] <- bs = binding b
 >         | otherwise = vcommaSep $ map binding bs
-> expr (LetRec bs e) = text "letrec" <+> nest 2 (commaSep $ map binding bs)
->     <> text ":" <+> nest 2 (expr e) <+> text "end"
+> expr (LetRec bs e) = vcat
+>     [text "letrec" <+> nest 2 (commaSep $ map binding bs) <> text ":"
+>     ,nest 2 (expr e)
+>     ,text "end"]
 > expr (Block ss) = vcat [text "block:", nest 2 (stmts ss), text "end"]
 
 > expr (Construct e as) = text "[" <> expr e <> text ":" <+> nest 2 (commaSep $ map expr as) <> text "]"
@@ -131,11 +135,11 @@
 >     f (n,v) = text n <> text ":" <+> expr v
 
 > stmt (RecDecl b) = text "rec" <+> binding b
-> stmt (FunDecl n as e w) =
->      text "fun" <+> text n <+> parens (commaSep $ map pat as) <+> text ":"
->      <+> nest 2 (expr e)
->      <+> maybe empty whereBlock w
->      <+> text "end"
+> stmt (FunDecl n as e w) = vcat
+>      [text "fun" <+> text n <+> parens (commaSep $ map pat as) <> text ":"
+>      ,nest 2 (expr e)
+>      ,maybe empty whereBlock w
+>      ,text "end"]
 
 > stmt (DataDecl nm vs w ) =
 >     text "data" <+> text nm <+> text ":"
@@ -163,7 +167,9 @@
 
 
 > whereBlock :: [Stmt] -> Doc
-> whereBlock ts = text "where:" <+> nest 2 (stmts ts)
+> whereBlock ts = vcat
+>     [text "where:"
+>     ,nest 2 (stmts ts)]
 
 > commaSep :: [Doc] -> Doc
 > commaSep ds = sep $ punctuate comma ds
