@@ -41,6 +41,24 @@ check:
   link(empty, link(empty, [list: ])) is [list: [list:],[list:]]
 end
 
+check:
+  x = [list: 1,2,3]
+  # -> link(1, link(2, link (3,empty)))
+  # test variant binding
+  link(a,b) = x
+  a is 1
+  link(_,link(c,d)) = x
+  c is 2
+  d is [list: 3]
+  w = let link(y,z) = x: {y;z} end
+  w is {1;[list:2,3]}
+  a0 = [list:]
+  # this seems pretty dodgy: pattern match on a no arg variant
+  # instead of binding to an identifier called empty
+  empty = a0
+  # todo: do a raises test with this
+  nothing
+end
 #|
 fun my-is-empty(l):
   cases(List) l:

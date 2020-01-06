@@ -15,9 +15,9 @@ letrec
 > import Data.Generics.Uniplate.Data (transformBi)
 > import Data.Maybe (catMaybes, mapMaybe)
 
-> import Control.Monad.RWS (RWST(..), runRWST, ask, local,state)
+> import Control.Monad.RWS (RWST(..), runRWST, ask, local,state, get)
 > import Control.Monad.Except (Except, runExcept, throwError)
-> import Control.Monad (forM, zipWithM)
+> import Control.Monad (forM, zipWithM, forM_)
 
 > --import Debug.Trace (trace)
 
@@ -69,11 +69,31 @@ good way to do it
 >     {nextCheckBlockNameID :: Int -- the id for the next anonymous check block name
 >     ,nextCheckBlockID :: Int
 >     ,cheapoUnique :: Int
+>     ,variantFields :: [(String,[String])] -- variant name, variant field names
 >     }
 >     deriving (Eq,Show)
 
 > defaultDesugarStore :: DesugarStore
 > defaultDesugarStore = DesugarStore 1 0 0
+>     -- hardcoded list data type
+>     [("empty", [])
+>     ,("link", ["first", "rest"])]
+
+> getVariantFields :: String -> DesugarStack [String]
+> getVariantFields vnt = do
+>     x <- variantFields <$> get
+>     maybe (throwError $ "variant not found: " ++ vnt)
+>          pure $ lookup vnt x
+
+> getVariantNames :: DesugarStack [String]
+> getVariantNames = map fst <$> variantFields <$> get
+
+> addVariantFields :: String -> [String] -> DesugarStack ()
+> addVariantFields vnt fs = do
+>     state $ \s ->
+>         (()
+>         ,s {variantFields = (vnt,fs) : variantFields s})
+
 
 a slightly improved hack to keep moving without getting stuck doing
  this properly yet:
@@ -187,7 +207,13 @@ work without error on any value
 >         w = case whr of
 >              Nothing -> []
 >              Just w' -> [S.Check (Just typenm) w']
->     desugarStmts $ [isT] ++ vnts ++ isVnts ++ w
+>     x <- desugarStmts $ [isT] ++ vnts ++ isVnts ++ w
+>     -- add the variant fields to the env so pattern bindings
+>     -- can be desugared
+>     -- desugar the statements first, otherwise the defintion of the variant
+>     -- desugarers gets desugared to pattern binding
+>     forM_ vs $ \(S.VariantDecl n fs) -> addVariantFields n fs
+>     pure x
 >   where
 >     orEm a b = S.BinOp a "or" b
 >     mkListSel = S.Construct (S.Iden "list")
@@ -206,7 +232,8 @@ pt = lam (x,y): I.App "make-variant" ["pt",[list: {"x",x},{"y",y}]]
 is-pt = lam(x): I.App "variant-name" [x] == "pt"
 
 
-> desugarStmt (S.VarDecl (S.Binding (S.IdenP _ n) e)) = (:[]) <$> (I.LetDecl n . I.Box) <$> desugarExpr' e
+> desugarStmt (S.VarDecl (S.Binding (S.IdenP _ n) e)) =
+>     (:[]) <$> (I.LetDecl n . I.Box) <$> desugarExpr' e
 > desugarStmt (S.VarDecl (S.Binding p _)) = throwError $ "var binding must be name, got " ++ show p
 > desugarStmt (S.SetVar n e) = (:[]) <$> I.SetBox n <$> desugarExpr' e
 
@@ -446,8 +473,13 @@ turn a list of expressions into a nested seq value
 desugar pattern binding
 
 > desugarPatternBinding :: S.Binding -> DesugarStack [(S.Shadow, String, S.Expr)]
-> desugarPatternBinding (S.Binding (S.IdenP s nm) e) =
->     pure [(s,nm,e)]
+> desugarPatternBinding (S.Binding (S.IdenP s nm) e) = do
+>     -- check if nm is a variant name
+>     -- todo: see if we can use shadow to shadow a variant
+>     x <- getVariantNames
+>     if nm `elem` x
+>     then desugarPatternBinding (S.Binding (S.VariantP nm []) e)
+>     else pure [(s,nm,e)]
 
 {x; y} = {1; 2}
 ->
@@ -455,18 +487,77 @@ tmp = {1; 2}
 x = tmp.{0}
 y = tmp.{1}
 
-> desugarPatternBinding (S.Binding (S.TupleP ps) e) = do
->     tmpNm <- getUnique "tmpAs"
->     desugarPatternBinding (S.Binding (S.AsP (S.TupleP ps) S.NoShadow tmpNm) e)
-
 > desugarPatternBinding (S.Binding (S.AsP (S.TupleP ps) s anm) e) = do
+>     -- todo: desugar the tuple to a variant binding instead
+>     -- and recurse
 >     let tmp = (s, anm, e)
 >     let expandIt p f =
 >             desugarPatternBinding
 >                 (S.Binding p (S.TupleGet (S.Iden anm) f))
 >     fs <- zipWithM expandIt ps [0..]
 >     pure (tmp : concat fs)
-> 
+
+link(a,b) as x
+->
+x = link(a,b)
+a = x.first
+b = x.rest
+
+cnm = link : assert this
+ps = a,b
+x = anm
+where to get the names first, rest from?
+these have to be saved into the desugar monad
+  the reason we can find this in a dynamic language
+  is that the variant name uniquely identifies the field names
+  (there is also the type name in the cases syntax, but this is
+   more like an assertion, since it isn't really needed in correct code,
+   and doesn't give enough information on it's own either)
+
+desugar tuples to the same thing instead of via tupleget, to combine
+ the code paths?
+
+problem: this function only returns deconstructed bindings, not a list
+ of statements
+when -> use a hack
+
+anm = e
+_ = block:
+      when variant-name(anm) <> cnm:
+        raise
+      nothing
+    end
+
+> desugarPatternBinding (S.Binding (S.AsP (S.VariantP cnm ps) s anm) e) = do
+>     let a0 = (s, anm, e)
+>     -- assert e.variantname == cnm
+>         msg = S.Sel (S.Str "pattern match failure, expected ")
+>               `plus` S.Sel (S.Str cnm) `plus` S.Sel (S.Str ", got ")
+>               `plus` S.App (S.Iden "variant-name") [S.Iden anm]
+>         a1 = (S.NoShadow, "_", S.Block [
+>               S.When (S.BinOp (S.App (S.Iden "variant-name") [S.Iden anm]) "<>" (S.Sel $ S.Str cnm))
+>                    $ S.App (S.Iden "raise") [msg]])
+>     vfs <- getVariantFields cnm
+>     let expandIt p f =
+>             desugarPatternBinding
+>                 (S.Binding p (S.DotExpr (S.Iden anm) f))
+>     fs <- zipWithM expandIt ps vfs
+>     pure (a0:a1:concat fs)
+>   where
+>     plus a b = S.BinOp a "+" b
+
+
+every variant/tuple/"compound type" without an 'as' gets one added
+automatically
+
+> desugarPatternBinding (S.Binding x e) | wantsAs x = do
+>     tmpNm <- getUnique "tmpAs"
+>     desugarPatternBinding (S.Binding (S.AsP x S.NoShadow tmpNm) e)
+>   where
+>     wantsAs (S.AsP {}) = False
+>     wantsAs (S.IdenP {}) = False
+>     wantsAs _ = True
+
 
 
 > desugarPatternBinding x = error $ "desugar: unsupported type of pattern binding: " ++ show x
