@@ -55,7 +55,7 @@ using a hack sort of ffi for haskell.
 >            | BoolV Bool
 >            | StrV String
 >            | ClosV I.Expr Env
->            | VariantV String -- ctor name
+>            | VariantV String -- variant name
 >                       [(String,Value)] -- fields, is it better to not include the names,
 >                                        -- the desugarer will handle?
 >            | BoxV Int
@@ -524,10 +524,10 @@ haskellfunimpls and default env duplicates a bunch of stuff
 > variantName x = throwM $ MyException $ "variant-name called on " ++ show (length x) ++ " args, should be 1"
 
 > makeVariant :: [Value] -> Interpreter Value
-> makeVariant [StrV ctor, listargs] = do
+> makeVariant [StrV vnt, listargs] = do
 >     vs <- listToHaskList listargs
 >     cd <- mapM unpackTuple vs
->     pure $ VariantV ctor cd
+>     pure $ VariantV vnt cd
 >   where
 >     unpackTuple (VariantV "tuple" [(_,StrV nm),(_,v)]) = pure (nm,v)
 >     unpackTuple x = throwM $ MyException $ "value in list in make-variant, expected tuple of name and val, got " ++ show x

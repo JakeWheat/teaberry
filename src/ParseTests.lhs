@@ -191,7 +191,7 @@ todo: review all the whitespace rules that are being ignored
 >       \end"
 >      ,Cases "List" (Construct (Iden "list") [num 1, num 2, num 3])
 >         [(IdenP NoShadow "empty", Sel $ Str "empty")
->         ,(CtorP "link" [IdenP NoShadow "f", IdenP NoShadow "r"], Sel $ Str "link")]
+>         ,(VariantP "link" [IdenP NoShadow "f", IdenP NoShadow "r"], Sel $ Str "link")]
 >         Nothing)
 
 >     ,("cases(List) [list: 1,2,3]:\n\
@@ -211,7 +211,7 @@ todo: review all the whitespace rules that are being ignored
 >                                             ,Sel $ Tuple [Sel $ Str "b", num 2]
 >                                             ,Sel $ Tuple [Sel $ Str "c", num 3]])
 >         [(IdenP NoShadow "empty", Sel $ Str "empty")
->         ,(CtorP "link" [TupleP [IdenP NoShadow "x", IdenP NoShadow "y"], IdenP NoShadow "r"], Iden "x")]
+>         ,(VariantP "link" [TupleP [IdenP NoShadow "x", IdenP NoShadow "y"], IdenP NoShadow "r"], Iden "x")]
 >         (Just $ Sel $ Str "else"))
 
 

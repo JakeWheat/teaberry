@@ -166,24 +166,24 @@ when a fun or rec is seen, it will collect subsequent funs and recs
 >         isT = S.LetDecl (S.Binding (S.IdenP S.NoShadow ("is-" ++ typenm))
 >               $ S.Lam [S.IdenP S.Shadow "x"] (S.Let [S.Binding (S.IdenP S.Shadow "vn") vnofx]
 >                        (foldr orEm (S.Iden "false") eqVariants)))
->     -- variant constructors
->         mkC :: String -> [String] -> S.Stmt
->         mkC ctnm fs = S.LetDecl (S.Binding (S.IdenP S.NoShadow ctnm)
+>     -- variant selectors
+>         mkV :: String -> [String] -> S.Stmt
+>         mkV ctnm fs = S.LetDecl (S.Binding (S.IdenP S.NoShadow ctnm)
 >                                  $ S.Lam (map (S.IdenP S.Shadow) fs) $ S.App
 >              (S.Iden "make-variant")
 >              [S.Sel (S.Str ctnm)
 >              ,mkListSel $ map (\a -> S.Sel $ S.Tuple [S.Sel $ S.Str a, S.Iden a]) fs])
->         ctors = map (\(S.VariantDecl nm fs) -> mkC nm fs) vs
->     -- is-ctor fns
->         mkIsCt ctnm = S.LetDecl (S.Binding (S.IdenP S.NoShadow ("is-" ++ ctnm))
+>         vnts = map (\(S.VariantDecl nm fs) -> mkV nm fs) vs
+>     -- is-variant fns
+>         mkIsVnt ctnm = S.LetDecl (S.Binding (S.IdenP S.NoShadow ("is-" ++ ctnm))
 >                                $ S.Lam [S.IdenP S.Shadow "x"] $ S.BinOp (S.App (S.Iden "variant-name") [S.Iden "x"])
 >                                "==" (S.Sel $ S.Str ctnm))
->         isCtors = map (\(S.VariantDecl nm _) -> mkIsCt nm) vs
+>         isVnts = map (\(S.VariantDecl nm _) -> mkIsVnt nm) vs
 >     -- where block
 >         w = case whr of
 >              Nothing -> []
 >              Just w' -> [S.Check (Just typenm) w']
->     desugarStmts $ [isT] ++ ctors ++ isCtors ++ w
+>     desugarStmts $ [isT] ++ vnts ++ isVnts ++ w
 >   where
 >     orEm a b = S.BinOp a "or" b
 >     mkListSel = S.Construct (S.Iden "list")
@@ -415,9 +415,7 @@ end
 >     desugarExpr' (S.App (S.Iden "variant-field-get") [e, S.Sel $ S.Str f])
 
 special case for lists and bootstrapping, the desugar knows the
-implementation of list "construct" (which is not a haskell constructor)
-todo: think some more about construct, selector, haskell constructors,
-variant 'tags'? and jargon used in this system#
+implementation of list "constructor"
 does pyret have a consistent set that can be used here?
 
 > desugarExpr' (S.Construct (S.Iden "list") vs) =

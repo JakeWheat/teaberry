@@ -5,17 +5,24 @@ Goal is to implement a dialect of Pyret in Haskell, with a high level
 interpreter, to learn how to implement functional programming + a
 basic type system.
 
-sketch
+Not ready for human consumption yet, see the examples dir for
+progress:
 
-mostly pyret concrete syntax
+https://github.com/JakeWheat/teaberry/tree/master/examples/tests/fulltests
+
+sketch of early approximate target
+
+mostly pyret syntax to start with
 strict/eager
 basic functional programming: functions as values + closures
 algebraic data types + pattern binding
+typed only, with inference
 parametric polymorphism
 type classes
-non whitespace significant
-typed only, with inference
+non whitespace significant (except maybe copying some of pyret, but
+  not indentation significant)
 no purity tracking in the type system
+  (to be reviewed)
 exceptions
 garbage collection
 resource management

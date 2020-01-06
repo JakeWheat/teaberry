@@ -62,7 +62,7 @@ The high level syntax which the parser produces
 >           deriving (Eq,Show,Data,Typeable,Generic) 
 
 > data Pat = IdenP Shadow String
->          | CtorP String [Pat]
+>          | VariantP String [Pat]
 >          | TupleP [Pat]
 >          | AsP Pat String
 >           deriving (Eq,Show,Data,Typeable,Generic) 

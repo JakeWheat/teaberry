@@ -371,17 +371,17 @@ todo: remove the trys by implementing a proper lexer or a lexer style
 > pat :: Parser Pat
 > pat = choice
 >       [(IdenP <$> option NoShadow (Shadow <$ keyword_ "shadow")
->               <*> identifier) <**> option id ctorPSuffix
+>               <*> identifier) <**> option id vntPSuffix
 >       ,TupleP <$> (symbol_ "{" *> xSep ';' pat <* symbol_ "}")]
 >       <**> option id asPatSuffix
 
 > asPatSuffix :: Parser (Pat -> Pat)
 > asPatSuffix = flip AsP <$> (keyword_ "as" *> identifier)
 
-> ctorPSuffix :: Parser (Pat -> Pat)
-> ctorPSuffix = do
+> vntPSuffix :: Parser (Pat -> Pat)
+> vntPSuffix = do
 >     x <- parens (commaSep pat)
->     pure (\(IdenP NoShadow y) -> CtorP y x)
+>     pure (\(IdenP NoShadow y) -> VariantP y x)
 
 
 put all the parsers which start with a keyword first
@@ -455,7 +455,7 @@ works
 
 > patternSyntaxToExpr :: Pat -> Expr
 > patternSyntaxToExpr (IdenP NoShadow s) = Iden s
-> patternSyntaxToExpr (CtorP s p) = App (Iden s) $ map patternSyntaxToExpr p
+> patternSyntaxToExpr (VariantP s p) = App (Iden s) $ map patternSyntaxToExpr p
 > patternSyntaxToExpr (TupleP es) = Sel $ Tuple $ map patternSyntaxToExpr es
 > --patternSyntaxToExpr (AsP {}) = Nothing
 

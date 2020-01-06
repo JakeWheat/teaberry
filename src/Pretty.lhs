@@ -99,7 +99,7 @@
 >                        NoShadow -> empty
 >                        Shadow -> text "shadow")
 >                   <+> text p
-> pat (CtorP c ps) = text c <> parens (commaSep $ map pat ps)
+> pat (VariantP c ps) = text c <> parens (commaSep $ map pat ps)
 > pat (TupleP ps) = text "{" <> (xSep ";" $ map pat ps) <> text "}"
 > pat (AsP p nm) = pat p <+> text "as" <+> text nm
 
