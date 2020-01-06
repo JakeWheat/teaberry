@@ -157,6 +157,10 @@ when a fun or rec is seen, it will collect subsequent funs and recs
 >    defs <- desugarRecs [b]
 >    desugarStmts $ map S.LetDecl defs
 
+
+the is- functions use safe-variant-name since they are supposed to
+work without error on any value
+
 > desugarStmt (S.DataDecl typenm vs whr) = do
 >     -- is-typenm
 >     let variantNames = map (\(S.VariantDecl nm _) -> nm) vs
@@ -451,10 +455,10 @@ y = tmp.{1}
 
 > desugarPatternBinding (S.Binding (S.TupleP ps) e) = do
 >     tmpNm <- getUnique "tmpAs"
->     desugarPatternBinding (S.Binding (S.AsP (S.TupleP ps) tmpNm) e)
+>     desugarPatternBinding (S.Binding (S.AsP (S.TupleP ps) S.NoShadow tmpNm) e)
 
-> desugarPatternBinding (S.Binding (S.AsP (S.TupleP ps) anm) e) = do
->     let tmp = (S.NoShadow, anm, e)
+> desugarPatternBinding (S.Binding (S.AsP (S.TupleP ps) s anm) e) = do
+>     let tmp = (s, anm, e)
 >     let expandIt p f =
 >             desugarPatternBinding
 >                 (S.Binding p (S.TupleGet (S.Iden anm) f))

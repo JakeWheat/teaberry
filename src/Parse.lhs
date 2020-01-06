@@ -112,7 +112,7 @@ fixity parser either
 
 > whiteSpace :: Parser ()
 > whiteSpace = space *> choice [blockComment *> whiteSpace
->                              , lineComment *> whiteSpace
+>                              ,lineComment *> whiteSpace
 >                              ,pure ()] <?> ""
 
 > lineComment :: Parser ()
@@ -376,7 +376,10 @@ todo: remove the trys by implementing a proper lexer or a lexer style
 >       <**> option id asPatSuffix
 
 > asPatSuffix :: Parser (Pat -> Pat)
-> asPatSuffix = flip AsP <$> (keyword_ "as" *> identifier)
+> asPatSuffix = f <$> (keyword_ "as" *> option NoShadow (Shadow <$ keyword_ "shadow"))
+>                 <*> identifier
+>    where
+>      f a b c = AsP c a b
 
 > vntPSuffix :: Parser (Pat -> Pat)
 > vntPSuffix = do

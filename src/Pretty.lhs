@@ -107,7 +107,13 @@
 >                   <+> text p
 > pat (VariantP c ps) = text c <> parens (commaSep $ map pat ps)
 > pat (TupleP ps) = text "{" <> (xSep ";" $ map pat ps) <> text "}"
-> pat (AsP p nm) = pat p <+> text "as" <+> text nm
+> pat (AsP p s nm) =
+>     pat p
+>     <+> text "as"
+>     <+> (case s of
+>                 NoShadow -> empty
+>                 Shadow -> text "shadow")
+>     <+> text nm
 
 > stmt :: Stmt -> Doc
 > stmt (StExpr e) = expr e

@@ -64,7 +64,7 @@ The high level syntax which the parser produces
 > data Pat = IdenP Shadow String
 >          | VariantP String [Pat]
 >          | TupleP [Pat]
->          | AsP Pat String
+>          | AsP Pat Shadow String
 >           deriving (Eq,Show,Data,Typeable,Generic) 
 
 > data Shadow = NoShadow | Shadow

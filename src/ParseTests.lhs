@@ -236,8 +236,15 @@ todo: review all the whitespace rules that are being ignored
 >                (Iden "x")))
 >
 >     ,("{w; x} as wx = z"
->      ,LetDecl (Binding (AsP (TupleP [IdenP NoShadow "w", IdenP NoShadow "x"]) "wx")
+>      ,LetDecl (Binding (AsP (TupleP [IdenP NoShadow "w", IdenP NoShadow "x"]) NoShadow "wx")
 >       (Iden "z")))
+
+>     ,("{w; x} as shadow wx = z"
+>      ,LetDecl (Binding (AsP (TupleP [IdenP NoShadow "w", IdenP NoShadow "x"]) Shadow "wx")
+>       (Iden "z")))
+
+
+
 >     ,("data BTree:\n\
 >       \  | node(value, left, right)\n\
 >       \  | leaf(value)\n\
