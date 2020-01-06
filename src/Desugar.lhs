@@ -59,11 +59,15 @@ good way to do it
 
 > data DesugarReader = DesugarReader
 >     {inCheckBlockID :: Maybe Int -- just iff in a check block
->     }
->     deriving (Eq,Show)
+>     ,variablesEnv :: [String] -- store the names of variables in scope
+>                               -- so these can be desugared differently
+>     } deriving (Eq,Show)
 
 > defaultDesugarReader :: DesugarReader
-> defaultDesugarReader = DesugarReader Nothing
+> defaultDesugarReader = DesugarReader Nothing []
+
+> addVariableName :: String -> DesugarReader -> DesugarReader
+> addVariableName v r = r {variablesEnv = v:variablesEnv r}
 
 > data DesugarStore = DesugarStore
 >     {nextCheckBlockNameID :: Int -- the id for the next anonymous check block name
@@ -146,7 +150,15 @@ when a fun or rec is seen, it will collect subsequent funs and recs
 >     convRec (S.RecDecl b) = Just (b, Nothing)
 >     convRec _ = Nothing
 
-> desugarStmts (s:ss) = (++) <$> desugarStmt s <*> desugarStmts ss
+> desugarStmts (s:ss) = do
+>     -- if it's a variable, add to the env
+>     xs <- desugarStmt s
+>     ys <- case s of
+>               S.VarDecl (S.Binding (S.IdenP _ n) _) -> do
+>                   local (addVariableName n) $ desugarStmts ss
+>               _ -> desugarStmts ss
+>     pure (xs ++ ys)
+
 > desugarStmts [] = pure []
 
 
@@ -235,7 +247,7 @@ is-pt = lam(x): I.App "variant-name" [x] == "pt"
 > desugarStmt (S.VarDecl (S.Binding (S.IdenP _ n) e)) =
 >     (:[]) <$> (I.LetDecl n . I.Box) <$> desugarExpr' e
 > desugarStmt (S.VarDecl (S.Binding p _)) = throwError $ "var binding must be name, got " ++ show p
-> desugarStmt (S.SetVar n e) = (:[]) <$> I.SetBox n <$> desugarExpr' e
+> desugarStmt (S.SetVar n e) = (:[]) <$> I.SetBox (I.Iden n) <$> desugarExpr' e
 
 ------------------------------------------------------------------------------
 
@@ -374,7 +386,14 @@ end
 > desugarExpr' (S.Sel (S.Str s)) = pure $ I.Sel (I.Str s)
 > desugarExpr' (S.Sel S.NothingS) = pure $ I.Sel I.NothingS
 > desugarExpr' (S.Iden "_") = throwError "'_' in expression context"
-> desugarExpr' (S.Iden i) = pure $ I.Iden i
+
+> desugarExpr' (S.Iden i) = do
+>     -- see if it's a variable
+>     vs <- variablesEnv <$> ask
+>     if i `elem` vs
+>       then pure $ I.Unbox (I.Iden i)
+>       else pure $ I.Iden i
+> 
 > desugarExpr' (S.Parens e) = desugarExpr' e
 > desugarExpr' (S.Ask b e) = desugarExpr' (S.If b e)
 

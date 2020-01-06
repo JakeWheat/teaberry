@@ -68,6 +68,7 @@ convert nested single arg apps into multi arg apps
 >     f bs (I.Let nm' v' e') = f ((nm',resugarExpr v'):bs) e'
 >     f bs e' = S.Let (map (\(a,b) -> S.Binding (S.IdenP S.NoShadow a) b) $ reverse bs) $ resugarExpr e'
 
+> resugarExpr (I.Unbox x) = S.App (S.Iden "unbox") [resugarExpr x]
 
 
 convert a sequence of seqs to a flat block
@@ -78,7 +79,7 @@ convert a sequence of seqs to a flat block
 >   where
 >     getSqs (I.Seq a b) = unwrap a : getSqs b
 >     getSqs e = [unwrap e]
->     unwrap (I.SetBox s e) = S.StExpr $ S.App (S.Iden "setbox") [resugarExpr (I.Iden s),resugarExpr e]
+>     unwrap (I.SetBox s e) = S.StExpr $ S.App (S.Iden "setbox") [resugarExpr s,resugarExpr e]
 >     unwrap (I.LetDecl nm e) = S.LetDecl $ S.Binding (S.IdenP S.NoShadow nm) (resugarExpr e)
 >     unwrap x = S.StExpr $ resugarExpr x
 
@@ -86,5 +87,5 @@ convert a sequence of seqs to a flat block
 
 adding a block here is wrong, it's a hack
 
-> resugarExpr (I.SetBox s e) =  S.Block [S.SetVar s (resugarExpr e)]
+> resugarExpr (I.SetBox (I.Iden s) e) =  S.Block [S.SetVar s (resugarExpr e)]
 > resugarExpr (I.LetDecl nm e) = S.Block [S.LetDecl $ S.Binding (S.IdenP S.NoShadow nm) (resugarExpr e)]

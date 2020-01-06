@@ -203,13 +203,8 @@ interpreters for syntax nodes
 
 > interp (I.Iden e) = do
 >     rd <- ask
->     v <- maybe (throwM $ MyException $ "Identifier not found: " ++ e)
+>     maybe (throwM $ MyException $ "Identifier not found: " ++ e)
 >         pure $ lookupEnv e (irEnv rd)
->     case v of
->         BoxV i -> do
->                   st <- get
->                   fetchStore i (isStore st)
->         _ -> pure v
 >   
 > interp _x@(I.If c t e) = do
 >    c' <- interp c
@@ -258,18 +253,21 @@ it
 >     local (updateIREnv (extendEnv nm v)) $ interp b
 > interp (I.Seq a b) = interp a >> interp b
 
+> interp (I.Unbox e) = do
+>     v <- interp e
+>     case v of
+>         BoxV i -> do
+>                   st <- get
+>                   fetchStore i (isStore st)
+>         _ -> throwM $ MyException $ "Unbox on non box: " ++ torepr' v
+
+
 > interp (I.Box e) = do
 >     v <- interp e
->     i <- state $ \s ->
->          let i = newStoreLoc (isStore s)
->          in (i, updateISStore (extendStore i v) s)
->     pure $ BoxV i
+>     box v
 
 > interp (I.SetBox b v) = do
->     b' <- do
->           env <- irEnv <$> ask
->           maybe (throwM $ MyException $ "Identifier not found: " ++ b)
->               pure $ lookupEnv b env
+>     b' <- interp b
 >     v' <- interp v
 >     i <- case b' of
 >              BoxV i -> pure i
@@ -282,6 +280,15 @@ it
 > interp x@(I.LetDecl {}) = error $ "Interpreter: block ends with let: " ++ prettyExpr x
 
 > --interp x = error $ "Interpreter: interp " ++ show x
+
+
+
+> box :: Value -> Interpreter Value
+> box v = do
+>     i <- state $ \s ->
+>          let i = newStoreLoc (isStore s)
+>          in (i, updateISStore (extendStore i v) s)
+>     pure $ BoxV i
 
 
 ------------------------------------------------------------------------------

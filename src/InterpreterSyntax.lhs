@@ -25,7 +25,8 @@ TODO: add provides and imports
 >           | AppHaskell String [Expr]
 >           | Seq Expr Expr
 >           | Box Expr
->           | SetBox String Expr
+>           | SetBox Expr Expr
+>           | Unbox Expr
 >           | LetDecl String Expr
 >           deriving (Eq,Show)
 
