@@ -13,16 +13,10 @@ The state value contains the store for read/write values, and logs the
 callbacks for the tests (which are gathered during script execution,
 and then executed at the end).
 
-The test results are put to the writer. No particular reason other
-than it's there, maybe it would be more legit to put them in the
-state.
+The test results are put to the state.
 
 After the interpretation finishes, the test log is turned into test
 results for the user api.
-
-The code is a little confused about variables and boxes right
-now. This will be fixed when agdt then refs are implemented so users
-can use both variables and explicit boxes.
 
 The system comes with a small standard lib (really small) implemented
 using a hack sort of ffi for haskell.

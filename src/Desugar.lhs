@@ -3,10 +3,12 @@ Desugaring from the high level syntax to the interpreter syntax.
 
 The non trivial parts are
 
-the test (check:, example:, where:)
+the testing support (check:, example:, where:)
 data decls
 pattern desugaring
 letrec
+ref update
+cases
 
 
 > {-# LANGUAGE TupleSections #-}
