@@ -160,7 +160,7 @@ when a fun or rec is seen, it will collect subsequent funs and recs
 > desugarStmt (S.DataDecl typenm vs whr) = do
 >     -- is-typenm
 >     let variantNames = map (\(S.VariantDecl nm _) -> nm) vs
->         vnofx = S.App (S.Iden "variant-name") [S.Iden "x"]
+>         vnofx = S.App (S.Iden "safe-variant-name") [S.Iden "x"]
 >         eqVariants = map (\n -> S.App (S.Iden "==") [S.Iden "vn", S.Sel $ S.Str n]) variantNames
 >         
 >         isT = S.LetDecl (S.Binding (S.IdenP S.NoShadow ("is-" ++ typenm))
@@ -176,7 +176,7 @@ when a fun or rec is seen, it will collect subsequent funs and recs
 >         vnts = map (\(S.VariantDecl nm fs) -> mkV nm fs) vs
 >     -- is-variant fns
 >         mkIsVnt ctnm = S.LetDecl (S.Binding (S.IdenP S.NoShadow ("is-" ++ ctnm))
->                                $ S.Lam [S.IdenP S.Shadow "x"] $ S.BinOp (S.App (S.Iden "variant-name") [S.Iden "x"])
+>                                $ S.Lam [S.IdenP S.Shadow "x"] $ S.BinOp (S.App (S.Iden "safe-variant-name") [S.Iden "x"])
 >                                "==" (S.Sel $ S.Str ctnm))
 >         isVnts = map (\(S.VariantDecl nm _) -> mkIsVnt nm) vs
 >     -- where block

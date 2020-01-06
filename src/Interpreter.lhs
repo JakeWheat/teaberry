@@ -407,6 +407,7 @@ haskellfunimpls and default env duplicates a bunch of stuff
 >                      [NumV a, NumV b] -> pure $ BoolV (a > b)
 >                      _ -> throwM $ MyException $ "< needs two num args, got " ++ listToRepr x)
 >     ,("==", \[a, b] -> pure $ BoolV (a == b))
+>     ,("<>", \[a, b] -> pure $ BoolV (a /= b))
 
 >     -- boolean ops
 >     ,("and", \[BoolV a, BoolV b] -> pure $ BoolV (a && b))
@@ -437,6 +438,7 @@ haskellfunimpls and default env duplicates a bunch of stuff
 >
 >     ,("make-variant", makeVariant)
 >     ,("variant-name", variantName)
+>     ,("safe-variant-name", safeVariantName)
 >     ,("variant-field-get", \[v@(VariantV _ fs), StrV x] -> do
 >              maybe (throwM $ MyException $ "variant field not found " ++ x ++ ": " ++ torepr' v)
 >                         pure
@@ -455,6 +457,7 @@ haskellfunimpls and default env duplicates a bunch of stuff
 >     ,liftBinOp "+"
 >     ,liftBinOp "-"
 >     ,liftBinOp "=="
+>     ,liftBinOp "<>"
 >     ,liftBinOp "<"
 >     ,liftBinOp ">"
 >     ,liftBinOp "and"
@@ -474,6 +477,7 @@ haskellfunimpls and default env duplicates a bunch of stuff
 >     ,liftUnOp "is-link"
 >     ,liftUnOp "is-list"
 >     ,liftUnOp "variant-name"
+>     ,liftUnOp "safe-variant-name"
 >     ,liftBinOp "make-variant"
 >     ] emptyEnv
 >   where
@@ -535,8 +539,14 @@ haskellfunimpls and default env duplicates a bunch of stuff
 
 > variantName :: [Value] -> Interpreter Value
 > variantName [VariantV x _] = pure $ StrV x
-> variantName [_] = pure $ StrV "nowt"
+> variantName [x] = throwM $ MyException $ "variant-name called on non variant: " ++ torepr' x
 > variantName x = throwM $ MyException $ "variant-name called on " ++ show (length x) ++ " args, should be 1"
+
+> safeVariantName :: [Value] -> Interpreter Value
+> safeVariantName [VariantV x _] = pure $ StrV x
+> safeVariantName [_] = pure NothingV
+> safeVariantName x = throwM $ MyException $ "safe-variant-name called on " ++ show (length x) ++ " args, should be 1"
+
 
 > makeVariant :: [Value] -> Interpreter Value
 > makeVariant [StrV vnt, listargs] = do
