@@ -49,13 +49,14 @@
 >     vcat (prettyCs cs ++ pel el ++ [text "end"])
 >   where
 >     prettyCs [] = []
->     prettyCs ((c,t):cs') = (text "if" <+> expr c <> text ":"
->                            <+> nest 2 (expr t))
->                            : map prettyEx cs'
->     prettyEx (c,t) = text "else" <+> text "if" <+> expr c <> text ":"
->                      <+> nest 2 (expr t)
+>     prettyCs ((c,t):cs') = [text "if" <+> expr c <> text ":"
+>                            ,nest 2 (expr t)]
+>                            ++ concat (map prettyEx cs')
+>     prettyEx (c,t) = [text "else" <+> text "if" <+> expr c <> text ":"
+>                      ,nest 2 (expr t)]
 >     pel Nothing = []
->     pel (Just e) = [text "else:" <+> nest 2 (expr e)]
+>     pel (Just e) = [text "else:"
+>                    ,nest 2 (expr e)]
 
 > expr (Ask cs el) =
 >     vcat [text "ask:", nest 2 (vcat (map prettyC cs ++ pel el)), text "end"]
@@ -70,8 +71,13 @@
 > expr (BinOp a op b) = expr a <+> text op <+> expr b
 > expr (Lam bs e) = text "lam" <> parens (commaSep $ map pat bs)
 >     <> text ":" <+> nest 2 (expr e) <+> text "end"
-> expr (Let bs e) = text "let" <+> nest 2 (commaSep $ map binding bs)
->     <> text ":" <+> nest 2 (expr e) <+> text "end"
+> expr (Let bs e) =
+>     vcat [text "let" <+> nest 2 bs' <> text ":"
+>          ,nest 2 (expr e)
+>          ,text "end"]
+>   where
+>     bs' | [b] <- bs = binding b
+>         | otherwise = vcommaSep $ map binding bs
 > expr (LetRec bs e) = text "letrec" <+> nest 2 (commaSep $ map binding bs)
 >     <> text ":" <+> nest 2 (expr e) <+> text "end"
 > expr (Block ss) = vcat [text "block:", nest 2 (stmts ss), text "end"]
@@ -145,6 +151,10 @@
 
 > commaSep :: [Doc] -> Doc
 > commaSep ds = sep $ punctuate comma ds
+
+> vcommaSep :: [Doc] -> Doc
+> vcommaSep ds = vcat $ punctuate comma ds
+
 
 > xSep :: String -> [Doc] -> Doc
 > xSep x ds = sep $ punctuate (text x) ds
