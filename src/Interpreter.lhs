@@ -42,10 +42,11 @@ using a hack sort of ffi for haskell.
 > import Control.Monad.Trans.RWS (RWST, runRWST, ask, get, {-put,-} local, {-tell,-} state)
 > import Data.List (partition, intercalate)
 > import Data.Scientific (Scientific)
-> import Text.Show.Pretty (ppShow)
+> --import Text.Show.Pretty (ppShow)
 
 > import qualified InterpreterSyntax as I
 > import Syntax (extractInt)
+> import PrettyInterpreter (prettyExpr)
 
 ------------------------------------------------------------------------------
 
@@ -215,7 +216,7 @@ interpreters for syntax nodes
 >    case c' of
 >        BoolV True -> interp t
 >        BoolV False -> interp e
->        _ -> throwM $ MyException $ "expected bool in if test, got " ++ show c'
+>        _ -> throwM $ MyException $ "expected bool in if test, got " ++ torepr' c'
 
 the AppHaskell is only used in the default ffi env, the desugarer never produces
 it
@@ -242,9 +243,9 @@ it
 >         ClosV (I.LamVoid bdy) env' -> do
 >              case a of
 >                  I.Sel I.NothingS -> local (updateIREnv (const env')) $ interp bdy
->                  _ -> throwM $ MyException $ "0 arg lambda called with something other than literal nothing: " ++ show a
->         ClosV ee _ -> throwM $ MyException $ "non lambda in closure expression: " ++ show ee
->         _ -> throwM $ MyException $ "non function in app position: " ++ show x
+>                  _ -> throwM $ MyException $ "0 arg lambda called with something other than literal nothing: " ++ prettyExpr a
+>         ClosV ee _ -> throwM $ MyException $ "non lambda in closure expression: " ++ prettyExpr ee
+>         _ -> throwM $ MyException $ "non function in app position: " ++ torepr' x
 
 > interp (I.Let nm v bdy) = do
 >     v' <- interp v
@@ -272,14 +273,15 @@ it
 >     v' <- interp v
 >     i <- case b' of
 >              BoxV i -> pure i
->              _ -> throwM $ MyException $ "attemped to setbox non box value: " ++ show b'
+>              _ -> throwM $ MyException $ "attemped to setbox non box value: " ++ torepr' b'
 >     state $ \s ->
 >         ((), updateISStore (extendStore i v') s)
 >     pure v'
 
-> interp x = error $ "Interpreter: interp " ++ show x
 
+> interp x@(I.LetDecl {}) = error $ "Interpreter: block ends with let: " ++ prettyExpr x
 
+> --interp x = error $ "Interpreter: interp " ++ show x
 
 
 ------------------------------------------------------------------------------
@@ -387,22 +389,22 @@ haskellfunimpls and default env duplicates a bunch of stuff
 >      ("+", \x -> case x of
 >                      [StrV a, StrV b] -> pure $ StrV (a ++ b)
 >                      [NumV a, NumV b] -> pure $ NumV (a + b)
->                      _ -> throwM $ MyException $ "Interpreter: plus implementation" ++ show x)
+>                      _ -> throwM $ MyException $ "Interpreter: plus implementation" ++ listToRepr x)
 >     ,("-", \[NumV a, NumV b] -> pure $ NumV (a - b))
 >     ,("*", \x -> case x of
 >                      [NumV a, NumV b] -> pure $ NumV (a * b)
->                      _ -> throwM $ MyException $ "* needs two num args, got " ++ ppShow x)
+>                      _ -> throwM $ MyException $ "* needs two num args, got " ++ listToRepr x)
 >     ,("/", \x -> case x of
 >                      [NumV a, NumV b] -> pure $ NumV (a / b)
->                      _ -> throwM $ MyException $ "/ needs two num args, got " ++ ppShow x)
+>                      _ -> throwM $ MyException $ "/ needs two num args, got " ++ listToRepr x)
 >     -- comparisons - needs some work
 >     ,("<", \x -> case x of
 >                      [NumV a, NumV b] -> pure $ BoolV (a < b)
->                      _ -> throwM $ MyException $ "< needs two num args, got " ++ ppShow x)
+>                      _ -> throwM $ MyException $ "< needs two num args, got " ++ listToRepr x)
 
 >     ,(">", \x -> case x of
 >                      [NumV a, NumV b] -> pure $ BoolV (a > b)
->                      _ -> throwM $ MyException $ "< needs two num args, got " ++ ppShow x)
+>                      _ -> throwM $ MyException $ "< needs two num args, got " ++ listToRepr x)
 >     ,("==", \[a, b] -> pure $ BoolV (a == b))
 
 >     -- boolean ops
@@ -413,9 +415,7 @@ haskellfunimpls and default env duplicates a bunch of stuff
 >     -- misc
 >     ,("raise", \[StrV s] -> throwM $ MyException s)
 >     ,("print", \[x] ->
->              let s = case x of
->                          StrV v -> v
->                          _ -> torepr' x
+>              let s = torepr' x
 >              in liftIO (putStrLn s) >> pure (StrV s))
 >     ,("torepr", \[x] -> pure $ torepr x)
 >     ,("to-repr", \[x] -> pure $ torepr x)
@@ -437,7 +437,7 @@ haskellfunimpls and default env duplicates a bunch of stuff
 >     ,("make-variant", makeVariant)
 >     ,("variant-name", variantName)
 >     ,("variant-field-get", \[v@(VariantV _ fs), StrV x] -> do
->              maybe (throwM $ MyException $ "variant field not found " ++ x ++ ": " ++ show v)
+>              maybe (throwM $ MyException $ "variant field not found " ++ x ++ ": " ++ torepr' v)
 >                         pure
 >                         $ lookup x fs)
 
@@ -481,6 +481,9 @@ haskellfunimpls and default env duplicates a bunch of stuff
 >      liftTriOp f = (f, ClosV (I.Lam "a" (I.Lam "b" (I.Lam "c"
 >                         (I.AppHaskell f [I.Iden "a", I.Iden "b", I.Iden "c"])))) emptyEnv)
 
+> listToRepr :: [Value] -> String
+> listToRepr = intercalate "," . map torepr'
+
 > torepr :: Value -> Value
 > torepr = StrV . torepr'
  
@@ -498,12 +501,16 @@ haskellfunimpls and default env duplicates a bunch of stuff
 >     getList _ = Nothing -- (VariantV "list" (x:xs))
 >   
 > torepr' (VariantV "empty" []) = "empty"
-> torepr' (VariantV "link" [("first",x),("rest",xs)]) =
->     "link(" ++ torepr' x ++ ", " ++ torepr' xs ++ ")"
+
+> torepr' (VariantV v fs) =
+>     v ++ "(" ++ intercalate ", " (map (torepr' . snd) fs) ++ ")"
+
+> torepr' (BoxV x) = "Box " ++ show x
+
+> torepr' (StrV s) = s
 
 > torepr' NothingV = "nothing"
 
-> torepr' x = error $ "Interpreter: torepr implementation " ++ show x
 
 > listLink :: [Value] -> Interpreter Value
 > listLink [v1, v2] = pure $ VariantV "link" [("first", v1)
@@ -543,4 +550,4 @@ haskellfunimpls and default env duplicates a bunch of stuff
 > listToHaskList :: Value -> Interpreter [Value]
 > listToHaskList (VariantV "empty" []) = pure []
 > listToHaskList (VariantV "link" [("first",v),("rest",x)]) = (v:) <$> listToHaskList x
-> listToHaskList x = throwM $ MyException $ "interpreter: listToHaskList: " ++ show x
+> listToHaskList x = throwM $ MyException $ "interpreter: listToHaskList: " ++ torepr' x
