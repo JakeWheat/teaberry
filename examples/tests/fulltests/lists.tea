@@ -59,7 +59,33 @@ check:
   # todo: do a raises test with this
   nothing
 end
-#|
+
+check:
+  x = [list:1]
+  cases(list) x:
+    | empty => true
+    | else => false
+  end is false
+
+  shadow x = [list:]
+  cases(list) x:
+    | empty => true
+    | else => false
+  end is true
+
+  shadow x = [list:1]
+  cases(list) x:
+    | link(a,b) => block:
+        a is 1
+        b is empty
+        nothing
+      end
+    | else => nothing
+  end
+  
+end
+
+
 fun my-is-empty(l):
   cases(List) l:
     | empty => true
@@ -81,6 +107,5 @@ check:
   my-is-empty(l2) is false
 
   length(l1) is 0
-  length(l2) is 2
+  length(l2) is 3
 end
-|#

@@ -26,10 +26,49 @@ end
 t1 = pt1(1,2)
 t2 = pt2(3,4)
 
+fun pf(a,n):
+  cases (Two) a:
+    | pt1(x,y) => if n == 0: x else: y end
+    | pt2(x,y) => if n == 0: x else: y end
+  end
+end
+
 check:
   is-pt1(t1) is true
   is-pt2(t1) is false
   is-pt1(t2) is false
   is-pt2(t2) is true
+  pf(t1,0) is 1
+  pf(t1,1) is 2
+  pf(t2,0) is 3
+  pf(t2,1) is 4
+  
 end
 
+
+
+data BTree:
+  | node(value #|:: Number|#, left #|:: BTree|#, right #|:: BTree|#)
+  | leaf(value #|:: Number|#)
+where:
+  a-btree = node(1, leaf(2), node(3, leaf(4), leaf(5)))
+
+  is-BTree(a-btree) is true
+  is-BTree("not-a-tree") is false
+  is-BTree(leaf(5)) is true
+  is-leaf(leaf(5)) is true
+  is-leaf(a-btree) is false
+  is-leaf("not-a-tree") is false
+  is-node(leaf(5)) is false
+  is-node(a-btree) is true
+  is-node("not-a-tree") is false
+
+  a-btree.value is 1
+  a-btree.left.value is 2
+  a-btree.right.value is 3
+  a-btree.right.left.value is 4
+  a-btree.right.right.value is 5
+
+end
+
+nothing

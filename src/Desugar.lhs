@@ -451,6 +451,39 @@ does pyret have a consistent set that can be used here?
 >     f [] = S.Iden "empty"
 >     f (v:vs') = S.App (S.Iden "link") [v,f vs']
 
+desugaring cases:
+  cases(List) l:
+-> assert typeof l is List
+   will need to be able to find the type from the variant name in the runtime
+    | empty => true
+    -> if variant-name == empty:
+         rhs
+    | link(f, r) => 1 + length(r)
+    ->
+      if variantname  == link
+      link(f,r) = l
+      rhs
+
+Cases String Expr [(Pat, Expr)] (Maybe Expr)
+
+> desugarExpr' (S.Cases _ty e branches els) = do
+>     -- enm = e
+>     enm <- getUnique "cases-e"
+>     -- todo: assert typeof e is ty
+>     let a0 = S.LetDecl (S.Binding (S.IdenP S.NoShadow enm) e)
+>     -- vnm = variant-name(e)
+>     vnm <- getUnique "cases-vnm"
+>     let a1 = S.LetDecl (S.Binding (S.IdenP S.NoShadow vnm) $ S.App (S.Iden "variant-name") [S.Iden enm])
+>         --a15 = S.StExpr $ S.App (S.Iden "print") [S.Iden vnm]
+>     -- fn to get the variant name from a pattern
+>     let makeVB pat expr = (S.BinOp (S.Iden vnm) "==" (S.Sel $ S.Str $  patternVariantName pat)
+>                           ,S.Let [S.Binding pat (S.Iden enm)]  expr)
+>         a2 = map (uncurry makeVB) branches
+>         aif = S.StExpr $ S.If a2 els
+>     desugarExpr' (S.Block [a0, a1, aif])
+>   where
+>     patternVariantName (S.VariantP x _) = x
+>     patternVariantName (S.IdenP _ x) = x
 > desugarExpr' x = error $ "desugarExpr': " ++ show x
 
 turn a list of expressions into a nested seq value
