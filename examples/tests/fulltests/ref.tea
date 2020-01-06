@@ -1,0 +1,33 @@
+data MutX:
+  | mut-x(ref x, y)
+end
+
+ex1 = mut-x(1, 2)
+
+
+check:
+  ex1!x is 1      # this access the value inside the reference
+  #ex1.x is-not 1  # this does not
+end
+
+ex1a = mut-x(1,2)
+
+ex1a!{x: 42}
+
+check:
+  ex1a!x is 42
+end
+
+data MutX1:
+  | mut-x1(ref x, ref y)
+end
+
+ex2 = mut-x1(1, 2)
+
+# multiple updates
+ex2!{x: 42, y:43}
+
+check:
+  ex2!x is 42
+  ex2!y is 43
+end

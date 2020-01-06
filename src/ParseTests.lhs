@@ -13,6 +13,7 @@
 > import Syntax (Stmt(..), Expr(..), Selector(..), VariantDecl(..), Pat(..)
 >               ,Shadow(..)
 >               ,Binding(..)
+>               ,Ref(..)
 >               ,Program(..)
 >               ,Provide(..)
 >               ,ProvideTypes(..)
@@ -90,6 +91,13 @@ todo: review all the whitespace rules that are being ignored
 >      ,App (App (Iden "f") [Iden "x"])[Iden "y"])
 
 
+>     ,("ex1!x"
+>      ,Unbox (Iden "ex1") "x")
+>     ,("ex2!x!y"
+>      ,Unbox (Unbox (Iden "ex2") "x") "y")
+>     ,("ex2.y!x"
+>      ,Unbox (DotExpr (Iden "ex2") "y") "x")
+> 
 >     ,("f()", App (Iden "f") [])
 
 
@@ -252,33 +260,61 @@ todo: review all the whitespace rules that are being ignored
 >     ,("data BTree:\n\
 >       \  | node(value, left, right)\n\
 >       \  | leaf(value)\n\
->       \end", DataDecl "BTree" [VariantDecl "node" ["value", "left", "right"]
->                     ,VariantDecl "leaf" ["value"]] Nothing)
+>       \end", DataDecl "BTree" [VariantDecl "node" [(Con, "value"), (Con, "left"), (Con, "right")]
+>                     ,VariantDecl "leaf" [(Con, "value")]] Nothing)
 
 >     ,("data MyEnum:\n\
 >       \  | node(left, right)\n\
 >       \  | leaf\n\
->       \end", DataDecl "MyEnum" [VariantDecl "node" ["left", "right"]
+>       \end", DataDecl "MyEnum" [VariantDecl "node" [(Con, "left"), (Con, "right")]
 >                     ,VariantDecl "leaf" []] Nothing)
 
 >     ,("data MyEnum:\n\
 >       \  | node(left, right)\n\
 >       \  | leaf()\n\
->       \end", DataDecl "MyEnum" [VariantDecl "node" ["left", "right"]
+>       \end", DataDecl "MyEnum" [VariantDecl "node" [(Con, "left"), (Con, "right")]
 >                     ,VariantDecl "leaf" []] Nothing)
 
 >     ,("data Point:\n\
 >       \  | pt(x, y)\n\
->       \end", DataDecl "Point" [VariantDecl "pt" ["x", "y"]] Nothing)
+>       \end", DataDecl "Point" [VariantDecl "pt" [(Con, "x"), (Con, "y")]] Nothing)
 
 >     ,("data Point: pt(x, y) end"
->      ,DataDecl "Point" [VariantDecl "pt" ["x", "y"]] Nothing)
+>      ,DataDecl "Point" [VariantDecl "pt" [(Con, "x"), (Con, "y")]] Nothing)
 
 >     ,("data Point: pt() end"
 >      ,DataDecl "Point" [VariantDecl "pt" []] Nothing)
 
 >     ,("data Point: pt end"
 >      ,DataDecl "Point" [VariantDecl "pt" []] Nothing)
+
+
+>     ,("data MutX:\n\
+>       \  | mut-x(ref x, y)\n\
+>       \end"
+>       ,DataDecl "MutX" [VariantDecl "mut-x" [(Ref,"x"), (Con,"y")]] Nothing)
+>     ,("ex1!{x: 42}"
+>      ,SetRef (Iden "ex1") [("x", num 42)])
+>     ,("ex1!{x: 42, y:43}"
+>      ,SetRef (Iden "ex1") [("x", num 42), ("y", num 43)])
+>     ,("ex1!a!{x: 42}"
+>      ,SetRef (Unbox (Iden "ex1") "a") [("x", num 42)])
+
+>     ,("ex1.a!{x: 42}"
+>      ,SetRef (DotExpr (Iden "ex1") "a") [("x", num 42)])
+
+
+
+check:
+  ex1!x is 1      # this access the value inside the reference
+  ex1.x is-not 1  # this does not
+end
+
+ex1!{x: 42}
+check:
+  ex1!x is 42
+end
+
 
 
 >     ,("check \"a first block\":\n\
@@ -330,7 +366,7 @@ todo: review all the whitespace rules that are being ignored
 >       \  a-pt = pt(1,2)\n\
 >       \  is-Point(a-pt) is true\n\
 >       \end"
->      ,DataDecl "Point" [VariantDecl "pt" ["x", "y"]]
+>      ,DataDecl "Point" [VariantDecl "pt" [(Con, "x"), (Con, "y")]]
 >       (Just [LetDecl (Binding (IdenP NoShadow "a-pt") (App (Iden "pt") [num 1, num 2]))
 >             ,StExpr $ BinOp (App (Iden "is-Point") [Iden "a-pt"]) "is" (Iden "true")]))
 >

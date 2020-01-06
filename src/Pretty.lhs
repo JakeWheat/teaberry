@@ -19,6 +19,7 @@
 >               ,ProvideTypes(..)
 >               ,Import(..)
 >               ,ImportSource(..)
+>               ,Ref(..)
 >               ,extractInt)
 >  
 
@@ -95,6 +96,8 @@
 >   where
 >     mf (p, e1) = text "|" <+> pat p <+> text "=>" <+> expr e1
 
+> expr (Unbox e f) = expr e <> text "!" <> text f
+
 > binding :: Binding -> Doc
 > binding (Binding n e) =
 >     pat n <+> text "=" <+> nest 2 (expr e)
@@ -123,6 +126,9 @@
 
 > stmt (VarDecl b) = text "var" <+> binding b
 > stmt (SetVar n e) = text n <+> text ":=" <+> nest 2 (expr e)
+> stmt (SetRef e fs) = expr e <> text "!{" <> commaSep (map f fs) <> text "}"
+>   where
+>     f (n,v) = text n <> text ":" <+> expr v
 
 > stmt (RecDecl b) = text "rec" <+> binding b
 > stmt (FunDecl n as e w) =
@@ -137,7 +143,11 @@
 >     <+> maybe empty whereBlock w
 >     <+> text "end"
 >   where
->       vf (VariantDecl vnm fs) = text "|" <+> text vnm <+> parens (commaSep $ map text fs)
+>       vf (VariantDecl vnm fs) = text "|" <+> text vnm <+> parens (commaSep $ map f fs)
+>       f (m, x) = (case m of
+>                      Ref -> text "ref"
+>                      _ -> empty)
+>                  <+> text x
 
 > stmt (Check nm ts) =
 >     vcat [text "check" <+> maybe empty (doubleQuotes . text) nm <> text ":"

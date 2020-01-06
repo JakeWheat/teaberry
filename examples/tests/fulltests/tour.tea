@@ -242,3 +242,15 @@ check:
   o2.z is "new-z"
 end
 |#
+
+rec countdown-good =
+  # countdown-good is in scope here, because of the 'rec'
+  lam(n):
+    if n == 0: true
+    else: countdown-good(n - 1) # so this call is fine
+    end
+  end
+
+countdown-good(5)
+
+nothing

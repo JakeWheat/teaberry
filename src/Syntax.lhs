@@ -15,6 +15,7 @@ The high level syntax which the parser produces
 >               ,ProvideTypes(..)
 >               ,Import(..)
 >               ,ImportSource(..)
+>               ,Ref(..)
 >               ,extractInt
 >               ) where
 
@@ -52,6 +53,7 @@ The high level syntax which the parser produces
 >           | FunDecl String [Pat] Expr (Maybe [Stmt])
 >           | VarDecl Binding
 >           | SetVar String Expr
+>           | SetRef Expr [(String,Expr)]
 >           | DataDecl String [VariantDecl] (Maybe [Stmt])
 >           | TPred Expr String Expr Expr -- is%, is-not%
 >           | TPostfixOp Expr String --- does-not-raise
@@ -87,6 +89,7 @@ The high level syntax which the parser produces
 >           | Let [Binding] Expr
 >           | LetRec [Binding] Expr
 >           | Block [Stmt]
+>           | Unbox Expr String
 >           deriving (Eq,Show,Data,Typeable,Generic) 
 
 
@@ -103,6 +106,9 @@ The high level syntax which the parser produces
 >                          Left _ -> Nothing
 
 
-> data VariantDecl = VariantDecl String [String]
+> data VariantDecl = VariantDecl String [(Ref,String)]
 >                  deriving (Eq,Show,Data,Typeable,Generic) 
+
+> data Ref = Ref | Con
+>          deriving (Eq,Show,Data,Typeable,Generic) 
 

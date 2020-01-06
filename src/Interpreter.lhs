@@ -561,8 +561,13 @@ haskellfunimpls and default env duplicates a bunch of stuff
 >     cd <- mapM unpackTuple vs
 >     pure $ VariantV vnt cd
 >   where
->     unpackTuple (VariantV "tuple" [(_,StrV nm),(_,v)]) = pure (nm,v)
->     unpackTuple x = throwM $ MyException $ "value in list in make-variant, expected tuple of name and val, got " ++ show x
+>     unpackTuple (VariantV "tuple" [(_,BoolV ref),(_,StrV nm),(_,v)]) = do
+>         x <- if ref
+>              then box v
+>              else pure v
+>         pure (nm,x)
+>     unpackTuple (VariantV "tuple" x) = throwM $ MyException $ "value in list in make-variant, expected tuple of is-ref, name and val, got " ++ show (map (\(_,b) -> torepr' b) x)
+>     unpackTuple x = throwM $ MyException $ "expected tuple in make-variant, got " ++ torepr' x
 > makeVariant x = throwM $ MyException $ "make-variant called on " ++ show (length x) ++ " args, should be 2"
 
 > listToHaskList :: Value -> Interpreter [Value]

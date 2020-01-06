@@ -69,7 +69,7 @@ wrapper to lift tests written in the language into tests for the
 >     ,"records.tea"
 >     ,"lists.tea"
 >     ,"agdt.tea"
->     --,"ref.tea"
+>     ,"ref.tea"
 
 >     ,"empty.tea"
 >     ,"empty_check.tea"

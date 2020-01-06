@@ -76,6 +76,7 @@ fixity parser either
 >               ,Shadow(..)
 >               ,Binding(..)
 >               ,Pat(..)
+>               ,Ref(..)
 >               ,Program(..)
 >               ,Provide(..)
 >               ,ProvideTypes(..)
@@ -183,6 +184,7 @@ the can get rid of more trys
 >     ,"where", "fun", "rec", "data"
 >     ,"import", "provide", "provide-types"
 >     ,"from", "and", "or", "shadow", "as"
+>     ,"ref"
 >     ]
 
 > identifierX :: Parser String
@@ -386,6 +388,9 @@ todo: remove the trys by implementing a proper lexer or a lexer style
 >     x <- parens (commaSep pat)
 >     pure (\(IdenP NoShadow y) -> VariantP y x)
 
+> unboxSuffix :: Parser (Expr -> Expr)
+> unboxSuffix = flip Unbox <$> (try (symbol_ "!" *> identifier))
+
 
 put all the parsers which start with a keyword first
 
@@ -412,7 +417,8 @@ put all the parsers which start with a keyword first
 > termSuffixes :: Expr -> Parser Expr
 > termSuffixes x = option x $ do
 >     y <- choice [pure x <**> appSuffix
->                 ,pure x <**> dotSuffix]
+>                 ,pure x <**> dotSuffix 
+>                 ,pure x <**> unboxSuffix]
 >     termSuffixes y
 
 > exprSuffix :: Expr -> Parser Expr
@@ -445,11 +451,13 @@ need to change pat to patOrExpression
 >             ,do
 >              es <- exprSuffix (patternSyntaxToExpr x)
 >              bb <- choice [testPost
+>                           ,setRef
 >                           ,pure StExpr]
 >              pure (bb es)
 >             ]
 >      
 >     ,expr <**> choice [testPost
+>                       ,setRef
 >                       ,pure StExpr]
 >     ]
 
@@ -485,6 +493,13 @@ works
 > setVarStmt = try (SetVar <$> identifier
 >            <*> (symbol_ ":=" *> expr))
 
+> setRef :: Parser (Expr -> Stmt)
+> setRef = flip SetRef
+>          <$> (symbol_ "!{" *> commaSep1 rf <* symbol "}")
+>   where
+>     rf = (,) <$> identifier <*> (symbol_ ":" *> expr)
+>          
+
 > checkBlock :: Parser Stmt
 > checkBlock = Check
 >      <$> (keyword "check" *> optional checkName <* symbol_ ":")
@@ -517,10 +532,11 @@ works
 >     <*> (optional whereBlock <* keyword_ "end")
 >   where
 >     singleVariant = VariantDecl
->                     <$> identifier <*> option [] (parens (commaSep identifier))
+>                     <$> identifier <*> option [] (parens (commaSep fld))
 >     variant = VariantDecl
 >               <$> (symbol_ "|" *> identifier)
->               <*> option [] (parens (commaSep identifier))
+>               <*> option [] (parens (commaSep fld))
+>     fld = (,) <$> option Con (Ref <$ keyword_ "ref") <*> identifier
 
 > letDecl :: Parser (Pat -> Stmt)
 > letDecl = f <$> (symbol_ "=" *> expr)

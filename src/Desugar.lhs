@@ -203,12 +203,15 @@ work without error on any value
 >               $ S.Lam [S.IdenP S.Shadow "x"] (S.Let [S.Binding (S.IdenP S.Shadow "vn") vnofx]
 >                        (foldr orEm (S.Iden "false") eqVariants)))
 >     -- variant selectors
->         mkV :: String -> [String] -> S.Stmt
+>         mkV :: String -> [(S.Ref,String)] -> S.Stmt
 >         mkV ctnm fs = S.LetDecl (S.Binding (S.IdenP S.NoShadow ctnm)
->                                  $ S.Lam (map (S.IdenP S.Shadow) fs) $ S.App
+>                                  $ S.Lam (map (S.IdenP S.Shadow) $ map snd fs) $ S.App
 >              (S.Iden "make-variant")
 >              [S.Sel (S.Str ctnm)
->              ,mkListSel $ map (\a -> S.Sel $ S.Tuple [S.Sel $ S.Str a, S.Iden a]) fs])
+>              ,mkListSel $ map (\(m,a) -> S.Sel $ S.Tuple [case m of
+>                                                               S.Ref -> S.Iden "true"
+>                                                               S.Con -> S.Iden "false"
+>                                                          ,S.Sel $ S.Str a, S.Iden a]) fs])
 >         vnts = map (\(S.VariantDecl nm fs) -> mkV nm fs) vs
 >     -- is-variant fns
 >         mkIsVnt ctnm = S.LetDecl (S.Binding (S.IdenP S.NoShadow ("is-" ++ ctnm))
@@ -224,7 +227,7 @@ work without error on any value
 >     -- can be desugared
 >     -- desugar the statements first, otherwise the defintion of the variant
 >     -- desugarers gets desugared to pattern binding
->     forM_ vs $ \(S.VariantDecl n fs) -> addVariantFields n fs
+>     forM_ vs $ \(S.VariantDecl n fs) -> addVariantFields n $ map snd fs
 >     pure x
 >   where
 >     orEm a b = S.BinOp a "or" b
@@ -248,6 +251,22 @@ is-pt = lam(x): I.App "variant-name" [x] == "pt"
 >     (:[]) <$> (I.LetDecl n . I.Box) <$> desugarExpr' e
 > desugarStmt (S.VarDecl (S.Binding p _)) = throwError $ "var binding must be name, got " ++ show p
 > desugarStmt (S.SetVar n e) = (:[]) <$> I.SetBox (I.Iden n) <$> desugarExpr' e
+
+> desugarStmt (S.SetRef e as) = do
+>     enm <- getUnique "setref"
+>     bs <- desugarPatternBinding (S.Binding (S.IdenP S.NoShadow enm) e)
+>     sts <- forM bs $ \(_,nm,e') -> I.LetDecl nm <$> desugarExpr' e'
+>     stsets <- forM as $ \(nm, bdy) -> do
+>         nm' <- desugarExpr' (S.DotExpr (S.Iden enm) nm)
+>         bdy' <- desugarExpr' bdy
+>         pure $ I.SetBox nm' bdy'
+>     pure $ sts ++ stsets
+
+a!{a:1, b:2}
+->
+setbox(a.a, 1)
+setbox(a.b, 2)
+
 
 ------------------------------------------------------------------------------
 
@@ -503,6 +522,11 @@ Cases String Expr [(Pat, Expr)] (Maybe Expr)
 >   where
 >     patternVariantName (S.VariantP x _) = x
 >     patternVariantName (S.IdenP _ x) = x
+
+> desugarExpr' (S.Unbox e f) = do
+>     x <- desugarExpr' (S.DotExpr e f)
+>     pure $ I.Unbox x
+
 > desugarExpr' x = error $ "desugarExpr': " ++ show x
 
 turn a list of expressions into a nested seq value
