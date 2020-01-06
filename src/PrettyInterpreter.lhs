@@ -18,7 +18,7 @@
 > resugarExpr (I.Sel (I.Num n)) = S.Sel (S.Num n)
 > resugarExpr (I.Sel (I.Str s)) = S.Sel (S.Str s)
 > resugarExpr (I.Sel (I.Variant nm s)) = S.App (S.Iden nm) $ map (resugarExpr . snd) s
-> resugarExpr (I.Sel I.VoidS) = S.Sel S.VoidS
+> resugarExpr (I.Sel I.NothingS) = S.Sel S.NothingS
 
 > resugarExpr (I.Iden s) = S.Iden s
 > resugarExpr (I.If a b c) = S.If [(resugarExpr a,resugarExpr b)] (Just $ resugarExpr c)

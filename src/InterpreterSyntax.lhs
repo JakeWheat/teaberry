@@ -32,5 +32,5 @@ TODO: add provides and imports
 > data Selector = Num Scientific
 >               | Str String
 >               | Variant String [(String,Expr)]
->               | VoidS
+>               | NothingS
 >               deriving (Eq,Show)

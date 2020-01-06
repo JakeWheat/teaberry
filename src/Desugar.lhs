@@ -216,7 +216,7 @@ add-tests(lam():
   checkblockid = n # unique number, and the variable name checkblock id should be unique (todo)
   log-check-block(checkblockid, "blockname")
   {desuged statements in the check block}
-  VoidV # a top level check block has no value
+  nothing # a top level check block has no value
 end
 
 todo: a non top level check block can use something like this:
@@ -229,7 +229,7 @@ end
 shadow tmpvar = expr
 add-tests(lam():
    ...
-   # instead of ending with VoidV:
+   # instead of ending with nothing:
    tmpvar
 end
 
@@ -282,7 +282,7 @@ this fails with 'a block cannot end with a binding'
 >         blk = [S.LetDecl (S.Binding (S.IdenP S.NoShadow checkblockidnm) checkblockidval)
 >                 ,S.StExpr $ S.App (S.Iden "log-check-block") [S.Iden checkblockidnm
 >                                                              ,blockNameVal]
->               ] ++ sts ++ [S.StExpr $ S.Sel S.VoidS]
+>               ] ++ sts ++ [S.StExpr $ S.Sel S.NothingS]
 >         blockWrap =
 >             [S.StExpr $ S.App (S.Iden "add-tests") $ [S.Lam [] $ S.Block blk]]
 >     sts' <- local (\x -> x {inCheckBlockID = Just checkblockid}) $ desugarStmts blockWrap
@@ -341,7 +341,7 @@ end
 > desugarExpr' :: S.Expr -> DesugarStack I.Expr
 > desugarExpr' (S.Sel (S.Num n)) = pure $ I.Sel (I.Num n)
 > desugarExpr' (S.Sel (S.Str s)) = pure $ I.Sel (I.Str s)
-> desugarExpr' (S.Sel S.VoidS) = pure $ I.Sel I.VoidS
+> desugarExpr' (S.Sel S.NothingS) = pure $ I.Sel I.NothingS
 > desugarExpr' (S.Iden "_") = throwError "'_' in expression context"
 > desugarExpr' (S.Iden i) = pure $ I.Iden i
 > desugarExpr' (S.Parens e) = desugarExpr' e
@@ -354,7 +354,7 @@ end
 > desugarExpr' (S.App f xs) = do
 >     f' <- desugarExpr' f
 >     xs' <- mapM desugarExpr' xs
->     let r g [] = pure $ I.App g (I.Sel $ I.VoidS)
+>     let r g [] = pure $ I.App g (I.Sel $ I.NothingS)
 >         r g [y] = pure $ I.App g y
 >         r g (y:ys) = r (I.App g y) ys
 >     r f' xs'
@@ -429,7 +429,7 @@ does pyret have a consistent set that can be used here?
 turn a list of expressions into a nested seq value
 
 > seqify :: [I.Expr] -> I.Expr
-> seqify [] = I.Sel I.VoidS
+> seqify [] = I.Sel I.NothingS
 > seqify [e] = e
 > seqify (e:es) = I.Seq e $ seqify es
 

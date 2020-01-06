@@ -18,6 +18,7 @@
 >     ,("true", [], BoolV True) 
 >     ,("false", [],  BoolV False)
 >     ,("\"hello\"", [], StrV "hello")
+>     ,("nothing", [], NothingV)
 >     ]
 
 > testInterpreter :: (String, String, Value) -> T.TestTree

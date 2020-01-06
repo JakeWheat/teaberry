@@ -94,7 +94,7 @@ The high level syntax which the parser produces
 >               | Str String
 >               | Tuple [Expr]
 >               | Record [(String,Expr)]
->               | VoidS
+>               | NothingS
 >               deriving (Eq,Show,Data,Typeable,Generic) 
 
 > extractInt :: Scientific -> Maybe Int

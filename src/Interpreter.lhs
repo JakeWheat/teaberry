@@ -59,7 +59,7 @@ using a hack sort of ffi for haskell.
 >                       [(String,Value)] -- fields, is it better to not include the names,
 >                                        -- the desugarer will handle?
 >            | BoxV Int
->            | VoidV
+>            | NothingV
 >            deriving (Eq,Show)
 
 ------------------------------------------------------------------------------
@@ -195,7 +195,7 @@ interpreters for syntax nodes
 > interp :: I.Expr -> Interpreter Value
 > interp (I.Sel (I.Num n)) = pure $ NumV n
 > interp (I.Sel (I.Str s)) = pure $ StrV s
-> interp (I.Sel I.VoidS) = pure $ VoidV
+> interp (I.Sel I.NothingS) = pure $ NothingV
 > interp (I.Sel (I.Variant nm es)) = do
 >     vs <- mapM (\(n,e) -> (n,) <$> interp e) es
 >     pure $ VariantV nm vs
@@ -241,8 +241,8 @@ it
 >              local (updateIREnv (const $ extendEnv n argVal env')) $ interp bdy
 >         ClosV (I.LamVoid bdy) env' -> do
 >              case a of
->                  I.Sel I.VoidS -> local (updateIREnv (const env')) $ interp bdy
->                  _ -> throwM $ MyException $ "0 arg lambda called with something other than literal void: " ++ show a
+>                  I.Sel I.NothingS -> local (updateIREnv (const env')) $ interp bdy
+>                  _ -> throwM $ MyException $ "0 arg lambda called with something other than literal nothing: " ++ show a
 >         ClosV ee _ -> throwM $ MyException $ "non lambda in closure expression: " ++ show ee
 >         _ -> throwM $ MyException $ "non function in app position: " ++ show x
 
@@ -296,24 +296,24 @@ they are in language functions
 > logTestPass :: [Value] -> Interpreter Value
 > logTestPass = \[NumV n, StrV t] -> do
 >     appendTestResults (TestPass n t)
->     pure VoidV
+>     pure NothingV
 
 > logTestFail :: [Value] -> Interpreter Value
 > logTestFail = \[NumV n, StrV t, StrV m] -> do
 >     appendTestResults (TestFail n t m)
->     pure VoidV
+>     pure NothingV
 
 > logCheckBlock :: [Value] -> Interpreter Value
 > logCheckBlock = \[NumV i, StrV s] -> do
 >     appendTestResults (TestBlock i s)
->     pure VoidV
+>     pure NothingV
 
 > addTests :: [Value] -> Interpreter Value
 > addTests = \[t@(ClosV (I.LamVoid _) _)] -> do
 >     -- save the test so it can be run at the end
 >     -- is it worth optimising this out if the tests aren't going to be run?
 >     appendTest t
->     pure VoidV
+>     pure NothingV
 >   where
 >     appendTest :: Value -> Interpreter ()
 >     appendTest t = state $ \s ->
@@ -444,6 +444,7 @@ haskellfunimpls and default env duplicates a bunch of stuff
 >     [("true", BoolV True)
 >     ,("false", BoolV False)
 >     ,("empty", VariantV "empty" [])
+>     ,("nothing", NothingV)
 >     ,liftBinOp "*"
 >     ,liftBinOp "/"
 >     ,liftBinOp "+"
@@ -495,6 +496,8 @@ haskellfunimpls and default env duplicates a bunch of stuff
 > torepr' (VariantV "empty" []) = "empty"
 > torepr' (VariantV "link" [("first",x),("rest",xs)]) =
 >     "link(" ++ torepr' x ++ ", " ++ torepr' xs ++ ")"
+
+> torepr' NothingV = "nothing"
 
 > torepr' x = error $ "Interpreter: torepr implementation " ++ show x
 

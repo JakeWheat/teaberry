@@ -41,7 +41,7 @@
 > expr (Sel (Record flds)) = text "{" <> nest 2 (commaSep (map fld flds) <> text "}")
 >   where
 >     fld (n,e) = text n <> text ":" <+> expr e
-> expr (Sel VoidS) = text "()"
+> expr (Sel NothingS) = text "nothing"
 > 
 > expr (Iden n) = text n
 > expr (Parens e) = parens (expr e)
