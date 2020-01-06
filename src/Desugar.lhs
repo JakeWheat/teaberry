@@ -83,7 +83,7 @@ a slightly improved hack to keep moving without getting stuck doing
 >     i <- state $ \s ->
 >             let i = cheapoUnique s
 >             in (i, s {cheapoUnique = cheapoUnique s + 1})
->     return $ prefix ++ "-deffoUnique" ++ show i
+>     return $ prefix ++ "-" ++ show i ++ "-XX" -- ++ "-deffoUnique"
 >                   
 
 the full plan is to find a pseudo random generator that can put in the
