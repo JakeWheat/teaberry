@@ -344,8 +344,9 @@ supported
 > -- message
 
 > getCheckResults :: [TestResultLog] -> Interpreter [CheckResult]
-> getCheckResults lg = do
->         let (blocknmsx, testresults) = partition isTestBlock lg
+> getCheckResults lg' = do
+>         let lg = reverse lg'
+>             (blocknmsx, testresults) = partition isTestBlock lg
 >             blocknms :: [(Scientific, String)]
 >             blocknms = map (\(TestBlock nm tid) -> (nm, tid)) blocknmsx
 >         gs <- mapM (\x -> (,) <$> blockID x <*> toCheckResult x) testresults
