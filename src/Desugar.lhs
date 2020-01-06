@@ -384,12 +384,8 @@ end
 
 > desugarExpr' (S.Let ps bdy) = do
 >     ps' <- concat <$> mapM desugarPatternBinding ps
->     f ps'
->   where
->     f [] = desugarExpr' bdy
->     f ((_, n, lbdy) : ls) = do
->         lbdy' <- desugarExpr' lbdy
->         I.Let n lbdy' <$> f ls
+>     bdy' <- desugarExpr' bdy
+>     desugarBindingsToLet bdy' ps'
 
 
 > desugarExpr' (S.LetRec fs ex) = do
@@ -437,6 +433,12 @@ turn a list of expressions into a nested seq value
 > seqify [e] = e
 > seqify (e:es) = I.Seq e $ seqify es
 
+> desugarBindingsToLet :: I.Expr -> [(S.Shadow, String, S.Expr)] -> DesugarStack I.Expr
+> desugarBindingsToLet bdy [] = pure bdy
+> desugarBindingsToLet bdy ((_, n, lbdy) : ls) = do
+>     lbdy' <- desugarExpr' lbdy
+>     I.Let n lbdy' <$> desugarBindingsToLet bdy ls
+>   
 
 
 ------------------------------------------------------------------------------
