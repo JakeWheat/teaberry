@@ -83,7 +83,11 @@ todo: review all the whitespace rules that are being ignored
 >     ,("letrec shadow a = 5: a end"
 >      ,LetRec [Binding (IdenP Shadow "a") (num 5)] (Iden "a"))
 
+>     ,("a.b.c"
+>      ,DotExpr (DotExpr (Iden "a") "b") "c")
 
+>     ,("f(x)(y)"
+>      ,App (App (Iden "f") [Iden "x"])[Iden "y"])
 
 
 >     ,("f()", App (Iden "f") [])

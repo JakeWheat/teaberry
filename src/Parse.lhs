@@ -390,7 +390,8 @@ todo: remove the trys by implementing a proper lexer or a lexer style
 put all the parsers which start with a keyword first
 
 > term :: Parser Expr
-> term = choice [unaryMinus
+> term = do
+>     x <- choice [unaryMinus
 >               ,lamE
 >               ,expressionLetRec
 >               ,expressionLet
@@ -404,14 +405,20 @@ put all the parsers which start with a keyword first
 >               ,parensE
 >               ,construct
 >               ,tupleOrRecord
->               ] <**> option id (appSuffix <|> dotSuffix)
+>               ]
+>     choice [termSuffixes x, pure x]
 
 
-> exprSuffix :: Parser (Expr -> Expr)
-> exprSuffix = do
->     x <- option id (appSuffix <|> dotSuffix)
->     y <- option id binOpSuffix
->     pure (y . x)
+> termSuffixes :: Expr -> Parser Expr
+> termSuffixes x = option x $ do
+>     y <- choice [pure x <**> appSuffix
+>                 ,pure x <**> dotSuffix]
+>     termSuffixes y
+
+> exprSuffix :: Expr -> Parser Expr
+> exprSuffix x = do
+>     y <- termSuffixes x
+>     pure y <**> option id binOpSuffix
 
 ------------------------------------------------------------------------------
 
@@ -432,13 +439,18 @@ need to change pat to patOrExpression
   so it can parse stuff that starts like a pattern
   but then can only be an expression after that
 
->     ,try pat <**> choice [letDecl
->                          ,do
->                           es <- option id exprSuffix
->                           bb <- option StExpr testPost
->                           pure $ bb . es . patternSyntaxToExpr
->                          ]
->     ,expr <**> option StExpr testPost
+>     ,try $ do
+>      x <- pat
+>      choice [pure x <**> letDecl 
+>             ,do
+>              es <- exprSuffix (patternSyntaxToExpr x)
+>              bb <- choice [testPost
+>                           ,pure StExpr]
+>              pure (bb es)
+>             ]
+>      
+>     ,expr <**> choice [testPost
+>                       ,pure StExpr]
 >     ]
 
 parsing let decls:
