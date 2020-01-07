@@ -10,7 +10,7 @@ progress:
 
 https://github.com/JakeWheat/teaberry/tree/master/examples/tests/fulltests
 
-sketch of early approximate target
+# sketch of early approximate target
 
 mostly pyret syntax to start with
 strict/eager
@@ -31,3 +31,98 @@ no implicit casting
 no pragmas, javadoc in comment syntax
 good error messages
 extensible records
+
+# sketch of possible roadmap
+
+This list mostly uses Pyret terminology for the things in Pyret.
+
+## Completed (no rigorous testing or completeness checks yet)
+
+temp command line interface
+
+lambda values, app
+closures
+letrec
+
+tuples
+records
+vars
+lists
+algebraic data types
+recursive data types (cheating slightly without types)
+pattern binding in let
+cases
+references (mutable fields)
+
+check, where
+
+shadow (syntax only, shadowing not detected)
+
+## planned
+
+import
+
+contracts and annotations
+
+critical whitespace issues
+  1. no space between expr and () in app
+  2. no multiple statements without newline
+
+extended pattern binding
+
+types
+  needs a todo list
+  algebraic data types
+    field access in a case
+  recursive functions
+  recursive data types
+  type classes
+  extensible records
+  ...
+
+type infererence
+
+## smaller planned items
+
+check additional features:
+  is-not
+  is%
+  is-not%
+  satisfies
+  violates
+  raises
+  raises-other-than
+  raises-satisfies
+  raises-violates
+
+shadow (actually does something)
+
+user constructors
+
+lambda shorthand
+for loops
+curried application
+chaining application
+block shorthands
+non blocky blocks
+
+pattern binding in lambda, functions arguments
+record binding
+
+... and variations (like with a message)
+
+doc strings
+
+type and new type
+
+improved set of builtin/basic types
+
+program output fixed to match pyret
+
+fixity handling
+
+source location information available to code
+  (__FILE__, etc.)
+
+spy statement
+

@@ -31,3 +31,24 @@ check:
   ex2!x is 42
   ex2!y is 43
 end
+
+data Box:
+  | box(ref v)
+where:
+  n1 = box(1)
+  n2 = box(2)
+  n1!{v : 3}
+  n2!{v : 4}
+  n1!v is 3
+  n2!v is 4
+end
+
+check:
+  fun adder(a):
+    a!{x: a!x + 1}
+  end
+  ex1 = mut-x(1, 2)
+  ex1!x is 1
+  adder(ex1)
+  ex1!x is 2
+end

@@ -72,8 +72,12 @@ quick exceptions, can come back to this
 > instance Exception MyException
 
 
-the env is used for read only bindings. the code distinguishes between
-these and variables, not sure there is a good reason to do this
+The env is used for read only bindings. The code distinguishes between
+these and variables, a reason why this possibly makes sense is it's
+easy to manage vars with the state, and non vars using rws local
+function - combined with closures, this means the non vars lifetime
+and scope is handled a little more easily. This doesn't exactly
+justify implementing constant bindings using the store though
 
 > data Env = Env [(String,Value)]
 >            deriving (Eq,Show)
