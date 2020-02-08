@@ -17,38 +17,29 @@ branches:
   - master
   - travis_stuff
 
-#cabal:
-#  - 2.2
-#  - 2.4
-#  - 3.0
-
-#ghc:
-#  - 8.8.2
-#  - 8.6.5
-#  - 8.4.4
-
 # jobs notes:
 # test last 3 major ghc versions with latest cabal
 # test them with the cabal they come with
+# update: life's too short for the second one
+# deal with it if anyone asks
 
 jobs:
   include:
-  - name: "8.8.2 / 3.0"
+  - name: "ghc 8.8.2 / cabal-install 3.0"
     ghc: "8.8.2"
-    cabal: "3.0"
-  - name: "8.6.5 / 3.0"
+    cabal-install: "3.0"
+  - name: "ghc 8.6.5 / cabal-install 3.0"
     ghc: "8.6.5"
-    cabal: "3.0"
-  - name: "8.4.4 / 3.0"
+    cabal-install: "3.0"
+  - name: "ghc 8.4.4 / cabal-install 3.0"
     ghc: "8.4.4"
-    cabal: "3.0"
-  - name: "8.6.5 / 2.4"
-    ghc: "8.6.5"
-    cabal: "2.4"
-  - name: "8.4.4 / 2.2"
-    ghc: "8.4.4"
-    cabal: "2.2"
-
+    cabal-install: "3.0"
+#  - name: "ghc 8.6.5 / cabal-install 2.4"
+#    ghc: "8.6.5"
+#    cabal-install: "2.4"
+#  - name: "ghc 8.4.4 / cabal-install 2.2"
+#    ghc: "8.4.4"
+#    cabal-install: "2.2"
 
 cache:
   directories:
@@ -65,3 +56,4 @@ install:
 
 script:
   - cabal test
+  - cabal run teaberry -- -p examples/tests/fulltests/tour.tea
