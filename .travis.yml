@@ -11,6 +11,12 @@ addons:
 git:
   depth: 5
 
+cache:
+ directories:
+ - $HOME/.cabal/packages
+ - $HOME/.cabal/store
+ - $HOME/.cabal/bin
+
 branches:
   only:
   - master
@@ -25,10 +31,6 @@ ghc:
   - 8.8.2
   - 8.6.5
   - 8.4.4
-
-cache:
-  directories:
-  - "$HOME/.cabal/store"
 
 install:
   - ghc --version
