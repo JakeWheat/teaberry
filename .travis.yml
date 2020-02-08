@@ -17,15 +17,15 @@ branches:
   - master
   - travis_stuff
 
-cabal:
-  - 2.2
-  - 2.4
-  - 3.0
+#cabal:
+#  - 2.2
+#  - 2.4
+#  - 3.0
 
-ghc:
-  - 8.8.2
-  - 8.6.5
-  - 8.4.4
+#ghc:
+#  - 8.8.2
+#  - 8.6.5
+#  - 8.4.4
 
 # jobs notes:
 # test last 3 major ghc versions with latest cabal
