@@ -23,23 +23,32 @@ branches:
 # update: life's too short for the second one
 # deal with it if anyone asks
 
-jobs:
-  include:
-  - name: "ghc 8.8.2 / cabal-install 3.0"
-    ghc: "8.8.2"
-    cabal-install: "3.0"
-  - name: "ghc 8.6.5 / cabal-install 3.0"
-    ghc: "8.6.5"
-    cabal-install: "3.0"
-  - name: "ghc 8.4.4 / cabal-install 3.0"
-    ghc: "8.4.4"
-    cabal-install: "3.0"
-#  - name: "ghc 8.6.5 / cabal-install 2.4"
-#    ghc: "8.6.5"
-#    cabal-install: "2.4"
-#  - name: "ghc 8.4.4 / cabal-install 2.2"
-#    ghc: "8.4.4"
-#    cabal-install: "2.2"
+cabal-install:
+  - 3.0
+
+ghc:
+  - 8.8.2
+  - 8.6.5
+  - 8.4.4
+
+
+# jobs:
+#   include:
+#   - name: "ghc 8.8.2 / cabal-install 3.0"
+#     ghc: "8.8.2"
+#     cabal-install: "3.0"
+#   - name: "ghc 8.6.5 / cabal-install 3.0"
+#     ghc: "8.6.5"
+#     cabal-install: "3.0"
+#   - name: "ghc 8.4.4 / cabal-install 3.0"
+#     ghc: "8.4.4"
+#     cabal-install: "3.0"
+# #  - name: "ghc 8.6.5 / cabal-install 2.4"
+# #    ghc: "8.6.5"
+# #    cabal-install: "2.4"
+# #  - name: "ghc 8.4.4 / cabal-install 2.2"
+# #    ghc: "8.4.4"
+# #    cabal-install: "2.2"
 
 cache:
   directories:
