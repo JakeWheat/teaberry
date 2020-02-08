@@ -1,13 +1,13 @@
 language: haskell
 
 dist: bionic
+
 addons:
   apt:
     sources:
-      - ppa:hvr/ghc
-    packages:
-      - ghc
-      - cabal
+    - deadsnakes
+    - sourceline: 'ppa:hvr/ghc'
+
 
 git:
   depth: 5
@@ -32,11 +32,11 @@ cache:
 install:
   - ghc --version
   - cabal --version
-  - cabal new-update
-  - cabal new-build --enable-tests --enable-benchmarks
+  - cabal update
+  - cabal build --enable-tests --enable-benchmarks
 
 script:
-  - cabal new-test --enable-tests
+  - cabal test
   - cabal check
   - cabal outdated
 
