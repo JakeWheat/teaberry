@@ -1,7 +1,22 @@
 language: haskell
 
+dist: bionic
+addons:
+  apt:
+    sources:
+      - ppa:hvr/ghc
+    packages:
+      - ghc
+
 git:
   depth: 5
+
+branches:
+  only:
+  - master
+  - travis_stuff
+
+
 
 cabal: "2.4"
 
@@ -9,11 +24,11 @@ cache:
   directories:
   - "$HOME/.cabal/store"
 
-matrix:
-  include:
+#matrix:
+#  include:
   # - ghc: 8.2.2
   # - ghc: 8.4.4
-  - ghc: 8.6.5
+#  - ghc: 8.6.5
 
 install:
   - ghc --version
@@ -23,3 +38,6 @@ install:
 
 script:
   - cabal new-test --enable-tests
+  - cabal check
+  - cabal outdated
+
