@@ -25,6 +25,8 @@ branches:
 
 cabal-install:
   - 3.0
+cabal:
+  - 3.0
 
 ghc:
   - 8.8.2
