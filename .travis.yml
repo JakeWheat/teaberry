@@ -1,25 +1,46 @@
+
 language: haskell
+dist: bionic
+
+addons:
+  apt:
+    sources:
+    - deadsnakes
+    - sourceline: 'ppa:hvr/ghc'
 
 git:
   depth: 5
 
-cabal: "2.4"
-
 cache:
-  directories:
-  - "$HOME/.cabal/store"
+ directories:
+ - $HOME/.cabal/packages
+ - $HOME/.cabal/store
+ - $HOME/.cabal/bin
 
-matrix:
-  include:
-  # - ghc: 8.2.2
-  # - ghc: 8.4.4
-  - ghc: 8.6.5
+branches:
+  only:
+  - master
+  - travis_stuff
+
+cabal-install:
+  - 3.0
+cabal:
+  - 3.0
+
+ghc:
+  - 8.8.2
+  - 8.6.5
+  - 8.4.4
 
 install:
   - ghc --version
   - cabal --version
-  - cabal new-update
-  - cabal new-build --enable-tests --enable-benchmarks
+  - cabal update
+  - cabal check
+  - cabal outdated
+  - cabal build --enable-tests --enable-benchmarks
 
 script:
-  - cabal new-test --enable-tests
+  - cabal run RunTests -- --ansi-tricks=false 
+  - cabal run teaberry -- -p examples/tests/fulltests/tour.tea
+
