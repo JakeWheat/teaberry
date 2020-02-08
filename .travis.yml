@@ -7,6 +7,7 @@ addons:
       - ppa:hvr/ghc
     packages:
       - ghc
+      - cabal
 
 git:
   depth: 5
@@ -16,19 +17,17 @@ branches:
   - master
   - travis_stuff
 
+cabal:
+  - 2.2
+  - 3.0
 
-
-cabal: "2.4"
+ghc:
+  - 8.8.2
+  - 8.6.5
 
 cache:
   directories:
   - "$HOME/.cabal/store"
-
-matrix:
-  include:
-  # - ghc: 8.2.2
-  # - ghc: 8.4.4
-  - ghc: 8.6.5
 
 install:
   - ghc --version
