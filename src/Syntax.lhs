@@ -11,9 +11,8 @@ The high level syntax which the parser produces
 >               ,VariantDecl(..)
 >               ,Pat(..)
 >               ,Program(..)
->               ,Provide(..)
->               ,ProvideTypes(..)
->               ,Import(..)
+>               ,PreludeItem(..)
+>               ,ProvideItem(..)
 >               ,ImportSource(..)
 >               ,Ref(..)
 >               ,extractInt
@@ -23,25 +22,23 @@ The high level syntax which the parser produces
 > import Data.Scientific (Scientific,floatingOrInteger)
 > import GHC.Generics (Generic)
 
-> data Program = Program (Maybe Provide) (Maybe ProvideTypes)
->                [Import]
->                [Stmt]
+> data Program = Program [PreludeItem]
+>                        [Stmt]
 >               deriving (Eq,Show)
 
-> data Provide = ProvideAll
->              | Provide [(String, String)]
->              deriving (Eq,Show)
-> data ProvideTypes = ProvideTypesAll
->                   | ProvideTypes [(String,String)]
->                   deriving (Eq,Show)
+> data PreludeItem = Provide [ProvideItem]
+>                  | Import ImportSource String
+>                  | Include ImportSource
+>                  | IncludeFrom String [ProvideItem]
+>                  deriving (Eq,Show)
 
-> data Import = Import ImportSource String
->             | ImportFrom [String] ImportSource
->                   deriving (Eq,Show)
+> data ProvideItem = ProvideAll
+>                  | ProvideAlias String String
+>                  | ProvideName String
+>                  deriving (Eq,Show)
 
 > data ImportSource = ImportSpecial String [String]
 >                   | ImportName String
->                   | ImportString String
 >                   deriving (Eq,Show)
 
  

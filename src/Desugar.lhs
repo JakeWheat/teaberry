@@ -32,7 +32,7 @@ cases
 = api
 
 > desugarProgram :: S.Program -> Either String I.Program
-> desugarProgram (S.Program Nothing Nothing [] stmts) =
+> desugarProgram (S.Program [] stmts) =
 >     case runExcept (runRWST f defaultDesugarReader defaultDesugarStore) of
 >         Left e -> Left e
 >         Right (result, _store, _log) -> Right result

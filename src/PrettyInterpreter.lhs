@@ -16,7 +16,7 @@
 
 > resugarProgram :: I.Program -> S.Program
 > resugarProgram (I.Program e) =
->     S.Program Nothing Nothing [] [S.StExpr (resugarExpr e)]
+>     S.Program [] [S.StExpr (resugarExpr e)]
 >
 > resugarExpr :: I.Expr -> S.Expr
 > resugarExpr (I.Sel (I.Num n)) = S.Sel (S.Num n)

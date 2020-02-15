@@ -78,10 +78,10 @@ fixity parser either
 >               ,Pat(..)
 >               ,Ref(..)
 >               ,Program(..)
->               ,Provide(..)
->               ,ProvideTypes(..)
->               ,Import(..)
->               ,ImportSource(..))
+>               ,PreludeItem(..)
+>               ,ProvideItem(..)
+>               ,ImportSource(..)
+>               )
 
 ------------------------------------------------------------------------------
 
@@ -565,32 +565,41 @@ works
 >             ,"satisfies", "violates", "raises"]
 
 > program :: Parser Program
-> program = Program <$> optional provide <*> optional provideTypes <*> many importS <*> many stmt
+> program = Program <$> many preludeItem <*> many stmt
 
-> provide :: Parser Provide
-> provide = try (keyword_ "provide" *> choice
->     [Provide <$> (symbol_ "{" *> commaSep p <* symbol_ "}" <* keyword_ "end")
->     ,ProvideAll <$ symbol_ "*"])
->   where
->     p = (,) <$> identifier <*> (symbol_ ":" *> identifier)
+> preludeItem :: Parser PreludeItem
+> preludeItem = provide <|> include <|> importItem
 
-> provideTypes :: Parser ProvideTypes
-> provideTypes = keyword_ "provide-types" *> choice
->     [ProvideTypes <$> (symbol_ "{" *> commaSep p <* symbol_ "}")
->     ,ProvideTypesAll <$ symbol_ "*"] 
->   where
->     p = (,) <$> identifier <*> (symbol_ "::" *> identifier)
 
-> importS :: Parser Import
-> importS = do
->     keyword_ "import"
->     choice [try importFrom
->            ,importAs]
->   where
->     importFrom = ImportFrom <$> commaSep identifier <*> (keyword_ "from" *> importSource)
->     importSource = choice [try (ImportSpecial <$> identifier
->                                 <*> parens (commaSep stringRaw))
->                           ,ImportString <$> stringRaw
->                           ,ImportName <$> identifier]
->     importAs = Import <$> importSource <*> (keyword_ "as" *> identifier)
+> provide :: Parser PreludeItem
+> provide = Provide <$> (keyword_ "provide"
+>                        *> symbol_ ":"
+>                        *> commaSep provideItem
+>                        <* keyword_ "end")
 
+> provideItem :: Parser ProvideItem
+> provideItem = choice
+>     [ProvideAll <$ symbol_ "*"
+>     ,do
+>      a <- identifier
+>      choice [ProvideAlias a <$> (keyword_ "as" *> identifier)
+>             ,pure $ ProvideName a]
+>     ]
+
+> include :: Parser PreludeItem
+> include = do
+>     keyword_ "include"
+>     choice [IncludeFrom
+>             <$> (keyword_ "from" *> identifier <* symbol_ ":")
+>             <*> (commaSep provideItem <* keyword_ "end")
+>            ,Include <$> importSource]
+
+> importSource :: Parser ImportSource
+> importSource = do
+>     a <- identifier
+>     choice [ImportSpecial a <$> parens (commaSep stringRaw)
+>            ,pure $ ImportName a]
+
+> importItem :: Parser PreludeItem
+> importItem = Import <$> (keyword_ "import" *> importSource)
+>                     <*> (keyword_ "as" *> identifier)

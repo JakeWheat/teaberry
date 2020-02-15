@@ -15,10 +15,10 @@
 >               ,Binding(..)
 >               ,Ref(..)
 >               ,Program(..)
->               ,Provide(..)
->               ,ProvideTypes(..)
->               ,Import(..)
->               ,ImportSource(..))
+>               ,PreludeItem(..)
+>               ,ProvideItem(..)
+>               ,ImportSource(..)
+>               )
 
 > import Parse (parseExpr, parseStmt, parseProgram)
 > import Pretty (prettyExpr, prettyStmts, prettyProgram)
@@ -399,90 +399,60 @@ end
 > parseProgramExamples :: [(String,Program)]
 > parseProgramExamples =
 >     [("\"hello\""
->      ,Program Nothing Nothing [] [StExpr $ Sel $ Str "hello"])
+>      ,Program [] [StExpr $ Sel $ Str "hello"])
 
->     ,("provide {\n\
->       \  x : x\n\
->       \}\n\
->       \end\n\
->       \5"
->      ,Program (Just $ Provide [("x","x")]) Nothing [] [StExpr $ Sel $ Num 5])
-
->     ,("provide {\n\
->       \  x : x,\n\
->       \  y : z\n\
->       \}\n\
->       \end\n\
->       \5"
->      ,Program (Just $ Provide [("x","x")
->                     ,("y", "z")])
->       Nothing [] [StExpr $ Sel $ Num 5])
-
->     ,("provide *\n\
->       \5"
->      ,Program (Just ProvideAll)
->       Nothing [] [StExpr $ Sel $ Num 5])
+>     ,("provide: * end\n\
+>       \1"
+>      ,Program [Provide [ProvideAll]] [StExpr $ Sel $ Num 1])
 
 
->     ,("provide-types {\n\
->       \  Foo:: Foo,\n\
->       \  FooBar:: FooBar\n\
->       \}\n\
->       \5"
->      ,Program Nothing
->       (Just $ ProvideTypes [("Foo", "Foo"),("FooBar", "FooBar")]) [] [StExpr $ Sel $ Num 5])
+>     ,("provide: a end\n\
+>       \1"
+>      ,Program [Provide [ProvideName "a"]] [StExpr $ Sel $ Num 1])
 
->     ,("provide-types *\n\
->       \5"
->      ,Program Nothing
->       (Just ProvideTypesAll) [] [StExpr $ Sel $ Num 5])
-
->     ,("provide *\n\
->       \provide-types *\n\
->       \5"
->      ,Program (Just ProvideAll)
->       (Just ProvideTypesAll) [] [StExpr $ Sel $ Num 5])
-
->     ,("import file(\"./pyret/main2.arr\") as _\n\
->       \5"
->      ,Program Nothing Nothing
->       [Import (ImportSpecial "file" ["./pyret/main2.arr"]) "_"]
->       [StExpr $ Sel $ Num 5])
-
->     ,("import s-exp as S\n\
->       \5"
->      ,Program Nothing Nothing
->       [Import (ImportName "s-exp") "S"]
->       [StExpr $ Sel $ Num 5])
-
->     ,("import is-invalid-array-index from error\n\
->       \5"
->      ,Program Nothing Nothing
->       [ImportFrom ["is-invalid-array-index"] (ImportName "error")]
->       [StExpr $ Sel $ Num 5])
-
->     ,("import \"./tests/test-strings.arr\" as _\n\
->       \5"
->      ,Program Nothing Nothing
->       [Import (ImportString "./tests/test-strings.arr") "_"]
->       [StExpr $ Sel $ Num 5])
-
->     ,("import a,b from c\n\
->       \5"
->      ,Program Nothing Nothing
->       [ImportFrom ["a", "b"] (ImportName "c")]
->       [StExpr $ Sel $ Num 5])
+>     ,("provide: a,b end\n\
+>       \1"
+>      ,Program [Provide [ProvideName "a", ProvideName "b"]] [StExpr $ Sel $ Num 1])
 
 
->     ,("provide *\n\
->       \provide-types *\n\
->       \import file(\"./pyret/main2.arr\") as _\n\
->       \import s-exp as S\n\
->       \5"
->      ,Program (Just ProvideAll) (Just ProvideTypesAll)
->       [Import (ImportSpecial "file" ["./pyret/main2.arr"]) "_"
->       ,Import (ImportName "s-exp") "S"]
->       [StExpr $ Sel $ Num 5])
+>     ,("provide: a as b end\n\
+>       \1"
+>      ,Program [Provide [ProvideAlias "a" "b"]] [StExpr $ Sel $ Num 1])
+
+
+
+>     ,("include file(\"file.tea\")\n\
+>       \1"
+>      ,Program [Include (ImportSpecial "file" ["file.tea"])] [StExpr $ Sel $ Num 1])
+
+>     ,("include string-dict\n\
+>       \1"
+>      ,Program [Include (ImportName "string-dict")] [StExpr $ Sel $ Num 1])
+
+>     ,("import file(\"file.tea\") as X\n\
+>       \1"
+>      ,Program [Import (ImportSpecial "file" ["file.tea"]) "X"] [StExpr $ Sel $ Num 1])
+
+>     ,("import string-dict as X\n\
+>       \1"
+>      ,Program [Import (ImportName "string-dict") "X"] [StExpr $ Sel $ Num 1])
+
+
+>     ,("include from X: * end\n\
+>       \1"
+>      ,Program [IncludeFrom "X" [ProvideAll]] [StExpr $ Sel $ Num 1])
+
+>     ,("include from X: a end\n\
+>       \1"
+>      ,Program [IncludeFrom "X" [ProvideName "a"]] [StExpr $ Sel $ Num 1])
+
+>     ,("include from X: a,b end\n\
+>       \1"
+>      ,Program [IncludeFrom "X" [ProvideName "a", ProvideName "b"]] [StExpr $ Sel $ Num 1])
+
+>     ,("include from X: a as b end\n\
+>       \1"
+>      ,Program [IncludeFrom "X" [ProvideAlias "a" "b"]] [StExpr $ Sel $ Num 1])
 
 >     ]
 

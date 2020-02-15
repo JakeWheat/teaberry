@@ -15,9 +15,8 @@
 >               ,Binding(..)
 >               ,Shadow(..)
 >               ,Program(..)
->               ,Provide(..)
->               ,ProvideTypes(..)
->               ,Import(..)
+>               ,PreludeItem(..)
+>               ,ProvideItem(..)
 >               ,ImportSource(..)
 >               ,Ref(..)
 >               ,extractInt)
@@ -182,32 +181,26 @@
 > xSep x ds = sep $ punctuate (text x) ds
 
 > program :: Program -> Doc
-> program (Program prov provt im sts) =
->     vcat [maybe empty provide prov
->          ,maybe empty provideTypes provt
->          ,vcat $ map importp im
->          ,stmts sts]
+> program (Program prel sts) =
+>     vcat (map preludeItem prel ++ [stmts sts])
 
-> provide :: Provide -> Doc
-> provide (ProvideAll) = text "provide" <+> text "*"
-> provide (Provide ps) =
->     text "provide" <+> text "{" <+> nest 2 (commaSep $ map p ps) <+> text "}" <+> text "end"
->   where
->     p (a,b) = text a <+> text ":" <+> text b
+> preludeItem :: PreludeItem -> Doc
+> preludeItem (Provide pis) =
+>     vcat [text "provide:"
+>          ,nest 2 $ commaSep $ map provideItem pis
+>          ,text "end"]
+> preludeItem (Include s) = text "include" <+> importSource s
+> preludeItem (IncludeFrom a pis) =
+>     vcat [text "include" <+> text "from" <+> text a <> text ":"
+>          ,nest 2 $ commaSep $ map provideItem pis
+>          ,text "end"]
+> preludeItem (Import is a) = text "import" <+> importSource is <+> text "as" <+> text a
 
-> provideTypes :: ProvideTypes -> Doc
-> provideTypes (ProvideTypesAll) = text "provide-types" <+> text "*"
-> provideTypes (ProvideTypes ps) =
->     text "provide-types" <+> text "{" <+> nest 2 (commaSep $ map p ps) <+> text "}"
->   where
->     p (a,b) = text a <+> text "::" <+> text b
+> provideItem :: ProvideItem -> Doc
+> provideItem ProvideAll = text "*"
+> provideItem (ProvideName n) = text n
+> provideItem (ProvideAlias n a) = text n <+> text "as" <+> text a
 
-> importp :: Import -> Doc
-> importp (Import is s) = text "import" <+> importSource is <+> text "as" <+> text s
-> importp (ImportFrom is s) = text "import" <+> (commaSep $ map text is) <+> text "from" <+> importSource s
- 
 > importSource :: ImportSource -> Doc
 > importSource (ImportSpecial nm as) = text nm <> parens (commaSep $ map (doubleQuotes . text) as)
 > importSource (ImportName s) = text s
-> importSource (ImportString s) = doubleQuotes (text s)
-
