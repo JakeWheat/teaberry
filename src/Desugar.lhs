@@ -28,7 +28,7 @@ cases
 > import qualified Pretty as P
 
 > -- temporary
-> import Parse (parseStmt)
+> import Parse (parseProgram)
 
 
 ------------------------------------------------------------------------------
@@ -36,7 +36,7 @@ cases
 = api
 
 > desugarProgram :: S.Program -> Either String I.Program
-> desugarProgram  (S.Program prels stmts) =
+> desugarProgram p =
 >     case runExcept (runRWST f defaultDesugarReader defaultDesugarStore) of
 >         Left e -> Left e
 >         Right (result, _store, _log) -> Right result
@@ -47,16 +47,9 @@ good way to do it
 
 >     f :: RWST DesugarReader [()] DesugarStore (Except String) I.Program
 >     f = do
->         x <- getUnique "module"
->         is <- desugarImports prels
->         let stmts' = [tempBuiltInModule]
->                      ++ is ++
->                      [S.LetDecl (S.Binding (S.IdenP S.NoShadow x)
->                                (S.Block (stmts ++ [S.StExpr $ S.Sel $ S.Record []])))
->                      ,S.StExpr $ S.Iden "nothing"]
->         (I.Program . seqify) <$> desugarStmts stmts'
-
-> desugarProgram x = error $ "Desugar: desugarProgram " ++ show x
+>         (_nm,stmts) <- desugarProgramPreludeLowLevel True "top-level" p
+>         
+>         (I.Program . seqify) <$> desugarStmts stmts
 
 
 > desugarExpr :: S.Expr -> Either String I.Expr
@@ -130,14 +123,81 @@ and then can implement this and other things properly
  
 ------------------------------------------------------------------------------
 
+desugaring programs
+
+pass one:
+change the extra import, include and provide statements into the base ones
+pass two:
+change the base import, include and provides into regular statements
+all this is in the high level syntax
+
+This is pass two:
+
+a module of
+provide: a as b, c as d, ... end
+stmts
+->
+module-the-module-name-or-something =
+  block:
+    stmts
+    {b : a, d : c,  ...}
+  end
+if there is no provide, then the last statement is the empty record value: {}
+
+import file('xxx') as X
+->
+X = lookup the module name of file 'xxx' in the module-the-module-name-or-something
+    binding for the desugaring of that module
+
+include from X:
+  n1 as n2, ...
+end
+->
+n2 = X.n1
+...
+
+
+> desugarProgramPreludeLowLevel :: Bool -> String -> S.Program -> DesugarStack (String,[S.Stmt])
+> desugarProgramPreludeLowLevel includeTempModule moduleName (S.Program prels stmts) = do
+>     x <- getUnique $ "module-" ++ moduleName
+>     (_,tm) <- if includeTempModule
+>               then desugarProgramPreludeLowLevel False "my-test" tempBuiltInModule
+>               else pure ("",[])
+>     is <- desugarImports prels
+>     rv' <- desugarProvides prels
+>     let rv = case rv' of
+>               [] -> [S.StExpr $ S.Sel $ S.Record []]
+>               _ -> rv'
+>     let stmts' = tm ++ is ++
+>                  [S.LetDecl (S.Binding (S.IdenP S.NoShadow x)
+>                              (S.Block (stmts ++ rv)))
+>                  ,S.StExpr $ S.Iden "nothing"]
+>     {-trace ("-----------------------\n" ++ P.prettyStmts stmts') $ -}
+>     pure (x,stmts')
+
+> desugarProvides :: [S.PreludeItem] -> DesugarStack [S.Stmt]
+> desugarProvides prs = concat <$> catMaybes <$> mapM desugarProvide prs
+>   where
+>     desugarProvide :: S.PreludeItem -> DesugarStack (Maybe [S.Stmt])
+>     desugarProvide (S.Provide pis) | Just x <- mapM f pis =
+>         pure $ Just [S.StExpr $ S.Sel $ S.Record x]
+>     desugarProvide _ = pure $ Nothing
+>     f (S.ProvideAlias n m) = Just (m,S.Iden n)
+>     f _ = Nothing
+
+
 > desugarImports :: [S.PreludeItem] -> DesugarStack [S.Stmt]
-> desugarImports pis = concat <$> catMaybes <$> mapM desugarImport pis
+> desugarImports prs = concat <$> catMaybes <$> mapM desugarImport prs
 >   where
 >     desugarImport :: S.PreludeItem -> DesugarStack (Maybe [S.Stmt])
->     desugarImport (S.Import (S.ImportName "my-test") x) =
+>     desugarImport (S.Import (S.ImportName z) x) =
 >         pure $ Just $ [S.LetDecl (S.Binding (S.IdenP S.NoShadow x)
->                                  (S.Iden "module-my-test"))]
+>                                  (S.Iden z))]
+>     desugarImport (S.IncludeFrom nm pis) | Just x <- mapM (f nm) pis =
+>         pure $ Just $ map (\(n,e) -> S.LetDecl (S.Binding (S.IdenP S.NoShadow n) e)) x
 >     desugarImport _ = pure $ Nothing
+>     f nm (S.ProvideAlias n m) = Just (m,S.DotExpr (S.Iden nm) n)
+>     f _ _ = Nothing
 
 
 ------------------------------------------------------------------------------
@@ -859,13 +919,10 @@ at the top level at all
 a temporary fake built in module, to get module desugaring right in
 step 1, then do loading additional modules from files in step 2
 
-> tempBuiltInModule :: S.Stmt
-> tempBuiltInModule = either error id $ parseStmt ""
->     "module-my-test =\n\
->     \  block:\n\
->     \    fun f(x):\n\
->     \      x + 2\n\
->     \    end\n\
->     \    {f : f}\n\
->     \  end"
- 
+> tempBuiltInModule :: S.Program
+> tempBuiltInModule = either error id $ parseProgram ""
+>     "provide: f as f end\n\
+>     \fun f(x):\n\
+>     \  x + 1\n\
+>     \end"
+

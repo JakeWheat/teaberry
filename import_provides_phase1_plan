@@ -5,11 +5,11 @@ DONE add let module-name = block ... {} end
   desugaring and see if everything still works, or there is a sensible fix
 
 this is the only external desugaring syntax:
-import file('path') as X
-include from X:
+1/2 DONE import file('path') as X
+DONE include from X:
   n1 as n2, ...
 end
-provide:
+DONE provide:
   n1 as n2, ...
 end
 implement the desugaring for all of this
