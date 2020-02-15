@@ -1,7 +1,7 @@
 
-add syntax + parsing tests, remove existing syntax
+DONE add syntax + parsing tests, remove existing syntax
 
-add let module-name = block ... {} end
+DONE add let module-name = block ... {} end
   desugaring and see if everything still works, or there is a sensible fix
 
 this is the only external desugaring syntax:

@@ -42,7 +42,12 @@ doing this weird create [I.Stmt], then seqify, doesn't seem like a
 good way to do it
 
 >     f :: RWST DesugarReader [()] DesugarStore (Except String) I.Program
->     f = (I.Program . seqify) <$> desugarStmts stmts
+>     f = do
+>         x <- getUnique "module"
+>         let stmts' = [S.LetDecl (S.Binding (S.IdenP S.NoShadow x)
+>                                (S.Block (stmts ++ [S.StExpr $ S.Sel $ S.Record []])))
+>                      ,S.StExpr $ S.Iden "nothing"]
+>         (I.Program . seqify) <$> desugarStmts stmts'
 
 > desugarProgram x = error $ "Desugar: desugarProgram " ++ show x
 

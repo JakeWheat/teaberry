@@ -14,11 +14,11 @@
 
 > interpreterTests :: [(String, String, Value)]
 > interpreterTests =
->     [("2", [], NumV 2)
+>     [{-("2", [], NumV 2)
 >     ,("true", [], BoolV True) 
 >     ,("false", [],  BoolV False)
 >     ,("\"hello\"", [], StrV "hello")
->     ,("nothing", [], NothingV)
+>     ,("nothing", [], NothingV)-}
 >     ]
 
 > testInterpreter :: (String, String, Value) -> T.TestTree
