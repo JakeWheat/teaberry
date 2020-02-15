@@ -27,12 +27,16 @@ cases
 > import qualified InterpreterSyntax as I
 > import qualified Pretty as P
 
+> -- temporary
+> import Parse (parseStmt)
+
+
 ------------------------------------------------------------------------------
 
 = api
 
 > desugarProgram :: S.Program -> Either String I.Program
-> desugarProgram (S.Program [] stmts) =
+> desugarProgram  (S.Program prels stmts) =
 >     case runExcept (runRWST f defaultDesugarReader defaultDesugarStore) of
 >         Left e -> Left e
 >         Right (result, _store, _log) -> Right result
@@ -44,7 +48,10 @@ good way to do it
 >     f :: RWST DesugarReader [()] DesugarStore (Except String) I.Program
 >     f = do
 >         x <- getUnique "module"
->         let stmts' = [S.LetDecl (S.Binding (S.IdenP S.NoShadow x)
+>         is <- desugarImports prels
+>         let stmts' = [tempBuiltInModule]
+>                      ++ is ++
+>                      [S.LetDecl (S.Binding (S.IdenP S.NoShadow x)
 >                                (S.Block (stmts ++ [S.StExpr $ S.Sel $ S.Record []])))
 >                      ,S.StExpr $ S.Iden "nothing"]
 >         (I.Program . seqify) <$> desugarStmts stmts'
@@ -121,6 +128,17 @@ the full plan is to find a pseudo random generator that can put in the
 pure monad state, and also track envs like in the interpreter (without values),
 and then can implement this and other things properly
  
+------------------------------------------------------------------------------
+
+> desugarImports :: [S.PreludeItem] -> DesugarStack [S.Stmt]
+> desugarImports pis = concat <$> catMaybes <$> mapM desugarImport pis
+>   where
+>     desugarImport :: S.PreludeItem -> DesugarStack (Maybe [S.Stmt])
+>     desugarImport (S.Import (S.ImportName "my-test") x) =
+>         pure $ Just $ [S.LetDecl (S.Binding (S.IdenP S.NoShadow x)
+>                                  (S.Iden "module-my-test"))]
+>     desugarImport _ = pure $ Nothing
+
 
 ------------------------------------------------------------------------------
 
@@ -837,3 +855,17 @@ regular letrec for not script-y programs, and shadow is not allowed
 at the top level at all
 
 
+
+a temporary fake built in module, to get module desugaring right in
+step 1, then do loading additional modules from files in step 2
+
+> tempBuiltInModule :: S.Stmt
+> tempBuiltInModule = either error id $ parseStmt ""
+>     "module-my-test =\n\
+>     \  block:\n\
+>     \    fun f(x):\n\
+>     \      x + 2\n\
+>     \    end\n\
+>     \    {f : f}\n\
+>     \  end"
+ 
