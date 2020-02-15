@@ -1,0 +1,44 @@
+#|
+
+  module a is:
+
+   provide { f : f}
+
+   fun f(x):
+     x + 1
+   end
+
+  module b is:
+
+   import a as a
+
+   check:
+     a.f(2) is 3
+   end
+
+the code represents how the system can desugar this to something
+simple where each module with imports and provides can be desugared
+very easily and locally, then you run the whole program just by
+concatenating the modules in the right order
+   
+|#
+
+module-a-hidden-name =
+  block:
+    fun f(x):
+      x + 1
+    end
+
+    {f : f}
+  end
+
+module-b-hidden-name =
+  block:
+    a = module-a-hidden-name
+    check:
+      a.f(2) is 3
+    end
+  end
+
+# a temp bug in the interpreter
+nothing

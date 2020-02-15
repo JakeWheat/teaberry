@@ -78,6 +78,8 @@ wrapper to lift tests written in the language into tests for the
 >     ,"check_closure.tea"
 >     ,"two_same_name_check.tea"
 >     ,"where.tea"
+>
+>     ,"import_desugar_example.tea"
 
 >     ,"tour.tea"
 >     ]
