@@ -1,0 +1,137 @@
+
+add syntax + parsing tests, remove existing syntax
+
+add let module-name = block ... {} end
+  desugaring and see if everything still works, or there is a sensible fix
+
+this is the only external desugaring syntax:
+import file('path') as X
+include from X:
+  n1 as n2, ...
+end
+provide:
+  n1 as n2, ...
+end
+implement the desugaring for all of this
+do a quick hack to have a temp 'built in' module which is just available
+start with provide and import
+then can implement include
+get it working
+then implement the loading from files
+then implement the surface desugaring parts
+do multiple provides combining or make it an error
+
+
+
+
+------------------------------------------------------------------------------
+syntax to support, parse tests
+
+provide: * end
+provide: a end
+provide: a,b end
+provide: a as b end
+include file("file.tea")
+include string-dict
+import file("file.tea") as X
+import string-dict as X
+
+include from X: * end
+include from X: a end
+include from X: a,b end
+include from X: a as b end
+
+------------------------------------------------------------------------------
+
+external desugaring (convert to interpreter syntax)
+
+target:
+import file('path') as X
+include from X:
+  n1 as n2, ...
+end
+provide:
+  n1 as n2, ...
+end
+
+import file('path') as X
+->
+X = module-path-hidden-name
+include from X:
+  n1 as n2, ...
+end
+->
+n2 = X.n1
+# imports and includes need to be ordered
+
+provide: n1 as n2, ... end
+-> desugared to a record value
+{n2 : n1, ...}
+# multiple provides should be combined
+# not sure if need this right now
+# if there is no provides, then the record value is {}
+
+file is desugared to:
+
+module-file-hidden-name = block:
+  ...
+  {n1 : n2, ...} # provides
+end
+
+---------------------------------------
+
+internal desugaring (macro/ from surface syntax to surface syntax)
+
+provide: * end
+->
+provide: a,b, ... end # figure out how to find all the values
+  # is it very trivial, or just trivial?
+
+provide: a,b end
+->
+provide: a as a, b as b end
+
+import built-in as X
+->
+import file("<built-in-path-system-defined>/built-in.tea") as X
+
+include file or built-in
+->
+import file(xxx) as temp-name
+include from temp-name: * end
+
+
+include from X: * end
+->
+include from X: all the elements of X listed explicitly
+
+
+include from X: a,b end
+->
+include from X: a as a,b as b end
+
+import name1, ... from <some-module>
+->
+import <some-module> as temp-name
+include from temp-name:
+  name1, ...
+end
+
+------------------------------------------------------------------------------
+
+
+importing from files process
+  files are always relative to the module file
+  built-ins are in a system dir
+
+start with the parsed module
+desugar each built-in to a file
+each file, load it and parse it
+repeat
+while doing this, create a list of filepath, parsed module pairs
+reverse this list at the end, then it can be concatenated and desugared
+while recursing: if a module is seen a second time, it should appear the
+  second time and be removed from the first time it is seen
+how to detect cycles nicely?
+
+ 
