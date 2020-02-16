@@ -22,6 +22,9 @@ cases
 > import Control.Monad.Except (Except, runExcept, throwError)
 > import Control.Monad (forM, zipWithM, forM_)
 
+> import Control.Exception.Safe (Exception, throwM)
+
+
 > import System.FilePath ((</>), takeBaseName, takeDirectory)
 > import Paths_teaberry
 
@@ -150,6 +153,12 @@ in is last.
 
 TODO: think about how separate compilation could work
 
+> data MyException = MyException String
+>     deriving Show
+
+> instance Exception MyException
+
+
 > getBuiltInModulesDir :: IO FilePath
 > getBuiltInModulesDir = getDataFileName "built-in-modules"
 
@@ -203,7 +212,7 @@ TODO: think about how separate compilation could work
 >     --   load the files
 >     let recurseOnModule fn = do
 >             src <- readFile fn
->             let ast = either error id $ parseProgram fn src
+>             ast <- either (throwM . MyException) pure $ parseProgram fn src
 >             loadProgramImports fn ast
 >     allModules <- ((imsrc,p'):) <$> concat <$> mapM recurseOnModule fns
 >     -- only have files appear once in the list
@@ -753,7 +762,7 @@ this fails with 'a block cannot end with a binding'
 >     pure [seqify sts']
 >     
 
-> desugarStmt x = error $ "Desugar desugarStmt " ++ show x
+> desugarStmt x = throwError $ "Desugar desugarStmt " ++ show x
 
 an "is" test desugars to
 
@@ -929,7 +938,7 @@ Cases String Expr [(Pat, Expr)] (Maybe Expr)
 >     x <- desugarExpr' (S.DotExpr e f)
 >     pure $ I.Unbox x
 
-> desugarExpr' x = error $ "desugarExpr': " ++ show x
+> desugarExpr' x = throwError $ "desugarExpr': " ++ show x
 
 turn a list of expressions into a nested seq value
 
@@ -1038,7 +1047,7 @@ automatically
 
 
 
-> desugarPatternBinding x = error $ "desugar: unsupported type of pattern binding: " ++ show x
+> desugarPatternBinding x = throwError $ "desugar: unsupported type of pattern binding: " ++ show x
 
 
 

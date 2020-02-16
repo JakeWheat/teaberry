@@ -36,9 +36,11 @@ once do imports, have an option to run all tests
 > compileProgram :: FilePath -> String -> IO (Either String I.Program)
 > compileProgram fn src = do
 >     -- todo: sort out the monad transformer
->     let ast = either error id $ parseProgram fn src
->     ps <- loadProgramImports fn ast
->     pure $ desugarProgram ps
+>     case parseProgram fn src of
+>         Left e -> pure $ Left e
+>         Right ast ->  do
+>             ps <- loadProgramImports fn ast
+>             pure $ desugarProgram ps
 
 compile report
 

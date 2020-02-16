@@ -275,7 +275,7 @@ it
 >     pure v'
 
 
-> interp x@(I.LetDecl {}) = error $ "Interpreter: block ends with let: " ++ prettyExpr x
+> interp x@(I.LetDecl {}) = throwM $ MyException $ "Interpreter: block ends with let: " ++ prettyExpr x
 
 > --interp x = error $ "Interpreter: interp " ++ show x
 
