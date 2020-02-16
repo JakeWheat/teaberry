@@ -30,6 +30,7 @@ The high level syntax which the parser produces
 >                  | Import ImportSource String
 >                  | Include ImportSource
 >                  | IncludeFrom String [ProvideItem]
+>                  | ImportNames [String] ImportSource
 >                  deriving (Eq,Show,Data,Typeable,Generic) 
 
 > data ProvideItem = ProvideAll

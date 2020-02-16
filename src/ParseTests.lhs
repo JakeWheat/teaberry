@@ -454,6 +454,11 @@ end
 >       \1"
 >      ,Program [IncludeFrom "X" [ProvideAlias "a" "b"]] [StExpr $ Sel $ Num 1])
 
+>     ,("import n1, n2 from my-module\n\
+>       \1"
+>      ,Program [ImportNames ["n1", "n2"] (ImportName "my-module")] [StExpr $ Sel $ Num 1])
+
+
 >     ]
 
 

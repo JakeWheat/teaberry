@@ -601,5 +601,11 @@ works
 >            ,pure $ ImportName a]
 
 > importItem :: Parser PreludeItem
-> importItem = Import <$> (keyword_ "import" *> importSource)
->                     <*> (keyword_ "as" *> identifier)
+> importItem = keyword_ "import" *> (try importFrom <|> importAs)
+>   where
+>     importFrom = ImportNames
+>                 <$> commaSep1 identifier
+>                 <*> (keyword_ "from" *> importSource)
+>                 
+>     importAs = Import <$> importSource
+>                       <*> (keyword_ "as" *> identifier)

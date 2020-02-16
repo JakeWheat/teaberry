@@ -195,6 +195,8 @@
 >          ,nest 2 $ commaSep $ map provideItem pis
 >          ,text "end"]
 > preludeItem (Import is a) = text "import" <+> importSource is <+> text "as" <+> text a
+> preludeItem (ImportNames nms is) = text "import" <+> commaSep (map text nms)
+>                                   <+> text "from" <+> importSource is
 
 > provideItem :: ProvideItem -> Doc
 > provideItem ProvideAll = text "*"
