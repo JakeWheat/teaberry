@@ -79,7 +79,6 @@ wrapper to lift tests written in the language into tests for the
 >     ,"two_same_name_check.tea"
 >     ,"where.tea"
 >
->     ,"prelude-built-in-module.tea"
 >     ,"prelude-local-module.tea"
 >     ,"prelude-include-module.tea"
 >     ,"prelude-provide-all.tea"
