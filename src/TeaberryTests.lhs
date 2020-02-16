@@ -79,13 +79,13 @@ wrapper to lift tests written in the language into tests for the
 >     ,"two_same_name_check.tea"
 >     ,"where.tea"
 >
->     ,"import_desugar_example.tea"
->     ,"built-in-module.tea"
->     ,"local-module.tea"
->     ,"include-module.tea"
->     ,"provide-all.tea"
->     ,"provide-x.tea"
->     ,"combine-provides.tea"
+>     ,"prelude-built-in-module.tea"
+>     ,"prelude-local-module.tea"
+>     ,"prelude-include-module.tea"
+>     ,"prelude-provide-all.tea"
+>     ,"prelude-provide-x.tea"
+>     ,"prelude-combine-provides.tea"
+>     ,"prelude-import-from.tea"
 
 >     ,"tour.tea"
 >     ]

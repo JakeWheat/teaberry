@@ -181,6 +181,13 @@ TODO: think about how separate compilation could work
 >                 Just fn' -> getImports (fn':fns')
 >                                 (S.Import is' a : prs')
 >                                 xs
+>         getImports fns' prs' (i@(S.ImportNames nms is) : xs) =
+>             let (is', fn) = convertIS is
+>             in case fn of
+>                 Nothing -> getImports fns' (i:prs') xs
+>                 Just fn' -> getImports (fn':fns')
+>                                 (S.ImportNames nms is' : prs')
+>                                 xs
 >         getImports fns' prs' (i@(S.Include is) : xs) =
 >             let (is', fn) = convertIS is
 >             in case fn of
@@ -266,12 +273,12 @@ import image as I
 >                                -> DesugarStack ([(String,[String])], S.Program)
 > desugarProgramPreludeHighLevel moduleNameMap moduleValueNameMap nm p = do
 >     p0 <- desugarIncludeModule p
->     -- importfrom todo here
->     p1 <- desugarIncludeAll moduleNameMap moduleValueNameMap p0
->     (modNames,p2) <- desugarProvideAll p1
->     p3 <- desugarProvideIncludeAliases p2
->     p4 <- desugarToOneProvide p3
->     pure ((nm, modNames) : moduleValueNameMap, p4)
+>     p1 <- desugarImportFrom p0
+>     p2 <- desugarIncludeAll moduleNameMap moduleValueNameMap p1
+>     (modNames,p3) <- desugarProvideAll p2
+>     p4 <- desugarProvideIncludeAliases p3
+>     p5 <- desugarToOneProvide p4
+>     pure ((nm, modNames) : moduleValueNameMap, p5)
 
 include
 
@@ -304,10 +311,16 @@ include from temp-name:
   name1, ...
 end
 
-not supported in the parser/syntax yet
-
-todo: add this as soon as the others are added, it's simple and very
- handy
+> desugarImportFrom :: S.Program -> DesugarStack S.Program
+> desugarImportFrom (S.Program prs stmts) = do
+>     prs' <- concat <$> mapM f prs
+>     pure $ S.Program prs' stmts
+>   where
+>     f (S.ImportNames nms is) = do
+>         nm <- getUnique "import-from"
+>         pure [S.Import is nm
+>              ,S.IncludeFrom nm $ map S.ProvideName nms]
+>     f x = pure [x]
 
 
 include from X: * end
