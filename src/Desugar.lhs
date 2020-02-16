@@ -22,6 +22,7 @@ cases
 > import Control.Monad (forM, zipWithM, forM_)
 
 > import System.FilePath ((</>), takeBaseName, takeDirectory)
+> import Paths_teaberry
 
 > --import Debug.Trace (trace)
 
@@ -142,8 +143,6 @@ TODO: think about how separate compilation could work
 > loadProgramImports :: FilePath -> S.ImportSource -> S.Program -> IO [(S.ImportSource, S.Program)]
 > loadProgramImports cwd imsrc p@(S.Program prs _) = do
 >     -- todo: use transformer to support io either
->     -- todo: figure out how to handle this with cabal and dev and deploy
->     let builtInModulePath = "/home/jake/wd/burdock/lang/built-in-modules"
 >     -- get the list of imports
 >     let is = mapMaybe getImportSource prs
 >     -- for each one
@@ -151,11 +150,13 @@ TODO: think about how separate compilation could work
 >     --   load the file
 >     --   recurse on load all imports
 >     --   return the list
->         fns = flip map is $ \i -> case i of
->                   S.ImportSpecial "file" [fn] -> (i,cwd </> fn)
->                   S.ImportName x -> (i,builtInModulePath </> x ++ ".tea")
+>     fns <- flip mapM is $ \i -> case i of
+>                   S.ImportSpecial "file" [fn] -> pure (i,cwd </> fn)
+>                   S.ImportName x -> do
+>                       bip <- getDataFileName ("built-in-modules" </> x ++ ".tea")
+>                       pure (i,bip)
 >                   S.ImportSpecial {} -> error $ "unsupported import : " ++ show i
->         recurseOnModule (i,fn) = do
+>     let recurseOnModule (i,fn) = do
 >             src <- readFile fn
 >             let ast = either error id $ parseProgram fn src
 >             loadProgramImports (takeDirectory fn) i ast

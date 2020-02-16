@@ -13,9 +13,9 @@ DONE provide:
   n1 as n2, ...
 end
 DONE implement the desugaring for all of this
-load actual files
-  add support for buil-ins and file paths
-use unique names in desugaring modules
+DONE load actual files
+  add support for built-ins and file paths
+DONE use unique names in desugaring modules
 check for import cycles
 check diamond imports handled correctly
 implement the high level desugaring parts

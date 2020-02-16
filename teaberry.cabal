@@ -16,6 +16,7 @@ copyright:           Copyright 2018-2019 Jake Wheat
 category:            Language
 build-type:          Simple
 extra-source-files:  README,LICENSE
+data-files:          built-in-modules/*.tea
 
 source-repository head
   type:                git
@@ -47,6 +48,8 @@ library
                        Pretty
                        PrettyInterpreter
                        Engine
+                       Paths_teaberry
+  autogen-modules:     Paths_teaberry
 
 common library-modules
   ghc-options:         -threaded
@@ -58,6 +61,8 @@ common library-modules
                        Pretty
                        PrettyInterpreter
                        Engine
+                       Paths_teaberry
+  autogen-modules:     Paths_teaberry
 
 executable teaberry
   import:              shared-properties, library-modules
