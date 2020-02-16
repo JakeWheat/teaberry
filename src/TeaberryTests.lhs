@@ -80,7 +80,8 @@ wrapper to lift tests written in the language into tests for the
 >     ,"where.tea"
 >
 >     ,"import_desugar_example.tea"
->     ,"fake-module.tea"
+>     ,"built-in-module.tea"
+>     ,"local-module.tea"
 
 >     ,"tour.tea"
 >     ]

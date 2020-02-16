@@ -5,21 +5,21 @@ DONE add let module-name = block ... {} end
   desugaring and see if everything still works, or there is a sensible fix
 
 this is the only external desugaring syntax:
-1/2 DONE import file('path') as X
+DONE import test-module as X
 DONE include from X:
   n1 as n2, ...
 end
 DONE provide:
   n1 as n2, ...
 end
-implement the desugaring for all of this
-do a quick hack to have a temp 'built in' module which is just available
-start with provide and import
-then can implement include
-get it working
-then implement the loading from files
-then implement the surface desugaring parts
-do multiple provides combining or make it an error
+DONE implement the desugaring for all of this
+load actual files
+  add support for buil-ins and file paths
+use unique names in desugaring modules
+check for import cycles
+check diamond imports handled correctly
+implement the high level desugaring parts
+review: is this a good point to leave it
 
 
 
@@ -118,20 +118,3 @@ include from temp-name:
 end
 
 ------------------------------------------------------------------------------
-
-
-importing from files process
-  files are always relative to the module file
-  built-ins are in a system dir
-
-start with the parsed module
-desugar each built-in to a file
-each file, load it and parse it
-repeat
-while doing this, create a list of filepath, parsed module pairs
-reverse this list at the end, then it can be concatenated and desugared
-while recursing: if a module is seen a second time, it should appear the
-  second time and be removed from the first time it is seen
-how to detect cycles nicely?
-
- 

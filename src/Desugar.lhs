@@ -12,7 +12,7 @@ cases
 
 
 > {-# LANGUAGE TupleSections #-}
-> module Desugar (desugarProgram,desugarExpr) where
+> module Desugar (loadProgramImports, desugarProgram,desugarExpr) where
 
 > import Data.Generics.Uniplate.Data (transformBi)
 > import Data.Maybe (catMaybes, mapMaybe)
@@ -21,13 +21,13 @@ cases
 > import Control.Monad.Except (Except, runExcept, throwError)
 > import Control.Monad (forM, zipWithM, forM_)
 
+> import System.FilePath ((</>), takeBaseName, takeDirectory)
+
 > --import Debug.Trace (trace)
 
 > import qualified Syntax as S
 > import qualified InterpreterSyntax as I
 > import qualified Pretty as P
-
-> -- temporary
 > import Parse (parseProgram)
 
 
@@ -35,8 +35,8 @@ cases
 
 = api
 
-> desugarProgram :: S.Program -> Either String I.Program
-> desugarProgram p =
+> desugarProgram :: [(S.ImportSource,S.Program)] -> Either String I.Program
+> desugarProgram ps =
 >     case runExcept (runRWST f defaultDesugarReader defaultDesugarStore) of
 >         Left e -> Left e
 >         Right (result, _store, _log) -> Right result
@@ -47,10 +47,14 @@ good way to do it
 
 >     f :: RWST DesugarReader [()] DesugarStore (Except String) I.Program
 >     f = do
->         (_nm,stmts) <- desugarProgramPreludeLowLevel True "top-level" p
->         
+>         let desugarPrograms _ [] = pure []
+>             desugarPrograms mp ((impsrc,q):qs) = do
+>                 (nm, sts) <- desugarProgramPreludeLowLevel mp impsrc q
+>                 let mp' = (impsrc, nm) : mp
+>                 (sts :) <$>  desugarPrograms mp' qs
+>         stmts <- concat <$> desugarPrograms [] ps
+>         --trace ("-------------------\n" ++ P.prettyStmts stmts) $ pure ()
 >         (I.Program . seqify) <$> desugarStmts stmts
-
 
 > desugarExpr :: S.Expr -> Either String I.Expr
 > desugarExpr e =
@@ -120,18 +124,120 @@ a slightly improved hack to keep moving without getting stuck doing
 the full plan is to find a pseudo random generator that can put in the
 pure monad state, and also track envs like in the interpreter (without values),
 and then can implement this and other things properly
- 
+
+------------------------------------------------------------------------------
+
+loading imports
+
+before the (pure) desugaring happens, we have to follow all the
+imports and load them.
+
+This takes a program, and returns all the imported programs with their
+filenames. They are returned in an order such that no module
+refers to a later module in the list, and the one you pass
+in is last.
+
+TODO: think about how separate compilation could work
+
+> loadProgramImports :: FilePath -> S.ImportSource -> S.Program -> IO [(S.ImportSource, S.Program)]
+> loadProgramImports cwd imsrc p@(S.Program prs _) = do
+>     -- todo: use transformer to support io either
+>     -- todo: figure out how to handle this with cabal and dev and deploy
+>     let builtInModulePath = "/home/jake/wd/burdock/lang/built-in-modules"
+>     -- get the list of imports
+>     let is = mapMaybe getImportSource prs
+>     -- for each one
+>     --   if it's a builtin, get the filename
+>     --   load the file
+>     --   recurse on load all imports
+>     --   return the list
+>         fns = flip map is $ \i -> case i of
+>                   S.ImportSpecial "file" [fn] -> (i,cwd </> fn)
+>                   S.ImportName x -> (i,builtInModulePath </> x ++ ".tea")
+>                   S.ImportSpecial {} -> error $ "unsupported import : " ++ show i
+>         recurseOnModule (i,fn) = do
+>             src <- readFile fn
+>             let ast = either error id $ parseProgram fn src
+>             loadProgramImports (takeDirectory fn) i ast
+>     allModules <- ((imsrc,p):) <$> concat <$> mapM recurseOnModule fns
+>     -- only have files appear once in the list
+>     let mkUnique _ [] = []
+>         mkUnique seen (x@(mnm,_):xs) =
+>             if mnm `elem` seen
+>             then mkUnique seen xs
+>             else x : mkUnique (mnm : seen) xs
+>     let allModulesUnique = mkUnique [] allModules
+>     -- reverse lists only at the top level
+>     pure $ reverse $ allModulesUnique
+>     -- todo: detect cycles
+>     -- how to memoize and not load files more than once?
+>     -- canonicalize the import sources so we don't load a module twice
+>     -- because it's referred to in two different ways
+>   where
+>     getImportSource (S.Import is _) = Just is
+>     getImportSource _ = Nothing
+
 ------------------------------------------------------------------------------
 
 desugaring programs
 
-pass one:
-change the extra import, include and provide statements into the base ones
-pass two:
-change the base import, include and provides into regular statements
-all this is in the high level syntax
+This code desugars programs to just be lists of statements -
+converting the import, include and provides into regular
+statements. The desugaring method for these is based on representing
+modules as record values. In the future, it will could use a renamer
+instead (at least, representing as record values isn't going to work
+for types).
 
-This is pass two:
+
+High level desugaring takes the full range of supported import,
+include and provide statements, and desugars them to the base set of
+import, include and provide statements.
+
+High level desugaring:
+
+all provides and includes are explicit lists with aliases (expand * as
+well)
+all imports and includes which refer to modules directly are desugared
+to "import file as alias" + extras
+all provides are combined, and if there isn't one, provides: end is
+added
+
+provide: * end
+->
+provide: a,b, ... end
+
+provide: a,b end
+->
+provide: a as a, b as b end
+
+import built-in as X
+->
+import file("<built-in-path-system-defined>/built-in.tea") as X
+
+include <file or built-in>
+->
+import file(xxx) as temp-name
+include from temp-name: * end
+
+
+include from X: * end
+->
+include from X: all the elements of X listed explicitly
+
+
+include from X: a,b end
+->
+include from X: a as a,b as b end
+
+import name1, ... from <some-module>
+->
+import <some-module> as temp-name
+include from temp-name:
+  name1, ...
+end
+
+
+Low level desugaring:
 
 a module of
 provide: a as b, c as d, ... end
@@ -157,23 +263,27 @@ n2 = X.n1
 ...
 
 
-> desugarProgramPreludeLowLevel :: Bool -> String -> S.Program -> DesugarStack (String,[S.Stmt])
-> desugarProgramPreludeLowLevel includeTempModule moduleName (S.Program prels stmts) = do
->     x <- getUnique $ "module-" ++ moduleName
->     (_,tm) <- if includeTempModule
->               then desugarProgramPreludeLowLevel False "my-test" tempBuiltInModule
->               else pure ("",[])
->     is <- desugarImports prels
+> desugarProgramPreludeLowLevel :: [(S.ImportSource, String)]
+>                               -> S.ImportSource
+>                               -> S.Program
+>                               -> DesugarStack (String, [S.Stmt])
+> desugarProgramPreludeLowLevel moduleNameMap impsrc (S.Program prels stmts) = do
+>     let moduleName = case impsrc of
+>                          S.ImportName n -> n
+>                          S.ImportSpecial "file" [fn] -> takeBaseName fn
+>                          _ -> error $ "unsupported import source " ++ show impsrc
+>     desugarModuleName <- getUnique $ "module-" ++ moduleName
+>     is <- desugarImports moduleNameMap prels
 >     rv' <- desugarProvides prels
 >     let rv = case rv' of
 >               [] -> [S.StExpr $ S.Sel $ S.Record []]
 >               _ -> rv'
->     let stmts' = tm ++ is ++
->                  [S.LetDecl (S.Binding (S.IdenP S.NoShadow x)
+>     let stmts' = is ++
+>                  [S.LetDecl (S.Binding (S.IdenP S.NoShadow desugarModuleName)
 >                              (S.Block (stmts ++ rv)))
 >                  ,S.StExpr $ S.Iden "nothing"]
 >     {-trace ("-----------------------\n" ++ P.prettyStmts stmts') $ -}
->     pure (x,stmts')
+>     pure (desugarModuleName, stmts')
 
 > desugarProvides :: [S.PreludeItem] -> DesugarStack [S.Stmt]
 > desugarProvides prs = concat <$> catMaybes <$> mapM desugarProvide prs
@@ -186,13 +296,15 @@ n2 = X.n1
 >     f _ = Nothing
 
 
-> desugarImports :: [S.PreludeItem] -> DesugarStack [S.Stmt]
-> desugarImports prs = concat <$> catMaybes <$> mapM desugarImport prs
+> desugarImports :: [(S.ImportSource, String)] -> [S.PreludeItem] -> DesugarStack [S.Stmt]
+> desugarImports moduleNameMap prs = concat <$> catMaybes <$> mapM desugarImport prs
 >   where
 >     desugarImport :: S.PreludeItem -> DesugarStack (Maybe [S.Stmt])
->     desugarImport (S.Import (S.ImportName z) x) =
->         pure $ Just $ [S.LetDecl (S.Binding (S.IdenP S.NoShadow x)
->                                  (S.Iden z))]
+>     desugarImport (S.Import impsrc x) =
+>         case lookup impsrc moduleNameMap of
+>              Just inm -> pure $ Just $ [S.LetDecl (S.Binding (S.IdenP S.NoShadow x)
+>                                                    (S.Iden inm))]
+>              Nothing -> throwError $ "module not found: " ++ show impsrc ++ "\n" ++ show moduleNameMap
 >     desugarImport (S.IncludeFrom nm pis) | Just x <- mapM (f nm) pis =
 >         pure $ Just $ map (\(n,e) -> S.LetDecl (S.Binding (S.IdenP S.NoShadow n) e)) x
 >     desugarImport _ = pure $ Nothing
@@ -692,7 +804,7 @@ _ = block:
 > desugarPatternBinding (S.Binding (S.AsP (S.VariantP cnm ps) s anm) e) = do
 >     let a0 = (s, anm, e)
 >     -- assert e.variantname == cnm
->         msg = S.Sel (S.Str "pattern match failure, expected ")
+>         msg = S.Sel (S.Str "desugarPatternBinding: pattern match failure in, expected ")
 >               `plus` S.Sel (S.Str cnm) `plus` S.Sel (S.Str ", got ")
 >               `plus` S.App (S.Iden "variant-name") [S.Iden anm]
 >         a1 = (S.NoShadow, "_", S.Block [
@@ -913,16 +1025,3 @@ flag to switch which - e.g top level desugaring works like blocks,
 shadow allowed for top level scripts, or top level works like a
 regular letrec for not script-y programs, and shadow is not allowed
 at the top level at all
-
-
-
-a temporary fake built in module, to get module desugaring right in
-step 1, then do loading additional modules from files in step 2
-
-> tempBuiltInModule :: S.Program
-> tempBuiltInModule = either error id $ parseProgram ""
->     "provide: f as f end\n\
->     \fun f(x):\n\
->     \  x + 1\n\
->     \end"
-

@@ -1,0 +1,11 @@
+import my-test as a
+include from a:
+  f as f
+end
+
+check:
+  # access via the module alias
+  a.f(2) is 3
+  # access via the include
+  f(3) is 4
+end

@@ -1,0 +1,16 @@
+
+# load a module in a local file (relative path)
+# an import path is relative to the path of the module the import is
+# in
+
+import file('my-module.tea') as a
+include from a:
+  g as g
+end
+
+check:
+  # access via the module alias
+  a.g(2) is 3
+  # access via the include
+  g(3) is 4
+end
