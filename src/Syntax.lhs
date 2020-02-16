@@ -24,22 +24,22 @@ The high level syntax which the parser produces
 
 > data Program = Program [PreludeItem]
 >                        [Stmt]
->               deriving (Eq,Show)
+>              deriving (Eq,Show,Data,Typeable,Generic) 
 
 > data PreludeItem = Provide [ProvideItem]
 >                  | Import ImportSource String
 >                  | Include ImportSource
 >                  | IncludeFrom String [ProvideItem]
->                  deriving (Eq,Show)
+>                  deriving (Eq,Show,Data,Typeable,Generic) 
 
 > data ProvideItem = ProvideAll
 >                  | ProvideAlias String String
 >                  | ProvideName String
->                  deriving (Eq,Show)
+>                  deriving (Eq,Show,Data,Typeable,Generic) 
 
 > data ImportSource = ImportSpecial String [String]
 >                   | ImportName String
->                   deriving (Eq,Show)
+>                   deriving (Eq,Show,Data,Typeable,Generic) 
 
  
 
@@ -47,7 +47,10 @@ The high level syntax which the parser produces
 >           | When Expr Expr
 >           | LetDecl Binding
 >           | RecDecl Binding
->           | FunDecl String [Pat] Expr (Maybe [Stmt])
+>           | FunDecl String -- name
+>                     [Pat] -- args
+>                     Expr -- body
+>                     (Maybe [Stmt]) -- test block
 >           | VarDecl Binding
 >           | SetVar String Expr
 >           | SetRef Expr [(String,Expr)]

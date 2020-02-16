@@ -12,7 +12,7 @@ cases
 
 
 > {-# LANGUAGE TupleSections #-}
-> module Desugar (loadProgramImports, desugarProgram,desugarExpr) where
+> module Desugar (loadProgramImports, desugarProgram,desugarExpr, getBuiltInModulesDir) where
 
 > import Data.Generics.Uniplate.Data (transformBi)
 > import Data.Maybe (catMaybes, mapMaybe)
@@ -25,6 +25,7 @@ cases
 > import Paths_teaberry
 
 > --import Debug.Trace (trace)
+> import Text.Show.Pretty (ppShow)
 
 > import qualified Syntax as S
 > import qualified InterpreterSyntax as I
@@ -36,8 +37,8 @@ cases
 
 = api
 
-> desugarProgram :: [(S.ImportSource,S.Program)] -> Either String I.Program
-> desugarProgram ps =
+> desugarProgram :: FilePath -> [(S.ImportSource,S.Program)] -> Either String I.Program
+> desugarProgram builtInModuleDir ps =
 >     case runExcept (runRWST f defaultDesugarReader defaultDesugarStore) of
 >         Left e -> Left e
 >         Right (result, _store, _log) -> Right result
@@ -50,9 +51,10 @@ good way to do it
 >     f = do
 >         let desugarPrograms _ [] = pure []
 >             desugarPrograms mp ((impsrc,q):qs) = do
->                 (nm, sts) <- desugarProgramPreludeLowLevel mp impsrc q
->                 let mp' = (impsrc, nm) : mp
->                 (sts :) <$>  desugarPrograms mp' qs
+>                 (mp',q') <- desugarProgramPreludeHighLevel builtInModuleDir mp q
+>                 (nm, sts) <- desugarProgramPreludeLowLevel mp' impsrc q'
+>                 let mp'' = (impsrc, nm) : mp'
+>                 (sts :) <$>  desugarPrograms mp'' qs
 >         stmts <- concat <$> desugarPrograms [] ps
 >         --trace ("-------------------\n" ++ P.prettyStmts stmts) $ pure ()
 >         (I.Program . seqify) <$> desugarStmts stmts
@@ -140,27 +142,55 @@ in is last.
 
 TODO: think about how separate compilation could work
 
-> loadProgramImports :: FilePath -> S.ImportSource -> S.Program -> IO [(S.ImportSource, S.Program)]
-> loadProgramImports cwd imsrc p@(S.Program prs _) = do
+> getBuiltInModulesDir :: IO FilePath
+> getBuiltInModulesDir = getDataFileName "built-in-modules"
+
+> loadProgramImports :: FilePath -> S.Program -> IO [(S.ImportSource, S.Program)]
+> loadProgramImports pfn (S.Program prs stmts) = do
 >     -- todo: use transformer to support io either
 >     -- get the list of imports
->     let is = mapMaybe getImportSource prs
->     -- for each one
->     --   if it's a builtin, get the filename
->     --   load the file
->     --   recurse on load all imports
->     --   return the list
->     fns <- flip mapM is $ \i -> case i of
->                   S.ImportSpecial "file" [fn] -> pure (i,cwd </> fn)
->                   S.ImportName x -> do
->                       bip <- getDataFileName ("built-in-modules" </> x ++ ".tea")
->                       pure (i,bip)
->                   S.ImportSpecial {} -> error $ "unsupported import : " ++ show i
->     let recurseOnModule (i,fn) = do
+>     let imsrc = S.ImportSpecial "file" [pfn]
+>         cwd = takeDirectory pfn
+>     builtInModulesDir <- getBuiltInModulesDir
+>
+>     -- run through the prelude statements
+>     -- each one that has an import source
+>     -- make sure it has the full path
+>     -- if it's a built in, convert it to a path
+>     let convertIS (S.ImportSpecial "file" [fn]) =
+>             let nfn = cwd </> fn
+>             in (S.ImportSpecial "file" [nfn], Just nfn)
+>         convertIS (S.ImportName x) =
+>             let nfn = builtInModulesDir </> x ++ ".tea"
+>             in (S.ImportSpecial "file" [nfn], Just nfn)
+>         convertIS x = (x, Nothing)
+> 
+>         getImports fns' prs' [] = (fns',prs')
+>         getImports fns' prs' (i@(S.Import is a) : xs) =
+>             let (is', fn) = convertIS is
+>             in case fn of
+>                 Nothing -> getImports fns' (i:prs') xs
+>                 Just fn' -> getImports (fn':fns')
+>                                 (S.Import is' a : prs')
+>                                 xs
+>         getImports fns' prs' (i@(S.Include is) : xs) =
+>             let (is', fn) = convertIS is
+>             in case fn of
+>                 Nothing -> getImports fns' (i:prs') xs
+>                 Just fn' -> getImports (fn':fns')
+>                                 (S.Include is' : prs')
+>                                 xs
+>         getImports fns' prs' (x:xs) =
+>             getImports fns' (x:prs') xs
+>         (fns, prsnew) = getImports [] [] prs
+>         p' = S.Program (reverse prsnew) stmts
+>
+>     --   load the files
+>     let recurseOnModule fn = do
 >             src <- readFile fn
 >             let ast = either error id $ parseProgram fn src
->             loadProgramImports (takeDirectory fn) i ast
->     allModules <- ((imsrc,p):) <$> concat <$> mapM recurseOnModule fns
+>             loadProgramImports fn ast
+>     allModules <- ((imsrc,p'):) <$> concat <$> mapM recurseOnModule fns
 >     -- only have files appear once in the list
 >     let mkUnique _ [] = []
 >         mkUnique seen (x@(mnm,_):xs) =
@@ -169,14 +199,13 @@ TODO: think about how separate compilation could work
 >             else x : mkUnique (mnm : seen) xs
 >     let allModulesUnique = mkUnique [] allModules
 >     -- reverse lists only at the top level
+>     --trace ("-----------loadstuff--------\n " ++ ppShow (map fst allModulesUnique) ++ "\n------------------\n") $ pure ()
 >     pure $ reverse $ allModulesUnique
 >     -- todo: detect cycles
 >     -- how to memoize and not load files more than once?
 >     -- canonicalize the import sources so we don't load a module twice
 >     -- because it's referred to in two different ways
->   where
->     getImportSource (S.Import is _) = Just is
->     getImportSource _ = Nothing
+
 
 ------------------------------------------------------------------------------
 
@@ -202,6 +231,22 @@ all imports and includes which refer to modules directly are desugared
 to "import file as alias" + extras
 all provides are combined, and if there isn't one, provides: end is
 added
+
+do the items need to be reordered?
+
+> desugarProgramPreludeHighLevel :: FilePath -> [(S.ImportSource, String)] -> S.Program -> DesugarStack ([(S.ImportSource, String)], S.Program)
+> desugarProgramPreludeHighLevel builtInModuleDir moduleNameMap p =
+>     desugarImportSource builtInModuleDir moduleNameMap p
+
+> desugarImportSource :: FilePath
+>                     -> [(S.ImportSource, String)]
+>                     -> S.Program
+>                     -> DesugarStack ([(S.ImportSource, String)], S.Program)
+> desugarImportSource builtInModuleDir mp p =
+>     pure (transformBi (\x ->
+>         case x of
+>             S.ImportName s -> S.ImportSpecial "file" [builtInModuleDir </> s ++ ".tea"]
+>             _ -> x) (mp,p))
 
 provide: * end
 ->
@@ -237,6 +282,7 @@ include from temp-name:
   name1, ...
 end
 
+---------------------------------------
 
 Low level desugaring:
 
@@ -270,9 +316,10 @@ n2 = X.n1
 >                               -> DesugarStack (String, [S.Stmt])
 > desugarProgramPreludeLowLevel moduleNameMap impsrc (S.Program prels stmts) = do
 >     let moduleName = case impsrc of
->                          S.ImportName n -> n
 >                          S.ImportSpecial "file" [fn] -> takeBaseName fn
->                          _ -> error $ "unsupported import source " ++ show impsrc
+>                          _ -> error $ "unsupported import source " ++ show impsrc ++ "\n"
+>                                       ++ ppShow moduleNameMap
+>                                       ++ "\n" ++ ppShow prels
 >     desugarModuleName <- getUnique $ "module-" ++ moduleName
 >     is <- desugarImports moduleNameMap prels
 >     rv' <- desugarProvides prels

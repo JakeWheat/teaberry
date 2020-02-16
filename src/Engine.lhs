@@ -27,26 +27,19 @@ once do imports, have an option to run all tests
 
 > import Pretty (prettyProgram)
 > import Parse (parseProgram)
-> import Desugar (loadProgramImports, desugarProgram)
+> import Desugar (loadProgramImports, desugarProgram, getBuiltInModulesDir)
 > import Interpreter (runProgram, Value(..), CheckResult(..))
 > import qualified Interpreter as I
 > import qualified InterpreterSyntax as I
 > import qualified PrettyInterpreter as I
-> import qualified Syntax as S
-> import System.FilePath (takeBaseName, takeDirectory)
 
 > compileProgram :: FilePath -> String -> IO (Either String I.Program)
 > compileProgram fn src = do
 >     -- todo: sort out the monad transformer
 >     let ast = either error id $ parseProgram fn src
->     let mn = S.ImportName $ stripExtras $ if fn == "" then "top-level" else fn
->     ps <- loadProgramImports (takeDirectory fn) mn ast
->     pure $ desugarProgram ps
->   where
->     -- translate a filename into a unique module name
->     -- todo: convert non identifier characters to _
->     stripExtras x = takeBaseName x
-
+>     ps <- loadProgramImports fn ast
+>     builtInModulesDir <- getBuiltInModulesDir
+>     pure $ desugarProgram builtInModulesDir ps
 
 compile report
 
@@ -57,7 +50,7 @@ at the moment, it's totally unreadable and useless for debugging
 > compileReport :: FilePath -> String -> Either String String
 > compileReport fn src = do
 >     ast <- parseProgram fn src
->     iast <- desugarProgram [(S.ImportName "top-level", ast)]
+>     iast <- undefined -- desugarProgram "" [(S.ImportName "top-level", ast)]
 >     pure (ppShow ast ++ "\n==============================\n"
 >           ++ ppShow iast ++ "\n==============================\n"
 >           ++ I.prettyProgram iast)
