@@ -82,7 +82,7 @@ wrapper to lift tests written in the language into tests for the
 >     ,"import_desugar_example.tea"
 >     ,"built-in-module.tea"
 >     ,"local-module.tea"
->     --,"include-module.tea"
+>     ,"include-module.tea"
 >     ,"provide-all.tea"
 >     ,"provide-x.tea"
 >     ,"combine-provides.tea"

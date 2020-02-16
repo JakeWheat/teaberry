@@ -50,13 +50,20 @@ good way to do it
 
 >     f :: RWST DesugarReader [()] DesugarStore (Except String) I.Program
 >     f = do
->         let desugarPrograms _ [] = pure []
->             desugarPrograms mp ((impsrc,q):qs) = do
->                 q' <- desugarProgramPreludeHighLevel q
->                 (nm, sts) <- desugarProgramPreludeLowLevel mp impsrc q'
->                 let mp' = (impsrc, nm) : mp
->                 (sts :) <$>  desugarPrograms mp' qs
->         stmts <- concat <$> desugarPrograms [] ps
+>         let desugarPrograms _ _ [] = pure []
+>             desugarPrograms mp mvnm ((impsrc,q):qs) = do
+>                 -- the name for the local let name for the desugared module
+>                 nmx <- case impsrc of
+>                            S.ImportSpecial "file" [fn] -> pure $ takeBaseName fn
+>                            _ -> throwError $ "unsupported import source " ++ show impsrc ++ "\n"
+>                                       ++ ppShow mp
+>                 localModuleName <- getUnique $ "module-" ++ nmx
+
+>                 (mvnm', q') <- desugarProgramPreludeHighLevel mp mvnm localModuleName q
+>                 sts <- desugarProgramPreludeLowLevel mp localModuleName q'
+>                 let mp' = (impsrc, localModuleName) : mp
+>                 (sts :) <$>  desugarPrograms mp' mvnm' qs
+>         stmts <- concat <$> desugarPrograms [] [] ps
 >         --trace ("-------------------\n" ++ P.prettyStmts stmts) $ pure ()
 >         (I.Program . seqify) <$> desugarStmts stmts
 
@@ -252,15 +259,19 @@ import tables as T
 import chart as C
 import image as I
 
-> desugarProgramPreludeHighLevel :: S.Program -> DesugarStack S.Program
-> desugarProgramPreludeHighLevel p = do
+> desugarProgramPreludeHighLevel :: [(S.ImportSource, String)]
+>                                -> [(String, [String])]
+>                                -> String -- the desugared let name for this module
+>                                -> S.Program
+>                                -> DesugarStack ([(String,[String])], S.Program)
+> desugarProgramPreludeHighLevel moduleNameMap moduleValueNameMap nm p = do
 >     p0 <- desugarIncludeModule p
 >     -- importfrom todo here
->     p1 <- desugarIncludeAll undefined undefined p0
->     (_modNames,p2) <- desugarProvideAll p1
+>     p1 <- desugarIncludeAll moduleNameMap moduleValueNameMap p0
+>     (modNames,p2) <- desugarProvideAll p1
 >     p3 <- desugarProvideIncludeAliases p2
 >     p4 <- desugarToOneProvide p3
->     pure p4
+>     pure ((nm, modNames) : moduleValueNameMap, p4)
 
 include
 
@@ -305,24 +316,41 @@ include from X: all the elements of X listed explicitly
 
 to support include all:
 1. go from the alias to the import filename
+   this can be done locally
 2. go from the import filename to the internal modulename
+   this is the map that is created
 3. from the internal module name, can look up the exposed names
+   this is the other map that is created
 
 > desugarIncludeAll :: [(S.ImportSource, String)]
 >                   -> [(String,[String])]
 >                   -> S.Program
 >                   -> DesugarStack S.Program
-> desugarIncludeAll _moduleNameMap _moduleValueNameMap p@(S.Program _prs _stmts) = pure p {-do
->     prs' <- mapM f prs
+> desugarIncludeAll moduleNameMap moduleValueNameMap (S.Program prs stmts) = do
+>     -- create the map from aliases to import sources
+>     let aliasMap = flip mapMaybe prs $ \x -> case x of
+>                        (S.Import is alias) -> Just (alias,is)
+>                        _ -> Nothing
+>     prs' <- mapM (f aliasMap) prs
 >     pure (S.Program prs' stmts)
 >   where
->     f (S.IncludeFrom a is) =
->         is' <- mapM (g a) is
->         pure $ S.IncludeFrom a is'
->     f x = pure x
->     g a ProvideAll = do
->         
->     g _ x = pure x-}
+>     f aliasMap (S.IncludeFrom alias is) = do
+>         is' <- mapM (g aliasMap alias) is
+>         pure $ S.IncludeFrom alias $ concat is'
+>     f _ x = pure x
+>     g :: [(String,S.ImportSource)] -> String -> S.ProvideItem -> DesugarStack [S.ProvideItem]
+>     g aliasMap alias S.ProvideAll = do
+>         is <- maybe (throwError $ "desugarincludeall:include from alias not found: " ++ alias
+>                                    ++ "\n" ++ show aliasMap)
+>               pure $ lookup alias aliasMap
+>         xis <- maybe (throwError $ "desugarincludeall: internal error module not found: " ++ show is
+>                                    ++ "\n" ++ show moduleNameMap)
+>                pure $ lookup is moduleNameMap
+>         nms <- maybe (throwError $ "desugarincludeall: internal error module names not found: " ++ show xis
+>                                    ++ "\n" ++ show moduleValueNameMap)
+>                pure $ lookup xis moduleValueNameMap
+>         pure $ map S.ProvideName nms
+>     g _ _ x = pure [x]
 > 
 
 
@@ -397,16 +425,10 @@ n2 = X.n1
 
 
 > desugarProgramPreludeLowLevel :: [(S.ImportSource, String)]
->                               -> S.ImportSource
+>                               -> String
 >                               -> S.Program
->                               -> DesugarStack (String, [S.Stmt])
-> desugarProgramPreludeLowLevel moduleNameMap impsrc (S.Program prels stmts) = do
->     let moduleName = case impsrc of
->                          S.ImportSpecial "file" [fn] -> takeBaseName fn
->                          _ -> error $ "unsupported import source " ++ show impsrc ++ "\n"
->                                       ++ ppShow moduleNameMap
->                                       ++ "\n" ++ ppShow prels
->     desugarModuleName <- getUnique $ "module-" ++ moduleName
+>                               -> DesugarStack [S.Stmt]
+> desugarProgramPreludeLowLevel moduleNameMap localModuleName (S.Program prels stmts) = do
 >     (prels', is) <- desugarImports moduleNameMap prels
 >     (prels'', rv') <- desugarProvides prels'
 >     case prels'' of
@@ -417,11 +439,11 @@ n2 = X.n1
 >               [] -> throwError $ "internal error: no provides in desugared module"
 >               _ -> throwError $ "internal error: multiple provides in desugared module"
 >     let stmts' = is ++
->                  [S.LetDecl (S.Binding (S.IdenP S.NoShadow desugarModuleName)
+>                  [S.LetDecl (S.Binding (S.IdenP S.NoShadow localModuleName)
 >                              (S.Block (stmts ++ rv)))
 >                  ,S.StExpr $ S.Iden "nothing"]
 >     {-trace ("-----------------------\n" ++ P.prettyStmts stmts') $ -}
->     pure (desugarModuleName, stmts')
+>     pure stmts'
 
 > desugarProvides :: [S.PreludeItem] -> DesugarStack ([S.PreludeItem], [S.Stmt])
 > desugarProvides prs =
