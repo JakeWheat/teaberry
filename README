@@ -58,9 +58,11 @@ check, where
 
 shadow (syntax only, shadowing not detected)
 
+usable subset of import, provide, include
+
 ## planned
 
-import
+full import, provide, include support
 
 contracts and annotations
 

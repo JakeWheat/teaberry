@@ -16,9 +16,9 @@ DONE implement the desugaring for all of this
 DONE load actual files
   add support for built-ins and file paths
 DONE use unique names in desugaring modules
+implement the high level desugaring parts
 check for import cycles
 check diamond imports handled correctly
-implement the high level desugaring parts
 review: is this a good point to leave it
 
 
