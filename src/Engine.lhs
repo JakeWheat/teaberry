@@ -27,7 +27,7 @@ once do imports, have an option to run all tests
 
 > import Pretty (prettyProgram)
 > import Parse (parseProgram)
-> import Desugar (loadProgramImports, desugarProgram, getBuiltInModulesDir)
+> import Desugar (loadProgramImports, desugarProgram)
 > import Interpreter (runProgram, Value(..), CheckResult(..))
 > import qualified Interpreter as I
 > import qualified InterpreterSyntax as I
@@ -38,8 +38,7 @@ once do imports, have an option to run all tests
 >     -- todo: sort out the monad transformer
 >     let ast = either error id $ parseProgram fn src
 >     ps <- loadProgramImports fn ast
->     builtInModulesDir <- getBuiltInModulesDir
->     pure $ desugarProgram builtInModulesDir ps
+>     pure $ desugarProgram ps
 
 compile report
 

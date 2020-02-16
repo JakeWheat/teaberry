@@ -16,6 +16,7 @@ cases
 
 > import Data.Generics.Uniplate.Data (transformBi)
 > import Data.Maybe (catMaybes, mapMaybe)
+> import Data.Either (partitionEithers)
 
 > import Control.Monad.RWS (RWST(..), runRWST, ask, local,state, get)
 > import Control.Monad.Except (Except, runExcept, throwError)
@@ -37,8 +38,8 @@ cases
 
 = api
 
-> desugarProgram :: FilePath -> [(S.ImportSource,S.Program)] -> Either String I.Program
-> desugarProgram builtInModuleDir ps =
+> desugarProgram :: [(S.ImportSource,S.Program)] -> Either String I.Program
+> desugarProgram ps =
 >     case runExcept (runRWST f defaultDesugarReader defaultDesugarStore) of
 >         Left e -> Left e
 >         Right (result, _store, _log) -> Right result
@@ -51,10 +52,10 @@ good way to do it
 >     f = do
 >         let desugarPrograms _ [] = pure []
 >             desugarPrograms mp ((impsrc,q):qs) = do
->                 (mp',q') <- desugarProgramPreludeHighLevel builtInModuleDir mp q
->                 (nm, sts) <- desugarProgramPreludeLowLevel mp' impsrc q'
->                 let mp'' = (impsrc, nm) : mp'
->                 (sts :) <$>  desugarPrograms mp'' qs
+>                 q' <- desugarProgramPreludeHighLevel q
+>                 (nm, sts) <- desugarProgramPreludeLowLevel mp impsrc q'
+>                 let mp' = (impsrc, nm) : mp
+>                 (sts :) <$>  desugarPrograms mp' qs
 >         stmts <- concat <$> desugarPrograms [] ps
 >         --trace ("-------------------\n" ++ P.prettyStmts stmts) $ pure ()
 >         (I.Program . seqify) <$> desugarStmts stmts
@@ -232,48 +233,58 @@ to "import file as alias" + extras
 all provides are combined, and if there isn't one, provides: end is
 added
 
-do the items need to be reordered?
+do the prelude items need to be reordered so they work in any order?
+can you write:
 
-> desugarProgramPreludeHighLevel :: FilePath -> [(S.ImportSource, String)] -> S.Program -> DesugarStack ([(S.ImportSource, String)], S.Program)
-> desugarProgramPreludeHighLevel builtInModuleDir moduleNameMap p =
->     desugarImportSource builtInModuleDir moduleNameMap p
+include from SD: * end
+import string-dict as SD
 
-> desugarImportSource :: FilePath
->                     -> [(S.ImportSource, String)]
->                     -> S.Program
->                     -> DesugarStack ([(S.ImportSource, String)], S.Program)
-> desugarImportSource builtInModuleDir mp p =
->     pure (transformBi (\x ->
->         case x of
->             S.ImportName s -> S.ImportSpecial "file" [builtInModuleDir </> s ++ ".tea"]
->             _ -> x) (mp,p))
+I think it's ok to demand these are in the right order (unless confirm
+ that pyret doesn't require this)
 
-provide: * end
-->
-provide: a,b, ... end
+provides can be in any order because of how the desugaring works, and
+pyret supports this also, e.g.:
 
-provide: a,b end
-->
-provide: a as a, b as b end
+provide from T: * end
+provide from C: * end
+provide from I: * end
+import tables as T
+import chart as C
+import image as I
 
-import built-in as X
-->
-import file("<built-in-path-system-defined>/built-in.tea") as X
+> desugarProgramPreludeHighLevel :: S.Program -> DesugarStack S.Program
+> desugarProgramPreludeHighLevel p = do
+>     p0 <- desugarIncludeModule p
+>     -- importfrom todo here
+>     p1 <- desugarIncludeAll undefined undefined p0
+>     (_modNames,p2) <- desugarProvideAll p1
+>     p3 <- desugarProvideIncludeAliases p2
+>     p4 <- desugarToOneProvide p3
+>     pure p4
+
+include
+
+includeall
+provideall
+provideincludealiases
 
 include <file or built-in>
 ->
 import file(xxx) as temp-name
 include from temp-name: * end
 
+> desugarIncludeModule :: S.Program -> DesugarStack S.Program
+> desugarIncludeModule (S.Program prs stmts) = do
+>     prs' <- concat <$> mapM dim prs
+>     pure (S.Program prs' stmts)
+>   where
+>     dim (S.Include is) = do
+>         nm <- getUnique "include-module"
+>         pure [S.Import is nm
+>              ,S.IncludeFrom nm [S.ProvideAll]]
+>     dim x = pure [x]
 
-include from X: * end
-->
-include from X: all the elements of X listed explicitly
 
-
-include from X: a,b end
-->
-include from X: a as a,b as b end
 
 import name1, ... from <some-module>
 ->
@@ -281,6 +292,81 @@ import <some-module> as temp-name
 include from temp-name:
   name1, ...
 end
+
+not supported in the parser/syntax yet
+
+todo: add this as soon as the others are added, it's simple and very
+ handy
+
+
+include from X: * end
+->
+include from X: all the elements of X listed explicitly
+
+to support include all:
+1. go from the alias to the import filename
+2. go from the import filename to the internal modulename
+3. from the internal module name, can look up the exposed names
+
+> desugarIncludeAll :: [(S.ImportSource, String)]
+>                   -> [(String,[String])]
+>                   -> S.Program
+>                   -> DesugarStack S.Program
+> desugarIncludeAll _moduleNameMap _moduleValueNameMap p@(S.Program _prs _stmts) = pure p {-do
+>     prs' <- mapM f prs
+>     pure (S.Program prs' stmts)
+>   where
+>     f (S.IncludeFrom a is) =
+>         is' <- mapM (g a) is
+>         pure $ S.IncludeFrom a is'
+>     f x = pure x
+>     g a ProvideAll = do
+>         
+>     g _ x = pure x-}
+> 
+
+
+provide: * end
+->
+provide: a,b, ... end
+
+> desugarProvideAll :: S.Program
+>                   -> DesugarStack ([String], S.Program)
+> desugarProvideAll (S.Program prs stmts) = do
+>     provideAllNames <- expandProvideAll stmts
+>     let prs' = map (epa provideAllNames) prs
+>     pure (provideAllNames, S.Program prs' stmts)
+>   where
+>     epa nms (S.Provide xs) = S.Provide $ concatMap (ep nms) xs
+>     epa _ p = p
+>     ep nms (S.ProvideAll) = map S.ProvideName nms
+>     ep _ x = [x]
+
+
+provide: a,b end
+->
+provide: a as a, b as b end
+
+include from X: a,b end
+->
+include from X: a as a,b as b end
+
+> desugarProvideIncludeAliases :: S.Program -> DesugarStack S.Program
+> desugarProvideIncludeAliases = pure . transformBi ( \x -> case x of
+>     S.ProvideName s -> S.ProvideAlias s s
+>     _ -> x)
+
+> desugarToOneProvide :: S.Program -> DesugarStack S.Program
+> desugarToOneProvide (S.Program prs stmts) =
+>     let fs = flip map prs $ \x -> case x of
+>                  S.Provide is -> Left is
+>                  _ -> Right x
+>         (pr, os) = partitionEithers fs
+>         pr1 = case concat pr of
+>                   [] -> S.Provide []
+>                   xs -> S.Provide xs
+>     in pure $ S.Program (pr1:os) stmts
+
 
 ---------------------------------------
 
@@ -321,11 +407,15 @@ n2 = X.n1
 >                                       ++ ppShow moduleNameMap
 >                                       ++ "\n" ++ ppShow prels
 >     desugarModuleName <- getUnique $ "module-" ++ moduleName
->     is <- desugarImports moduleNameMap prels
->     rv' <- desugarProvides prels
->     let rv = case rv' of
->               [] -> [S.StExpr $ S.Sel $ S.Record []]
->               _ -> rv'
+>     (prels', is) <- desugarImports moduleNameMap prels
+>     (prels'', rv') <- desugarProvides prels'
+>     case prels'' of
+>         x:_ -> throwError $ "unsupported prelude statement " ++ show x
+>         [] -> pure ()
+>     rv <- case rv' of
+>               [_] -> pure rv'
+>               [] -> throwError $ "internal error: no provides in desugared module"
+>               _ -> throwError $ "internal error: multiple provides in desugared module"
 >     let stmts' = is ++
 >                  [S.LetDecl (S.Binding (S.IdenP S.NoShadow desugarModuleName)
 >                              (S.Block (stmts ++ rv)))
@@ -333,32 +423,64 @@ n2 = X.n1
 >     {-trace ("-----------------------\n" ++ P.prettyStmts stmts') $ -}
 >     pure (desugarModuleName, stmts')
 
-> desugarProvides :: [S.PreludeItem] -> DesugarStack [S.Stmt]
-> desugarProvides prs = concat <$> catMaybes <$> mapM desugarProvide prs
+> desugarProvides :: [S.PreludeItem] -> DesugarStack ([S.PreludeItem], [S.Stmt])
+> desugarProvides prs =
+>     (\(a,b) -> (a,concat b)) <$> partitionEithers <$> mapM desugarProvide prs
 >   where
->     desugarProvide :: S.PreludeItem -> DesugarStack (Maybe [S.Stmt])
+>     desugarProvide :: S.PreludeItem -> DesugarStack (Either S.PreludeItem [S.Stmt])
 >     desugarProvide (S.Provide pis) | Just x <- mapM f pis =
->         pure $ Just [S.StExpr $ S.Sel $ S.Record x]
->     desugarProvide _ = pure $ Nothing
+>         pure $ Right [S.StExpr $ S.Sel $ S.Record x]
+>     desugarProvide x = pure $ Left x
 >     f (S.ProvideAlias n m) = Just (m,S.Iden n)
 >     f _ = Nothing
 
 
-> desugarImports :: [(S.ImportSource, String)] -> [S.PreludeItem] -> DesugarStack [S.Stmt]
-> desugarImports moduleNameMap prs = concat <$> catMaybes <$> mapM desugarImport prs
+> desugarImports :: [(S.ImportSource, String)] -> [S.PreludeItem] -> DesugarStack ([S.PreludeItem], [S.Stmt])
+> desugarImports moduleNameMap prs =
+>     (\(a,b) -> (a,concat b)) <$> partitionEithers <$> mapM desugarImport prs
 >   where
->     desugarImport :: S.PreludeItem -> DesugarStack (Maybe [S.Stmt])
+>     desugarImport :: S.PreludeItem -> DesugarStack (Either S.PreludeItem [S.Stmt])
 >     desugarImport (S.Import impsrc x) =
 >         case lookup impsrc moduleNameMap of
->              Just inm -> pure $ Just $ [S.LetDecl (S.Binding (S.IdenP S.NoShadow x)
+>              Just inm -> pure $ Right $ [S.LetDecl (S.Binding (S.IdenP S.NoShadow x)
 >                                                    (S.Iden inm))]
 >              Nothing -> throwError $ "module not found: " ++ show impsrc ++ "\n" ++ show moduleNameMap
 >     desugarImport (S.IncludeFrom nm pis) | Just x <- mapM (f nm) pis =
->         pure $ Just $ map (\(n,e) -> S.LetDecl (S.Binding (S.IdenP S.NoShadow n) e)) x
->     desugarImport _ = pure $ Nothing
+>         pure $ Right $ map (\(n,e) -> S.LetDecl (S.Binding (S.IdenP S.NoShadow n) e)) x
+>     desugarImport x = pure $ Left x
 >     f nm (S.ProvideAlias n m) = Just (m,S.DotExpr (S.Iden nm) n)
 >     f _ _ = Nothing
 
+
+---------------------------------------
+
+provide * desugaring
+
+how to tell what explicit list provide * should expand to?
+
+write a new pass, we only need the top level letdecls (and variations)
+of the user syntax + the values which are generated by data definitions
+
+> expandProvideAll :: [S.Stmt] -> DesugarStack [String]
+> expandProvideAll [] = pure []
+> expandProvideAll (S.LetDecl (S.Binding p _) : xs) =
+>     (getBindingNames p ++) <$> expandProvideAll xs
+> expandProvideAll (S.RecDecl (S.Binding p _) : xs) =
+>     (getBindingNames p ++) <$> expandProvideAll xs
+> expandProvideAll (S.VarDecl (S.Binding p _) : xs) =
+>     (getBindingNames p ++) <$> expandProvideAll xs
+> expandProvideAll (S.FunDecl nm _ _ _ : xs) =
+>     (nm:) <$> expandProvideAll xs
+> expandProvideAll (S.DataDecl {} : xs) =
+>     --todo
+>     expandProvideAll xs
+> expandProvideAll (_ : xs) = expandProvideAll xs
+
+> getBindingNames :: S.Pat -> [String]
+> getBindingNames (S.IdenP _ s) = [s]
+> getBindingNames (S.VariantP _ ps) = concatMap getBindingNames ps
+> getBindingNames (S.TupleP ps) = concatMap getBindingNames ps
+> getBindingNames (S.AsP p _ nm) = nm : getBindingNames p
 
 ------------------------------------------------------------------------------
 
