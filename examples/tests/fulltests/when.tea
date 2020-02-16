@@ -5,7 +5,7 @@ check:
   # multiple bugs:
   # 1 when should be an implicit block?
   # 2 with the block it gives a weird error instead of working
-  #|
+  # update: at least some of these bugs are not there anymore
   var a = 1
   when 1 == 2: block:
     a := 2
@@ -15,8 +15,7 @@ check:
   when 2 == 2: block:
     a := 3
   end end
-  a is 4
+  a is 3
 
-  |#
   
 end

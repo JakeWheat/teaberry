@@ -67,7 +67,7 @@ wrapper to lift tests written in the language into tests for the
 >     ,"vars.tea"
 >     ,"tuples.tea"
 >     ,"records.tea"
->     ,"lists.tea"
+>     ,"lists-basics.tea"
 >     ,"agdt.tea"
 >     ,"ref.tea"
 
@@ -86,6 +86,8 @@ wrapper to lift tests written in the language into tests for the
 >     ,"prelude-provide-x.tea"
 >     ,"prelude-combine-provides.tea"
 >     ,"prelude-import-from.tea"
+
+>     ,"lists.tea"
 
 >     ,"tour.tea"
 >     ]

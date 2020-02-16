@@ -16,9 +16,12 @@ DONE implement the desugaring for all of this
 DONE load actual files
   add support for built-ins and file paths
 DONE use unique names in desugaring modules
-implement the high level desugaring parts
+DONE implement the high level desugaring parts
 check for import cycles
 check diamond imports handled correctly
+memoize loading files
+document unimplemented bits
+check reexporting stuff in various ways works
 review: is this a good point to leave it
 
 
@@ -40,81 +43,29 @@ include from X: * end
 include from X: a end
 include from X: a,b end
 include from X: a as b end
-
-------------------------------------------------------------------------------
-
-external desugaring (convert to interpreter syntax)
-
-target:
-import file('path') as X
-include from X:
-  n1 as n2, ...
-end
-provide:
-  n1 as n2, ...
-end
-
-import file('path') as X
-->
-X = module-path-hidden-name
-include from X:
-  n1 as n2, ...
-end
-->
-n2 = X.n1
-# imports and includes need to be ordered
-
-provide: n1 as n2, ... end
--> desugared to a record value
-{n2 : n1, ...}
-# multiple provides should be combined
-# not sure if need this right now
-# if there is no provides, then the record value is {}
-
-file is desugared to:
-
-module-file-hidden-name = block:
-  ...
-  {n1 : n2, ...} # provides
-end
-
----------------------------------------
-
-internal desugaring (macro/ from surface syntax to surface syntax)
-
-provide: * end
-->
-provide: a,b, ... end # figure out how to find all the values
-  # is it very trivial, or just trivial?
-
-provide: a,b end
-->
-provide: a as a, b as b end
-
-import built-in as X
-->
-import file("<built-in-path-system-defined>/built-in.tea") as X
-
-include file or built-in
-->
-import file(xxx) as temp-name
-include from temp-name: * end
-
-
-include from X: * end
-->
-include from X: all the elements of X listed explicitly
-
-
-include from X: a,b end
-->
-include from X: a as a,b as b end
-
-import name1, ... from <some-module>
-->
-import <some-module> as temp-name
-include from temp-name:
   name1, ...
 end
 
-------------------------------------------------------------------------------
+import n1, n2, ... from my-builtin
+
+Unsupported complete list?
+
+provide: type x end
+provide: data x end
+provide:
+  data MyPosn hiding (pos2d, pos3d)
+end
+
+the non-file non-built in import sources
+
+provide:
+  * hiding (concat-helper)
+end
+provide from SD: * end
+provide:
+  module SD
+end
+
+provide *
+provide-types *
+  not sure if these are deprecated
