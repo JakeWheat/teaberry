@@ -1,0 +1,251 @@
+
+# a mess of tests and examples which aren't organised yet
+
+check "ifs":
+
+  if true: 1 else: 2 end is 1
+  if false: 1 else: 2 end is 2
+
+end
+
+
+check "vars":
+  var x = 10
+  x is 10
+  x := 15
+  x is 15
+end
+
+double = lam(x): x + x end
+quad = lam(x): double(double(x)) end
+const5 = lam(_): 5 end
+f4 = lam(x): if x: 1 else: 0 end end
+add2 = lam(a): a + 2 end
+
+check "idens, lambdas":
+  add2(1) is 3
+  5 + quad(3) is 17
+  const5(3) * 4 is 20
+  10 + const5(10) is 10 + 5
+  10 + double(1 + 2) is 10 + 3 + 3
+  10 + quad(1 + 2) is 10 + 3 + 3 + 3 + 3
+end
+
+check:
+  lam(x): x + 5 end(10) is 15
+  let x=4,y=5: x + y end is 9
+  let x=4,y=5: x - y end is -1
+  let myF=lam(x): x + 5 end: myF(20) end is 25
+  block:
+    1 + 2
+    3 + 4
+  end is 7
+end
+
+aa = 5
+block:
+  print(torepr(aa))
+end
+
+
+fun square(n):
+  n * n
+end
+
+check:
+  square(4) is 16
+  square(2) is 4
+end
+
+fun apply-twice(f, x):
+  f(f(x))
+where:
+  apply-twice(square, 2) is 16
+  apply-twice(square, 3) is 81
+end
+
+check:
+  apply-twice(lam(x): x + 1 end, 10) is 12
+end
+
+fun fact1(n #|:: NumNonNegative|#) #|-> Number|#:
+  #doc: "Returns n! = 1 * 2 * 3 ... * n"
+  if n == 0: 1
+  else:
+    n * fact1(n - 1)
+  end
+where:
+  fact1(1) is 1
+  fact1(5) is 120
+end
+
+check:
+  letrec fact = lam(n):
+    if n == 1: 1 else: n * fact(n - 1) end
+  end: fact(5) end is 120
+end
+
+check:
+  lam(): 7 end() is 7
+end
+
+check:
+  letrec
+    fact = lam(n): if n == 1: 1 else: n * fact(n - 1) end end,
+    abc = 5:
+    fact(abc)
+  end is 120
+  
+  letrec
+    fact = lam(n): if n == 1: 1 else: n * fact(n - 1) end end,
+    abc = fact(5):
+    abc
+  end is 120
+  
+  letrec
+    abc = fact(5),
+    fact = lam(n): if n == 1: 1 else: n * fact(n - 1) end end:
+    abc
+  end is 120
+
+  letrec
+    zero = 0,
+    one = zero + 1
+    : one
+  end is 1
+
+end
+
+check:
+
+  #todo: review the tests, some weird syntax bits because of the way
+  # these were previously run in the haskell tests
+  # try to make it more idiomatic
+
+  fun addeven4(x): if x == 0: 0 else: x + addodd4(x - 1) end end
+  fun addodd4(x): if x == 0: 0 else: x + addeven4(x - 1) end end
+  addeven4(6) is 21
+end
+
+check:
+  a = 4
+  a + 3 is 7
+end
+  
+check:
+  a = 4
+  b = 5
+  a + b is 9
+end
+  
+check:
+  f1 = lam(factx,x): if x == 0: 1 else: x * factx(factx,x - 1) end end
+  fact = lam(y): f1(f1,y) end
+  fact(1) is 1
+end
+  
+check:
+  var a = 5
+  a is 5
+end
+  
+check:
+  var a = 5
+  a := 6
+  a is 6
+end
+  
+check:
+  var a = 5
+  a := a + 1
+  a is 6
+end
+
+
+fun mk-counter():
+  var ctr = 0
+  lam(): block:
+      ctr := ctr + 1
+      ctr
+    end
+  end
+end
+
+check:
+  x = mk-counter()
+  y = mk-counter()
+  y() is 1
+  y() is 2
+  x() is 1
+  y() is 3
+end
+
+check:
+  fun fact(x):
+    if x == 0: 1
+    else: x * fact(x - 1)
+    end
+  end
+  fact(5) is 120
+end
+  
+check:
+  rec fact = lam(x):
+    if x == 0: 1
+    else: x * fact(x - 1)
+    end
+  end
+  fact(5) is 120
+end
+
+check:
+  letrec 
+    addeven = lam(x) : if x == 0: 0 else: x + addodd(x - 1) end end,
+    addodd = lam(x) : if x == 0: 0 else: x + addeven(x - 1) end end:
+    addeven(6)
+  end is 21
+end
+
+check:
+  f = lam(x, y): x - y end
+  f(5, 3) is 2
+end
+
+# todo: needs patterns in arg lists implementing
+#|
+check:
+  f = lam({x;y}): x - y end
+  f({5;3}) is 2
+end
+|#
+
+check:
+  x = 10
+  f = lam(y): y + x end
+  f(5) is 15
+end
+#|
+check:
+  x = 10
+  f = {(y :: Number) -> Number: x + y}
+  f(5) is 15
+end
+
+check:
+  o = {x : "original-x", y: "original-y"}
+  o2 = o.{x : "new-x", z : "new-z"}
+  o2.x is "new-x"
+  o2.y is "original-y"
+  o2.z is "new-z"
+end
+|#
+
+rec countdown-good =
+  # countdown-good is in scope here, because of the 'rec'
+  lam(n):
+    if n == 0: true
+    else: countdown-good(n - 1) # so this call is fine
+    end
+  end
+
+countdown-good(5)

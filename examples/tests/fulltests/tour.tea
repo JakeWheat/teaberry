@@ -1,55 +1,204 @@
-# todo:
-# rewrite to be more idiomatic
-# document it better
-# add individual tests to other files so they become the tests
-# and this becomes a small tour of the language
 
-check "ifs":
+#|
 
+This language has a lot in common with Pyret, two books on Pyret:
+* https://www.pyret.org/docs/latest/index.html
+* https://papl.cs.brown.edu/2019/index.html
+
+# Basic syntax
+
+Identifiers start with a letter, and can contain letters, numbers, +,
+- _
+kebab-case is the convention.
+
+Line comments start with #
+Block comments are delimted with #| and |#
+
+Strings are delimited with " or '. No escaping at the moment
+
+Function application looks like this: f(a), g(b,c)
+
+A small number of infix binary operators are supported, a == b, c + d.
+
+Parens a - (b + c)
+
+All whitespace is insignificant, except to separate two tokens which
+would otherwise be interpreted as one. (It will be modified to match
+Pyret: you need a newline between statements, you must have space
+around binary operators, you cannot have a space between a function
+valued expression and the parens for the function arguments.)
+
+Fixity
+
+The fixity isn't handled at the moment. If you don't use parens expect
+to get something wrong.
+
+
+Modules
+
+The following module-oriented statements are supported:
+
+# exports the name a from the current module
+provide: a, ... end
+
+# exports all the names
+provide: * end
+
+# exports the name a as b
+provide: a as b, ... end
+
+# imports the file 'file.tea' (relative to the importing module's path)
+# puts the values under the qualifier X
+import file("file.tea") as X
+
+# imports the built in module string-dict
+import string-dict as X
+
+# takes the name a under X.a, and makes it available as just a
+include from X: a, ... end
+# takes all the names under X and makes them available without th X
+include from X: * end
+# makes the name X.a available as b
+include from X: a as b, ... end
+
+# includes all the names from 'file.tea' without a qualifier
+include file("file.tea")
+
+# includes the names n1, n2, ... from my-builtin without a qualifier
+import n1, n2, ... from my-builtin
+
+All module statements must appear at the start of the module before
+any other statements.
+
+|#
+
+import lists as L
+
+
+# Check blocks are used for testing
+
+check:
+  1 is 1
+  # this one would fail
+  #1 is 2
+end
+
+# todo: this isn't a very gentle start
+
+check "let and letrec expressions":
+  let b = 5: b end is 5
+  # values are constants, they can't be updated (but can be shadowed)
+   
+  # doesn't need letrec
+  let a = 1, b = a + 1: a + b end is 3
+   
+  letrec fact = lam(n):
+    if n == 1: 1 else: n * fact(n - 1) end
+  end: fact(5) end is 120
+
+  # letrec supports constants:
+  letrec
+    zero = 0,
+    one = zero + 1
+    : one
+  end is 1
+
+  # the keyword shadow in bindings is ignored at the moment
+  # all variables can be shadowed without warning
+  # in the future shadowing a variable without the keyword shadow
+  # will be an error
+  let shadow a = 5: a end is 5
+
+end
+
+check "functions, lambdas and closures":
+  fun f(a): a + 1 end
+  f(2) is 3
+  let g = lam(a): a + 1 end: g(2) end is 3
+  b = 2
+  let h = lam(a): a + b end: h(2) end is 4
+  let f2 = lam(c,d): c + d end: f2(2,3) end is 5
+end 
+
+check "if and ask":
   if true: 1 else: 2 end is 1
   if false: 1 else: 2 end is 2
 
+  x = -5
+  
+  ask:
+    | x == 0 then: 1
+    | x > 0 then: x
+    | otherwise: x * -1
+  end is 5
+  
+
 end
 
+check "blocks and statements":
+  # blocks can have a list of statements
+  # the value of a block is the value of the last statement
 
-check "vars":
-  var x = 10
-  x is 10
-  x := 15
-  x is 15
-end
-
-double = lam(x): x + x end
-quad = lam(x): double(double(x)) end
-const5 = lam(_): 5 end
-f4 = lam(x): if x: 1 else: 0 end end
-add2 = lam(a): a + 2 end
-
-check "idens, lambdas":
-  add2(1) is 3
-  5 + quad(3) is 17
-  const5(3) * 4 is 20
-  10 + const5(10) is 10 + 5
-  10 + double(1 + 2) is 10 + 3 + 3
-  10 + quad(1 + 2) is 10 + 3 + 3 + 3 + 3
-end
-
-check:
-  lam(x): x + 5 end(10) is 15
-  let x=4,y=5: x + y end is 9
-  let x=4,y=5: x - y end is -1
-  let myF=lam(x): x + 5 end: myF(20) end is 25
   block:
     1 + 2
     3 + 4
   end is 7
+
+  # statements: any expression can also be a statement
+  # let statement
+  a = 5
+  # when statement
+  when a == 5:
+    print("a is 5")
+  end
+  
 end
 
-aa = 5
-block:
-  print(torepr(aa))
+check "rec, fun, where":
+  # define function using a regular let statement
+  f = lam(x): x + 1 end
+  # define function using fun
+  fun f1(x): x + 1 end
+
+  f(1) is 2
+  f1(2) is 3
+
+  # a regular let statement is not recursive, use a rec statement
+  # for this
+  rec fact = lam(x):
+    if x == 0: 1
+    else: x * fact(x - 1)
+    end
+  end
+  fact(5) is 120
+
+  # fun is recursive:
+  fun fact1(n):
+    if n == 0: 1
+    else:
+      n * fact1(n - 1)
+    end
+  end
+
+  fact1(5) is 120
+
+  # you can attach tests to a function. these tests will run in testing mode
+  # whenever that function definition is evaluated (so 0 to n times,
+  # unlike top level check blocks)
+
+  fun fact1(n):
+    if n == 0: 1
+    else:
+      n * fact1(n - 1)
+    end
+  where:
+    fact1(1) is 1
+    fact1(5) is 120
+  end
+
 end
 
+# the top level is an implicit block:
 
 fun square(n):
   n * n
@@ -71,186 +220,160 @@ check:
   apply-twice(lam(x): x + 1 end, 10) is 12
 end
 
-fun fact1(n #|:: NumNonNegative|#) #|-> Number|#:
-  #doc: "Returns n! = 1 * 2 * 3 ... * n"
-  if n == 0: 1
-  else:
-    n * fact1(n - 1)
-  end
-where:
-  fact1(1) is 1
-  fact1(5) is 120
-end
+# any number of fun and rec statements next to each other are
+# mutually recursive:
+
+fun addeven(x): if x == 0: 0 else: x + addodd(x - 1) end end
+fun addodd(x): if x == 0: 0 else: x + addeven(x - 1) end end
 
 check:
-  letrec fact = lam(n):
-    if n == 1: 1 else: n * fact(n - 1) end
-  end: fact(5) end is 120
+  addeven(6) is 21
 end
+
+# algebraic data types
+
+data Point:
+  | pt(x, y)
+end
+
+p1 = pt(1,2)
 
 check:
-  lam(): 7 end() is 7
+  # the data statements makes all these functions automatically exist:
+  is-Point(1) is false
+  is-Point({1;3}) is false
+  is-Point(p1) is true
+  is-pt(p1) is true
+  # field access:
+  p1.x is 1
+  p1.y is 2
+  # pattern binding let, slightly dodgy
+  pt(a,b) = p1
+  a is 1
+  b is 2
 end
 
-check:
-  letrec
-    fact = lam(n): if n == 1: 1 else: n * fact(n - 1) end end,
-    abc = 5:
-    fact(abc)
-  end is 120
-  
-  letrec
-    fact = lam(n): if n == 1: 1 else: n * fact(n - 1) end end,
-    abc = fact(5):
-    abc
-  end is 120
-  
-  letrec
-    abc = fact(5),
-    fact = lam(n): if n == 1: 1 else: n * fact(n - 1) end end:
-    abc
-  end is 120
-
-  letrec
-    zero = 0,
-    one = zero + 1
-    : one
-  end is 1
-
+# multiple variants:
+data Two:
+  | pt1(x, y)
+  | pt2(x, y)
 end
 
-check:
+t1 = pt1(1,2)
+t2 = pt2(3,4)
 
-  #todo: review the tests, some weird syntax bits because of the way
-  # these were previously run in the haskell tests
-  # try to make it more idiomatic
-
-  fun addeven4(x): if x == 0: 0 else: x + addodd4(x - 1) end end
-  fun addodd4(x): if x == 0: 0 else: x + addeven4(x - 1) end end
-  addeven4(6) is 21
-end
-
-check:
-  a = 4
-  a + 3 is 7
-end
-  
-check:
-  a = 4
-  b = 5
-  a + b is 9
-end
-  
-check:
-  f1 = lam(factx,x): if x == 0: 1 else: x * factx(factx,x - 1) end end
-  fact = lam(y): f1(f1,y) end
-  fact(1) is 1
-end
-  
-check:
-  var a = 5
-  a is 5
-end
-  
-check:
-  var a = 5
-  a := 6
-  a is 6
-end
-  
-check:
-  var a = 5
-  a := a + 1
-  a is 6
-end
-
-
-fun mk-counter():
-  var ctr = 0
-  lam(): block:
-      ctr := ctr + 1
-      ctr
-    end
+fun pf(a,n):
+  # case statement for matching on algebraic data types:
+  cases (Two) a:
+    | pt1(x,y) => if n == 0: x else: y end
+    | pt2(x,y) => if n == 0: x else: y end
   end
 end
 
-check:
-  x = mk-counter()
-  y = mk-counter()
-  y() is 1
-  y() is 2
-  x() is 1
-  y() is 3
+check "vars":
+  # create a variable
+  var x = 10
+  x is 10
+  x := 15
+  x is 15
 end
 
-check:
-  fun fact(x):
-    if x == 0: 1
-    else: x * fact(x - 1)
-    end
+check "boxes":
+
+  data MutX:
+    | mut-x(ref x, y)
   end
-  fact(5) is 120
-end
+
+  ex1 = mut-x(1, 2)
+
+  # access the value inside the box
+  ex1!x is 1
+
+  ex1.y is 2
+
+  ex2 = mut-x(1,2)
+
+  # update the box
+  ex2!{x: 42}
+
+  ex2!x is 42
+
+  fun adder(a):
+    a!{x: a!x + 1}
+  end
+  ex3 = mut-x(1, 2)
+  ex3!x is 1
+  adder(ex3)
+  ex3!x is 2
   
-check:
-  rec fact = lam(x):
-    if x == 0: 1
-    else: x * fact(x - 1)
-    end
-  end
-  fact(5) is 120
 end
 
-check:
-  letrec 
-    addeven = lam(x) : if x == 0: 0 else: x + addodd(x - 1) end end,
-    addodd = lam(x) : if x == 0: 0 else: x + addeven(x - 1) end end:
-    addeven(6)
-  end is 21
+check "constructor syntax":
+  # a way to create lists only at the moment
+
+  x = [list: 1,2]
+  x is link(1, link(2, empty))
 end
 
-check:
-  f = lam(x, y): x - y end
-  f(5, 3) is 2
+check "tuples":
+  t = {"a";"b";true}
+  t.{0} is "a"
+  t.{1} is "b"
+  t.{2} is true
+
+  myobj4 = {1}
+  myobj4.{0} is 1
 end
 
-# todo: needs patterns in arg lists implementing
+check "records":
+  x = 33
+  a = {a: "one", b : 2, c : x }
+  a.a is "one"
+  a.b is 2
+  a.c is 33
+
+  # fields are not ordered
+  {a:1, b:2} is { b:2, a:1}
+
+end
+
+# raise: motivation to add support for raises predicate in testing
+
+check "types":
+
+  #arbitrary precision numbers
+  #boolean
+  #strings
+  #closure/function
+  #variants/ agdt
+  #boxes
+  #nothing
+
+end
+
 #|
-check:
-  f = lam({x;y}): x - y end
-  f({5;3}) is 2
-end
+
+basic functions
+comparisons
+and, or, not
+   print
+   torepr
+
+   arithmetic
+
 |#
 
-check:
-  x = 10
-  f = lam(y): y + x end
-  f(5) is 15
-end
-#|
-check:
-  x = 10
-  f = {(y :: Number) -> Number: x + y}
-  f(5) is 15
-end
+# built in module: lists
 
 check:
-  o = {x : "original-x", y: "original-y"}
-  o2 = o.{x : "new-x", z : "new-z"}
-  o2.x is "new-x"
-  o2.y is "original-y"
-  o2.z is "new-z"
+
+  # start with the basic list functions and stuff
+  
+  L.length([list: 'a', 'b']) is 2
+  L.length(empty) is 0
+  
+  L.get([list: 1, 2, 3], 0) is 1
+  
+  L.set([list: 1, 2, 3], 0, 5) is [list: 5, 2, 3]
+  L.set([list: 1, 2, 3], 2, 5) is [list: 1, 2, 5]
 end
-|#
-
-rec countdown-good =
-  # countdown-good is in scope here, because of the 'rec'
-  lam(n):
-    if n == 0: true
-    else: countdown-good(n - 1) # so this call is fine
-    end
-  end
-
-countdown-good(5)
-
-nothing
