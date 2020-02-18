@@ -1,4 +1,12 @@
 
+#|
+
+   In teaberry, these things {a:1, b:'two'} are called records, not
+   objects. They will be used for 'extensible records'/'r-tuples'.
+   
+
+|#
+
 check:
   x = 33
   a = {a: "one", b : 2, c : x }
@@ -19,6 +27,13 @@ check:
   #  thing.n
   #end
   #g2(my-obj2) is 42
+
+  # check non ordering of fields in equality
+
+  {a:1, b:2} is { b:2, a:1}
+
+
+
   
 end
 

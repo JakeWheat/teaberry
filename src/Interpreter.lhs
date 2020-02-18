@@ -412,8 +412,8 @@ haskellfunimpls and default env duplicates a bunch of stuff
 >     ,(">", \case
 >              [NumV a, NumV b] -> pure $ BoolV (a > b)
 >              x -> throwM $ MyException $ "< needs two num args, got " ++ listToRepr x)
->     ,("==", \[a, b] -> pure $ BoolV (a == b))
->     ,("<>", \[a, b] -> pure $ BoolV (a /= b))
+>     ,("==", \[a, b] -> pure $ BoolV $ valuesEqual a b)
+>     ,("<>", \[a, b] -> pure $ BoolV $ not $ valuesEqual a b)
 
 >     -- boolean ops
 >     ,("and", \[BoolV a, BoolV b] -> pure $ BoolV (a && b))
@@ -492,6 +492,10 @@ haskellfunimpls and default env duplicates a bunch of stuff
 >      liftTriOp f = (f, ClosV (I.Lam "a" (I.Lam "b" (I.Lam "c"
 >                         (I.AppHaskell f [I.Iden "a", I.Iden "b", I.Iden "c"])))) emptyEnv)
 
+> valuesEqual :: Value -> Value -> Bool
+> valuesEqual (VariantV "record" as) (VariantV "record" bs) = sortOn fst as == sortOn fst bs
+> valuesEqual a b = a == b
+
 > listToRepr :: [Value] -> String
 > listToRepr = intercalate "," . map torepr'
 
@@ -513,6 +517,8 @@ haskellfunimpls and default env duplicates a bunch of stuff
 >   
 > torepr' (VariantV "empty" []) = "empty"
 
+> torepr' (VariantV "record" fs) =
+>     "{" ++ intercalate ";" (map (\(a,b) -> a ++ ":" ++ torepr' b) fs) ++ "}"
 > torepr' (VariantV v fs) =
 >     v ++ "(" ++ intercalate ", " (map (torepr' . snd) fs) ++ ")"
 
