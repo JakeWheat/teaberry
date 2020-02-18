@@ -22,7 +22,7 @@ The system comes with a small standard lib (really small) implemented
 using a hack sort of ffi for haskell.
 
 
-> {-# LANGUAGE ScopedTypeVariables,TupleSections #-}
+> {-# LANGUAGE ScopedTypeVariables,TupleSections, LambdaCase #-}
 > module Interpreter (runProgram
 >                    ,CheckResult(..)
 >                    ,runChecks
@@ -34,13 +34,15 @@ using a hack sort of ffi for haskell.
 > import Control.Monad (void, forM_{-, when-})
 > import Control.Monad.IO.Class (liftIO)
 > import Control.Monad.Trans.RWS (RWST, runRWST, ask, get, {-put,-} local, {-tell,-} state)
-> import Data.List (partition, intercalate)
+> import Data.List (partition, intercalate, sortOn)
 > import Data.Scientific (Scientific)
 > --import Text.Show.Pretty (ppShow)
 
 > import qualified InterpreterSyntax as I
 > import Syntax (extractInt)
 > import PrettyInterpreter (prettyExpr)
+
+> --import Debug.Trace(trace)
 
 ------------------------------------------------------------------------------
 
@@ -251,13 +253,12 @@ it
 >     local (updateIREnv (extendEnv nm v)) $ interp b
 > interp (I.Seq a b) = interp a >> interp b
 
-> interp (I.Unbox e) = do
->     v <- interp e
->     case v of
+> interp (I.Unbox e) =
+>     interp e >>= \case
 >         BoxV i -> do
 >                   st <- get
 >                   fetchStore i (isStore st)
->         _ -> throwM $ MyException $ "Unbox on non box: " ++ torepr' v
+>         v -> throwM $ MyException $ "Unbox on non box: " ++ torepr' v
 
 
 > interp (I.Box e) = do
@@ -392,25 +393,25 @@ haskellfunimpls and default env duplicates a bunch of stuff
 > haskellFunImpls :: [(String, [Value] -> Interpreter Value)]
 > haskellFunImpls =
 >     [-- arithmetic
->      ("+", \x -> case x of
->                      [StrV a, StrV b] -> pure $ StrV (a ++ b)
->                      [NumV a, NumV b] -> pure $ NumV (a + b)
->                      _ -> throwM $ MyException $ "Interpreter: plus implementation" ++ listToRepr x)
+>      ("+", \case
+>              [StrV a, StrV b] -> pure $ StrV (a ++ b)
+>              [NumV a, NumV b] -> pure $ NumV (a + b)
+>              x -> throwM $ MyException $ "Interpreter: plus implementation" ++ listToRepr x)
 >     ,("-", \[NumV a, NumV b] -> pure $ NumV (a - b))
->     ,("*", \x -> case x of
->                      [NumV a, NumV b] -> pure $ NumV (a * b)
->                      _ -> throwM $ MyException $ "* needs two num args, got " ++ listToRepr x)
->     ,("/", \x -> case x of
->                      [NumV a, NumV b] -> pure $ NumV (a / b)
->                      _ -> throwM $ MyException $ "/ needs two num args, got " ++ listToRepr x)
+>     ,("*", \case
+>              [NumV a, NumV b] -> pure $ NumV (a * b)
+>              x -> throwM $ MyException $ "* needs two num args, got " ++ listToRepr x)
+>     ,("/", \case
+>              [NumV a, NumV b] -> pure $ NumV (a / b)
+>              x -> throwM $ MyException $ "/ needs two num args, got " ++ listToRepr x)
 >     -- comparisons - needs some work
->     ,("<", \x -> case x of
->                      [NumV a, NumV b] -> pure $ BoolV (a < b)
->                      _ -> throwM $ MyException $ "< needs two num args, got " ++ listToRepr x)
+>     ,("<", \case
+>              [NumV a, NumV b] -> pure $ BoolV (a < b)
+>              x -> throwM $ MyException $ "< needs two num args, got " ++ listToRepr x)
 
->     ,(">", \x -> case x of
->                      [NumV a, NumV b] -> pure $ BoolV (a > b)
->                      _ -> throwM $ MyException $ "< needs two num args, got " ++ listToRepr x)
+>     ,(">", \case
+>              [NumV a, NumV b] -> pure $ BoolV (a > b)
+>              x -> throwM $ MyException $ "< needs two num args, got " ++ listToRepr x)
 >     ,("==", \[a, b] -> pure $ BoolV (a == b))
 >     ,("<>", \[a, b] -> pure $ BoolV (a /= b))
 

@@ -11,7 +11,7 @@ ref update
 cases
 
 
-> {-# LANGUAGE TupleSections #-}
+> {-# LANGUAGE TupleSections, LambdaCase #-}
 > module Desugar (loadProgramImports, desugarProgram,desugarExpr, getBuiltInModulesDir) where
 
 > import Data.Generics.Uniplate.Data (transformBi)
@@ -350,7 +350,7 @@ to support include all:
 >                   -> DesugarStack S.Program
 > desugarIncludeAll moduleNameMap moduleValueNameMap (S.Program prs stmts) = do
 >     -- create the map from aliases to import sources
->     let aliasMap = flip mapMaybe prs $ \x -> case x of
+>     let aliasMap = flip mapMaybe prs $ \case
 >                        (S.Import is alias) -> Just (alias,is)
 >                        _ -> Nothing
 >     prs' <- mapM (f aliasMap) prs
@@ -402,15 +402,15 @@ include from X: a,b end
 include from X: a as a,b as b end
 
 > desugarProvideIncludeAliases :: S.Program -> DesugarStack S.Program
-> desugarProvideIncludeAliases = pure . transformBi ( \x -> case x of
+> desugarProvideIncludeAliases = pure . transformBi ( \case
 >     S.ProvideName s -> S.ProvideAlias s s
->     _ -> x)
+>     x -> x)
 
 > desugarToOneProvide :: S.Program -> DesugarStack S.Program
 > desugarToOneProvide (S.Program prs stmts) =
->     let fs = flip map prs $ \x -> case x of
+>     let fs = flip map prs $ \case
 >                  S.Provide is -> Left is
->                  _ -> Right x
+>                  x -> Right x
 >         (pr, os) = partitionEithers fs
 >         pr1 = case concat pr of
 >                   [] -> S.Provide []
@@ -1145,9 +1145,9 @@ end
 > desugarRecs :: [S.Binding] -> DesugarStack [S.Binding]
 > desugarRecs rs = do
 >     let
->         recnms = flip mapMaybe rs (\r -> case r of
->                                           S.Binding (S.IdenP _ f) (S.Lam {}) -> Just f
->                                           _ -> Nothing)
+>         recnms = flip mapMaybe rs $ \case
+>                                         S.Binding (S.IdenP _ f) (S.Lam {}) -> Just f
+>                                         _ -> Nothing
 >         recmap = zip recnms recnms
 >     recnms' <- mapM getUnique recnms
 >     let recmap' = zip recnms recnms'
@@ -1165,9 +1165,9 @@ end
 >  where
 >      --showit :: [(String, S.Expr)] -> String
 >      --showit ss = intercalate "\n" $ map (\(a,b) -> a ++ " = " ++ prettyExpr b) ss
->      patchCalls mp ids = transformBi $ \x -> case x of
+>      patchCalls mp ids = transformBi $ \case
 >          S.App (S.Iden fx) args | Just fx' <- lookup fx mp -> S.App (S.Iden fx') (map S.Iden ids ++ args)
->          _ -> x
+>          x -> x
 
 ------------------------------------------------------------------------------
 
