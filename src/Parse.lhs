@@ -287,6 +287,8 @@ todo: remove the trys by implementing a proper lexer or a lexer style
 >                   ,symbol ">"
 >                   ,symbol "-"
 >                   ,symbol "/"
+>                   ,symbol "^"
+>                   ,symbol "|>"
 >                   ] ++ map keyword
 >                   ["and"
 >                   ,"or"

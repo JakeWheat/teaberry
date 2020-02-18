@@ -53,6 +53,17 @@
 >     ,("(1 < 2)", Parens $ (BinOp (num 1) "<" (num 2)))
 >     ,("- a", UnaryMinus (Iden "a"))
 
+>     ,("e1 ^ e2", BinOp (Iden "e1") "^" (Iden "e2"))
+>     --,("e1 ^ e2 ^ e3"
+>     -- ,let o a b = BinOp a "^" b
+>     --     in (Iden "e1" `o` Iden "e2") `o` Iden "e3")
+
+>     ,("e1 |> e2", BinOp (Iden "e1") "|>" (Iden "e2"))
+>     ,("e1 |> e2 |> e3"
+>      ,let o a b = BinOp a "|>" b
+>       in Iden "e1" `o` (Iden "e2" `o` Iden "e3"))
+
+
 >     ,("(a)", Parens (Iden "a"))
 
 >     ,("lam(x): x + 1 end", Lam [IdenP NoShadow "x"] (BinOp (Iden "x") "+" (num 1)))

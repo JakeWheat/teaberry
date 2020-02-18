@@ -229,18 +229,10 @@ it
 >     pure $ ClosV e env
 
 
-> interp (I.App f a) = do
->     x <- interp f
->     case x of
->         ClosV (I.Lam n bdy) env' -> do
->              argVal <- interp a
->              local (updateIREnv (const $ extendEnv n argVal env')) $ interp bdy
->         ClosV (I.LamVoid bdy) env' -> do
->              case a of
->                  I.Sel I.NothingS -> local (updateIREnv (const env')) $ interp bdy
->                  _ -> throwM $ MyException $ "0 arg lambda called with something other than literal nothing: " ++ prettyExpr a
->         ClosV ee _ -> throwM $ MyException $ "non lambda in closure expression: " ++ prettyExpr ee
->         _ -> throwM $ MyException $ "non function in app position: " ++ torepr' x
+> interp (I.App fe ae) = do
+>     f <- interp fe
+>     a <- interp ae
+>     app f a
 
 > interp (I.Let nm v bdy) = do
 >     v' <- interp v
@@ -289,6 +281,17 @@ it
 >          in (i, updateISStore (extendStore i v) s)
 >     pure $ BoxV i
 
+> -- helper for function implemention use
+> app :: Value -> Value -> Interpreter Value
+> app f a = case f of
+>         ClosV (I.Lam n bdy) env' -> do
+>              local (updateIREnv (const $ extendEnv n a env')) $ interp bdy
+>         ClosV (I.LamVoid bdy) env' -> do
+>              case a of
+>                  NothingV -> local (updateIREnv (const env')) $ interp bdy
+>                  _ -> throwM $ MyException $ "0 arg lambda called with something other than literal nothing: " ++ torepr' a
+>         ClosV ee _ -> throwM $ MyException $ "non lambda in closure expression: " ++ prettyExpr ee
+>         _ -> throwM $ MyException $ "non function in app position: " ++ torepr' f
 
 ------------------------------------------------------------------------------
 
@@ -390,6 +393,10 @@ todo: make this better: do better wrapping + error messages when the
 type is wrong
 haskellfunimpls and default env duplicates a bunch of stuff
 
+try to refactor so ops for a type are all together
+(like comparisons and torepr)
+
+
 > haskellFunImpls :: [(String, [Value] -> Interpreter Value)]
 > haskellFunImpls =
 >     [-- arithmetic
@@ -415,6 +422,10 @@ haskellfunimpls and default env duplicates a bunch of stuff
 >     ,("==", \[a, b] -> pure $ BoolV $ valuesEqual a b)
 >     ,("<>", \[a, b] -> pure $ BoolV $ not $ valuesEqual a b)
 
+>     -- app operators
+>     ,("^", \[a, f] -> app f a)
+>     ,("|>", \[f, a] -> app f a)
+> 
 >     -- boolean ops
 >     ,("and", \[BoolV a, BoolV b] -> pure $ BoolV (a && b))
 >     ,("or", \[BoolV a, BoolV b] -> pure $ BoolV (a || b))
@@ -466,6 +477,8 @@ haskellfunimpls and default env duplicates a bunch of stuff
 >     ,liftBinOp "<>"
 >     ,liftBinOp "<"
 >     ,liftBinOp ">"
+>     ,liftBinOp "^"
+>     ,liftBinOp "|>"
 >     ,liftBinOp "and"
 >     ,liftBinOp "or"
 >     ,liftUnOp "not"

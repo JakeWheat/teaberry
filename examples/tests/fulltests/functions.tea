@@ -52,3 +52,22 @@ check:
   
   
 end
+
+check "app operators":
+  fun f(a): a + 1 end
+  fun g(a): a + 2 end 
+  2 ^ f is 3
+
+  # work around two parsing issues, todo: fix the parsing
+  # 1. 2 ^ f ^ f parses with the wrong associativity
+  # 2. using parens to fix it triggers the whitespace bug
+  # where it parses the 3 above and then the parens as
+  # trying to call the 3 as a function.
+  block: 
+    (2 ^ f) ^ g is 5
+  end
+
+  f |> 2 is 3
+  g |> f |> 2 is 5
+  
+end
