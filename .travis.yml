@@ -42,5 +42,5 @@ install:
 
 script:
   - cabal run RunTests -- --ansi-tricks=false 
-  - cabal run teaberry -- -p examples/tests/fulltests/tour.tea
+  - cabal run teaberry -- -g examples/tests/fulltests/tour.tea
 
