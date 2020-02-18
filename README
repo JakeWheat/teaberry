@@ -3,12 +3,54 @@ A learning project to implement a dialect of Pyret.
 
 Goal is to implement a dialect of Pyret in Haskell, with a high level
 interpreter, to learn how to implement functional programming + a
-basic type system.
+basic type system. The original goal was to implement a language
+roughly along the lines of 'Python, but with proper functional
+programming and types', and Pyret is very close to this, so I'm mostly
+copying Pyret for the time being.
 
-Not ready for human consumption yet, see the examples dir for
-progress:
+Not ready for human consumption yet. There is almost no error
+handling, lots of mistakes will be ignored and cause weird behaviour.
+
+Demonstration of most supported features:
+https://github.com/JakeWheat/teaberry/tree/master/examples/tests/fulltests/tour.tea
+
+See the examples and built in modules directories for more:
 
 https://github.com/JakeWheat/teaberry/tree/master/examples/tests/fulltests
+https://github.com/JakeWheat/teaberry/tree/master/built-in-modules
+
+This is how I compile and run the code from source:
+
+cabal run RunTests --disable-optimization -- --hide-successes --ansi-tricks=false
+
+and how I use the command line interface:
+
+cabal run -v0 teaberry --disable-optimization -- -g examples/tests/fulltests/tour.tea
+
+(disabling the optimsation doesn't seem to make anything slower at
+this stage, and makes ghc compile it much faster)
+
+# About Pyret
+
+Pyret is a really nice functional language with an optional type
+checker primarily aimed at teaching programming at the moment.
+
+Homepage:
+https://www.pyret.org/
+Manual:
+https://www.pyret.org/docs/latest/index.html
+PAPL, a tutorial for Pyret, programming, and implementing programming languages:
+https://papl.cs.brown.edu/2019/index.html
+
+The other big source of knowledge was PLAI, a book about implementing
+programming languages (there is some overlap with the second half of
+PAPL):
+https://www.plai.org/
+
+I found PLAI and PAPL to be much easier for learning how to implement
+languages than the other usual suspects.
+
+This language will probably start to diverge from Pyret in some ways.
 
 # sketch of early approximate target
 
@@ -34,11 +76,11 @@ extensible records
 
 # sketch of possible roadmap
 
-This list mostly uses Pyret terminology for the things in Pyret.
+This list mostly uses Pyret terminology for the things that are also in Pyret.
 
 ## Completed (no rigorous testing or completeness checks yet)
 
-temp command line interface
+quick hack command line interface
 
 lambda values, app
 closures
@@ -59,10 +101,32 @@ check, where
 shadow (syntax only, shadowing not detected)
 
 usable subset of import, provide, include
+  doesn't check for import cycles yet, will probably hang if you do
+  this
+    
 
 ## planned
 
 full import, provide, include support
+  provide: type x end
+  provide: data x end
+  provide:
+    data MyPosn hiding (pos2d, pos3d)
+  end
+
+  the non-file non-built in import sources? not sure if will do any of them
+
+  provide:
+    * hiding (concat-helper)
+  end
+  provide from SD: * end
+  provide:
+    module SD
+  end
+
+  provide *
+  provide-types *
+    not sure if these are deprecated
 
 contracts and annotations
 
@@ -83,6 +147,10 @@ types
   ...
 
 type inference
+
+a better command line interface
+
+a bit more of an ffi
 
 ## smaller planned items
 
