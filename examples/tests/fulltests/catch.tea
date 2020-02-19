@@ -1,0 +1,11 @@
+
+# catch is used for internal testing development and isn't for public
+# use
+
+check "catch":
+  add1 = lam(a): a + 1 end
+  catch(1, add1) is 1
+  catch(raise(2), add1) is 3
+  
+end
+

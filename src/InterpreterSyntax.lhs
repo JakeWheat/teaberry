@@ -28,6 +28,9 @@ TODO: add provides and imports
 >           | SetBox Expr Expr
 >           | Unbox Expr
 >           | LetDecl String Expr
+>           | Catch Expr -- eval this, return the result if it doesn't raise
+>                   Expr -- if it does, pass the raised value to the
+>                        -- function value of this and return the value of that
 >           deriving (Eq,Show)
 
 > data Selector = Num Scientific

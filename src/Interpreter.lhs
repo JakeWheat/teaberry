@@ -68,8 +68,23 @@ using a hack sort of ffi for haskell.
 
 quick exceptions, can come back to this
 
-> data MyException = MyException String
+> data MyException = MyException String -- a programming error -
+>                                       --  represents something that
+>                                       --  cannot be caught or tested
+>                                       --  for (in the future will be
+>                                       --  internal errors and
+>                                       --  compile time errors only
+>                                       --  or somthing)
+>                  | ValueException Value -- used when 'raise' -ing in
+>                                         --  language, something
+>                                         --  which testing can test
+>                                         --  for (and the hacky catch
+>                                         --  function can catch
 >     deriving Show
+
+> myExceptionToString :: MyException -> String
+> myExceptionToString (MyException s) = s
+> myExceptionToString (ValueException v) = torepr' v
 
 > instance Exception MyException
 
@@ -187,7 +202,7 @@ a program doesn't have a value (in this way, at least)
 >         (InterpreterReader defaultEnv)
 >         defaultInterpreterState
 >     pure $ pure $ result
->     ) `catch` (\(MyException s) -> pure $ Left $ s)
+>     ) `catch` (\e -> pure $ Left $ myExceptionToString e)
 
 --------------------------------------
 
@@ -269,6 +284,14 @@ it
 
 
 > interp x@(I.LetDecl {}) = throwM $ MyException $ "Interpreter: block ends with let: " ++ prettyExpr x
+
+> interp (I.Catch e c) = interp e `catch` (\case
+>     -- is rethrowing an exception like this bad in haskell?
+>     s@(MyException {}) -> throwM s
+>     ValueException v -> do
+>         cf <- interp c
+>         app cf v)
+
 
 > --interp x = error $ "Interpreter: interp " ++ show x
 
@@ -396,6 +419,15 @@ haskellfunimpls and default env duplicates a bunch of stuff
 try to refactor so ops for a type are all together
 (like comparisons and torepr)
 
+todo: add a better ffi
+and try to put all these functions in pyret files
+  including a prelude file which works like haskell
+  (always included, unless you do it explicitly)
+  but don't call it prelude, since that is used already for
+  part of the syntax of a pyret file
+
+
+
 
 > haskellFunImpls :: [(String, [Value] -> Interpreter Value)]
 > haskellFunImpls =
@@ -432,7 +464,10 @@ try to refactor so ops for a type are all together
 >     ,("not", \[BoolV a] -> pure $ BoolV (not a))
 
 >     -- misc
->     ,("raise", \[StrV s] -> throwM $ MyException s)
+>     ,("raise", \case
+>                   [v] -> throwM $ ValueException v
+>                   xs -> throwM $ MyException $ "expected 1 arg for raise, got " ++ show (length xs)
+>                                                ++ ", " ++ intercalate "," (map torepr' xs))
 >     ,("print", \[x] ->
 >              let s = torepr' x
 >              in liftIO (putStrLn s) >> pure (StrV s))

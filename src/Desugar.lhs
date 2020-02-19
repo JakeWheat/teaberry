@@ -831,6 +831,16 @@ end
 > desugarExpr' (S.If [] (Just e)) = desugarExpr' e
 > desugarExpr' (S.If ((c,t):xs) els) = I.If <$> desugarExpr' c <*> desugarExpr' t <*> desugarExpr' (S.If xs els)
 
+bit of a hack, catch is like special syntax, not a regular function
+ value
+it exists for testing and development of the language only
+
+> desugarExpr' (S.App (S.Iden "catch") [e0,e1]) = do
+>   a <- desugarExpr' e0
+>   b <- desugarExpr' e1
+>   pure $ I.Catch a b
+
+
 > desugarExpr' (S.App f xs) = do
 >     f' <- desugarExpr' f
 >     xs' <- mapM desugarExpr' xs

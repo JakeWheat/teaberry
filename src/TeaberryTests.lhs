@@ -51,6 +51,7 @@ wrapper to lift tests written in the language into tests for the
 > sourceFiles = map ("examples/tests/fulltests/" ++)
 >     ["ahoy.tea"
 
+>     ,"catch.tea"
 >     ,"nested_comment.tea"
 >     ,"binding.tea"
 >     ,"identifiers.tea"
