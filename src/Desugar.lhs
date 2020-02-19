@@ -579,6 +579,16 @@ when a fun or rec is seen, it will collect subsequent funs and recs
 >   let p = P.prettyExpr x
 >   y <- desugarIs p e0 e1
 >   desugarStmt y
+
+
+> desugarStmt (S.StExpr (S.BinOp e0 "raises" e1)) = do
+>   desugarStmt(S.StExpr (S.BinOp e0 "raises-satisfies" (S.App (S.Iden "torepr-equals") [e1])))
+
+> desugarStmt (S.StExpr x@(S.BinOp e0 "raises-satisfies" e1)) = do
+>   let p = P.prettyExpr x
+>   y <- desugarRaises p e0 e1
+>   desugarStmt y
+
 > 
 > desugarStmt (S.StExpr e) = (:[]) <$> desugarExpr' e
 > desugarStmt (S.When c t) = (:[]) <$>
@@ -806,6 +816,70 @@ end
 >       plus a b = S.BinOp a "+" b
 >       str = S.Sel . S.Str
 >       app nm es = S.App (S.Iden nm) es
+
+
+aexpr raises-satisfies bexpr
+desugars to
+
+haskell:
+failmsg = "The test operation raise-satisfies failed for the test " ++ pretty bexpr
+
+it could show the value it actually got?
+
+catch(
+  block:
+    aexpr
+    log-test-fail(checkblockid, name, "No exception raised: " + $src)
+  end,
+  lam(shadow a):
+    shadow v1 = bexpr
+    if v1(a):
+      log-test-pass(checkblockid, name)
+    else:
+      shadow src = pretty something
+      log-test-fail(checkblockid, name, $failmsg)
+    end
+  end)
+
+
+> desugarRaises :: String -> S.Expr -> S.Expr -> DesugarStack S.Stmt
+> desugarRaises syn e e1 = do
+>     x <- inCheckBlockID <$> ask
+>     checkBlockID <- maybe (throwError $ "'raises' outside of checkblock")
+>                     (pure . S.Sel . S.Num . fromIntegral) x
+>     nameit <- getUnique "isname"
+>     v1 <- getUnique "isv1"
+>     let failMsg = "The test operation raises-satisfies failed for the test "
+>                   ++ P.prettyExpr e1
+>         arg0 = S.Block [S.StExpr e
+>                        ,S.LetDecl (S.Binding (S.IdenP S.Shadow nameit) $ S.Sel $ S.Str syn)
+>                        ,S.StExpr $ app "log-test-fail"
+>                          [checkBlockID, S.Iden nameit, str "No exception raised"]]
+>         arg1 = S.Lam [S.IdenP S.Shadow "a"]
+>                $ S.Block [S.LetDecl (S.Binding (S.IdenP S.Shadow v1) e1)
+>                          ,S.LetDecl (S.Binding (S.IdenP S.Shadow nameit) $ S.Sel $ S.Str syn)
+>                          ,S.StExpr (S.If [(app v1 [S.Iden "a"]
+>                                           ,app "log-test-pass" [checkBlockID, S.Iden nameit])]
+>                                     $ Just $ app "log-test-fail"
+>                                     [checkBlockID, S.Iden nameit
+>                                     ,str failMsg `plus`
+>                                     str ", value was "
+>                                     `plus` app "torepr" [S.Iden "a"]
+>                                     ]
+>                                     )
+>                           ]
+>     pure $ S.StExpr $ app "catch" [arg0,arg1]
+>   where
+>       plus a b = S.BinOp a "+" b
+>       str = S.Sel . S.Str
+>       app nm es = S.App (S.Iden nm) es
+
+
+todo: add a hook so that raises can desugar to this but have different
+ error messages:
+No exception raised, expected "hello"
+Got unexpected exception "bye", expected "hello"
+
 
 
 --------------------------------------

@@ -74,6 +74,9 @@ any other statements.
 
 import lists as L
 
+# todo: this isn't a very gentle start
+# introduce a bunch of things first, before introducing check
+# make sure it's clear, then can continue with check based examples
 
 # Check blocks are used for testing
 
@@ -83,7 +86,30 @@ check:
   #1 is 2
 end
 
-# todo: this isn't a very gentle start
+# raise raises an exception
+# this aren't intended to be caught at the moment, they should exit
+# the program but you can test for them being raised correctly
+
+check "raises tests":
+
+  # raises converts the value using torepr and compares
+  raise("hello") raises "hello"
+  raise(1) raises "1"
+
+  fun f():
+    raise("catch this")
+  end
+
+  f() raises "catch this"
+
+  fun is_one(a):
+    a == 1
+  end
+
+  raise(1) raises-satisfies is_one
+end
+
+
 
 check "let and letrec expressions":
   let b = 5: b end is 5
@@ -95,13 +121,6 @@ check "let and letrec expressions":
   letrec fact = lam(n):
     if n == 1: 1 else: n * fact(n - 1) end
   end: fact(5) end is 120
-
-  # letrec supports constants:
-  letrec
-    zero = 0,
-    one = zero + 1
-    : one
-  end is 1
 
   # the keyword shadow in bindings is ignored at the moment
   # all variables can be shadowed without warning
@@ -337,10 +356,9 @@ check "records":
 
 end
 
-# raise: motivation to add support for raises predicate in testing
-
 check "types":
 
+  # these are the built in types
   #arbitrary precision numbers
   #boolean
   #strings
@@ -349,10 +367,13 @@ check "types":
   #boxes
   #nothing
 
+  # todo: examples of creating and using each
+
 end
 
 #|
 
+these are the built in functions:
 basic functions
 comparisons
 and, or, not

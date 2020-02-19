@@ -486,6 +486,7 @@ and try to put all these functions in pyret files
 >     ,("log-test-pass", logTestPass)
 >     ,("log-test-fail", logTestFail)
 >     ,("add-tests", addTests)
+>     ,("torepr-equals", toreprEquals)
 >
 >
 >     ,("make-variant", makeVariant)
@@ -533,6 +534,7 @@ and try to put all these functions in pyret files
 >     ,liftUnOp "variant-name"
 >     ,liftUnOp "safe-variant-name"
 >     ,liftBinOp "make-variant"
+>     ,liftBinOp "torepr-equals"
 >     ] emptyEnv
 >   where
 >      liftUnOp f = (f, ClosV (I.Lam "a" (I.AppHaskell f [I.Iden "a"])) emptyEnv)
@@ -575,6 +577,13 @@ and try to put all these functions in pyret files
 > torepr' (StrV s) = s
 
 > torepr' NothingV = "nothing"
+
+> toreprEquals :: [Value] -> Interpreter Value
+> toreprEquals [e0, e1] = do
+>     let x = torepr e1
+>     pure $ BoolV $ valuesEqual e0 x
+
+> toreprEquals x = throwM $ MyException $ "torepr-equals called on " ++ show (length x) ++ " args, should be 2"
 
 
 > listLink :: [Value] -> Interpreter Value

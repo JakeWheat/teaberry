@@ -1,0 +1,11 @@
+
+check:
+  1 + 2 raises "test"
+  fun g(x): x == "test2" end
+  2 - 1 raises-satisfies g
+
+  raise("test") raises "test"
+  fun g(x): x == "test2" end
+  raise("test2") raises-satisfies g
+
+end

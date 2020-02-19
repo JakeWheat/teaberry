@@ -8,12 +8,12 @@ end
 
 check:
   L.get([list: 1, 2, 3], 0) is 1
-  #L.get([list: ], 0) raises "too large"
-  #L.get([list: 1, 2, 3], -1) raises "invalid argument"
+  L.get([list: ], 0) raises "too large"
+  L.get([list: 1, 2, 3], -1) raises "invalid argument"
 end
 
 check:
   L.set([list: 1, 2, 3], 0, 5) is [list: 5, 2, 3]
   L.set([list: 1, 2, 3], 2, 5) is [list: 1, 2, 5]
-  #L.set([list: ], 0, 5) raises "too large"
+  L.set([list: ], 0, 5) raises "too large"
 end

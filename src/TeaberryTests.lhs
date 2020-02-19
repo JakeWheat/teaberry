@@ -26,6 +26,7 @@ wrapper to lift tests written in the language into tests for the
 >     ,(p "two_tests_fail.tea", 0, 2)
 >     ,(p "one_pass_one_fail.tea", 1, 1)
 >     ,(p "nested.tea", 1, 0)
+>     ,(p "raises-fails.tea", 2, 2)
 >      -- test trivial success for each kind of test
 >      -- test trivial failure for each kind of test
 >     ]
@@ -51,6 +52,7 @@ wrapper to lift tests written in the language into tests for the
 > sourceFiles = map ("examples/tests/fulltests/" ++)
 >     ["ahoy.tea"
 
+>     ,"check.tea"
 >     ,"catch.tea"
 >     ,"nested_comment.tea"
 >     ,"binding.tea"
