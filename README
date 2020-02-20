@@ -95,6 +95,7 @@ recursive data types (cheating slightly without types)
 pattern binding in let
 cases
 references (mutable fields)
+construct expressions
 
 check, where
 
@@ -160,14 +161,10 @@ check additional features:
   is-not%
   satisfies
   violates
-  raises
   raises-other-than
-  raises-satisfies
   raises-violates
 
 shadow (actually does something)
-
-user constructors
 
 lambda shorthand
 for loops

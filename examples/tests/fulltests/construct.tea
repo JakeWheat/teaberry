@@ -1,0 +1,35 @@
+
+weird = {
+  make0: lam(): "nothing at all" end,
+  make1: lam(a): "just " + tostring(a) end,
+  make2: lam(a, b): tostring(a) + " and " + tostring(b) end,
+  make3: lam(a, b, c): "several things" end,
+  make4: lam(a, b, c, d): "four things" end,
+  make5: lam(a, b, c, d, e): "five things" end,
+  make : lam(args): "too many things" end
+}
+check:
+  [weird: ] is "nothing at all"
+  [weird: true] is "just true"
+  [weird: 5, 6.24] is "5 and 6.24"
+  [weird: true, false, 5] is "several things"
+  [weird: 1, 2, 3, 4] is "four things"
+  [weird: 1, 1, 1, 1, 1] is "five things"
+  [weird: "a", "b", "c", true, false, 5] is "too many things"
+end
+
+# this language will match any makeN with the right number
+# and will use make if it is present and there is no
+# exact makeN match (unlike pyret)
+
+example2 = {
+  make: lam(args): link(42,args) end,
+  make8: lam(a,b,c,d,e,f,g,h): [list: 8,a,b,c,d,e,f,g,h] end
+}
+
+check:
+  [example2:] is [list:42]
+  [example2:1,2,3] is [list:42,1,2,3]
+  [example2:1,2,3,4,5,6,7,8] is [list:8,1,2,3,4,5,6,7,8]
+end
+

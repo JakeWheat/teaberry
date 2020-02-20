@@ -58,7 +58,7 @@ using a hack sort of ffi for haskell.
 >                       [(String,Value)] -- fields, is it better to not include the names,
 >                                        -- the desugarer will handle?
 >            | BoxV Int
->            | NothingV
+>            | NothingV -- does nothing need to be separate, can it be a variant value?
 >            deriving (Eq,Show)
 
 ------------------------------------------------------------------------------
@@ -318,6 +318,13 @@ it
 >         ClosV ee _ -> throwM $ InternalException $ "non lambda in closure expression: " ++ prettyExpr ee
 >         _ -> throwM $ UserException $ "non function in app position: " ++ torepr' f
 
+> appN :: Value -> [Value] -> Interpreter Value
+> appN f [] = app f NothingV
+> appN f [x] = app f x
+> appN f (x:xs) = do
+>    f' <- app f x
+>    appN f' xs
+
 ------------------------------------------------------------------------------
 
 = Testing
@@ -534,7 +541,8 @@ and try to put all these functions in pyret files
 >     ,("add-tests", addTests)
 >     ,("tostring-equals", tostringEquals)
 >
->
+>     
+>     ,("call-construct-make", callConstructMake)
 >     ,("make-variant", makeVariant)
 >     ,("variant-name", variantName)
 >     ,("safe-variant-name", safeVariantName)
@@ -596,6 +604,7 @@ and try to put all these functions in pyret files
 >     ,liftUnOp "is-number"
 >     ,liftBinOp "make-variant"
 >     ,liftBinOp "tostring-equals"
+>     ,liftBinOp "call-construct-make"
 >     ] emptyEnv
 >   where
 >      liftUnOp f = (f, ClosV (I.Lam "a" (I.AppHaskell f [I.Iden "a"])) emptyEnv)
@@ -667,9 +676,13 @@ and try to put all these functions in pyret files
 > listIsLink x = throwM $ UserException $ "is-link called on " ++ show (length x) ++ " args, should be 1"
 
 > listIsList :: [Value] -> Interpreter Value
-> listIsList [VariantV x _] | x `elem` ["empty", "link"] = pure $ BoolV True
-> listIsList [_] = pure $ BoolV False
+> listIsList [x] = pure $ BoolV $ hlistIsList x
 > listIsList x = throwM $ UserException $ "is-list called on " ++ show (length x) ++ " args, should be 1"
+
+> hlistIsList :: Value -> Bool
+> hlistIsList (VariantV x _) | x `elem` ["empty", "link"] = True
+> hlistIsList _ = False
+
 > variantName :: [Value] -> Interpreter Value
 > variantName [VariantV x _] = pure $ StrV x
 > variantName [x] = throwM $ UserException $ "variant-name called on non variant: " ++ torepr' x
@@ -679,6 +692,26 @@ and try to put all these functions in pyret files
 > safeVariantName [VariantV x _] = pure $ StrV x
 > safeVariantName [_] = pure NothingV
 > safeVariantName x = throwM $ UserException $ "safe-variant-name called on " ++ show (length x) ++ " args, should be 1"
+
+algo: if there is a matching makeN in the record, use it, else if
+ there is a make, use that, else error
+todo: can do this in the desugaring once there is a type checker
+
+> callConstructMake :: [Value] -> Interpreter Value
+> callConstructMake = \case
+>     [] -> throwM $ InternalException $ "construct make called on 0 args"
+>     [VariantV "record" ts, args]
+>         | hlistIsList args -> do
+>               args' <- listToHaskList args
+>               let makeN = "make" ++ show (length args')
+>               case () of
+>                      _ | Just f <- lookup makeN ts -> appN f args'
+>                        | Just f <- lookup "make" ts -> app f args
+>                        | otherwise -> throwM $ UserException "The left side was not a defined convenience constructor."
+>         | otherwise -> throwM $ InternalException $ "construct make called on non list: " ++ torepr' args
+>     [_,_] -> throwM $ UserException "The left side was not a defined convenience constructor."
+>     x -> throwM $ InternalException $ "construct make called on " ++ show (length x) ++ " args"
+>         
 
 
 > makeVariant :: [Value] -> Interpreter Value

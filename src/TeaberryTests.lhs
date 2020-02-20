@@ -83,6 +83,7 @@ wrapper to lift tests written in the language into tests for the
 >     ,"two_same_name_check.tea"
 >     ,"where.tea"
 >     ,"random.tea"
+>     ,"construct.tea"
 
 >     ,"prelude-local-module.tea"
 >     ,"prelude-include-module.tea"

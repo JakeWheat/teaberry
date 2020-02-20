@@ -327,11 +327,24 @@ check "boxes":
   
 end
 
-check "constructor syntax":
-  # a way to create lists only at the moment
+check "convenience selector syntax":
+  # a way to create lists
+  # and a way to create data values from lists
 
   x = [list: 1,2]
   x is link(1, link(2, empty))
+
+  data MyData:
+    | my-data(x, y)
+  end
+
+  mkpoint = {
+    make2: lam(a,b): my-data(a,b) end
+  }
+  z = [mkpoint: 3,4]
+  z.x is 3
+  z.y is 4
+  
 end
 
 check "tuples":

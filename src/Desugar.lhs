@@ -976,13 +976,48 @@ it exists for testing and development of the language only
 
 special case for lists and bootstrapping, the desugar knows the
 implementation of list "constructor"
-does pyret have a consistent set that can be used here?
 
 > desugarExpr' (S.Construct (S.Iden "list") vs) =
 >     desugarExpr' $ f vs
 >   where
 >     f [] = S.Iden "empty"
 >     f (v:vs') = S.App (S.Iden "link") [v,f vs']
+
+general construct:
+
+all constructs desugar to the same thing:
+
+[xxx: <elements>]
+->
+xxx.make([list: <elements>])
+
+if the construction name isn't found, it's regular 'Identifier not found'
+if the make function isn't there, you should get:
+The left side was not a defined convenience constructor.
+(TODO)
+
+the plan is to call these 'selectors' after ttm, which I think is a
+better term than construct. It reflects the heavy value oriented
+interpretation of the language, which is a little different to pyret
+which I think has a more java style 'hidden reference' interpretation
+
+todo: rename the syntax node to Selector or ConvenienceSelector or
+something
+
+> desugarExpr' (S.Construct rc es) =
+>     desugarExpr' (S.App (S.Iden "call-construct-make")
+>                   [rc,S.Construct (S.Iden "list") es])
+>     {-let x = (\f -> desugarExpr' (S.App (S.DotExpr rc f) es))
+>     in case es of
+>         [] -> x "make0"
+>         [_] -> x "make1"
+>         [_,_] -> x "make2"
+>         [_,_,_] -> x "make3"
+>         [_,_,_,_] -> x "make4"
+>         [_,_,_,_,_] -> x "make5"
+>         _ -> desugarExpr' (S.App (S.DotExpr rc "make") [S.Construct (S.Iden "list") es])-}
+
+
 
 desugaring cases:
   cases(List) l:
