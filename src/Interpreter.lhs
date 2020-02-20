@@ -38,7 +38,7 @@ using a hack sort of ffi for haskell.
 > import Data.Maybe (isNothing)
 > import Data.List (partition, intercalate, sortOn)
 > import Data.Scientific (Scientific)
-> --import Text.Show.Pretty (ppShow)
+> import Text.Show.Pretty (ppShow)
 
 > import qualified InterpreterSyntax as I
 > import Syntax (extractInt)
@@ -100,6 +100,9 @@ justify implementing constant bindings using the store though
 
 > data Env = Env [(String,Value)]
 >            deriving (Eq,Show)
+
+> envNames :: Env -> [String]
+> envNames (Env e) = map fst e
 
 > emptyEnv :: Env
 > emptyEnv = Env []
@@ -220,7 +223,7 @@ interpreters for syntax nodes
 
 > interp (I.Iden e) = do
 >     rd <- ask
->     maybe (throwM $ UserException $ "Identifier not found: " ++ e)
+>     maybe (throwM $ UserException $ "Identifier not found: " ++ e ++ "\n" ++ ppShow (envNames $ irEnv rd))
 >         pure $ lookupEnv e (irEnv rd)
 >   
 > interp _x@(I.If c t e) = do
