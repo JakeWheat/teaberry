@@ -152,11 +152,13 @@ fixity parser either
 > commaSep :: Parser f -> Parser [f]
 > commaSep = xSep ','
 
+todo: switch to a separate lexer
+
 > keyword :: String -> Parser String
-> keyword n = lexeme (try $ string n)
+> keyword n = lexeme (try (string n <* notFollowedBy (satisfy (\a -> isAlphaNum a || a `elem` "?-+_"))))
 
 > keyword_ :: String -> Parser ()
-> keyword_ n = lexeme_ (try $ string n)
+> keyword_ n = void $ keyword n
 
 > symbol :: String -> Parser String
 > symbol x = lexeme (string x)
