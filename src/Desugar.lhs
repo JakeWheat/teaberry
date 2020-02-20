@@ -625,6 +625,12 @@ work without error on any value
 >                        (foldr orEm (S.Iden "false") eqVariants)))
 >     -- variant selectors
 >         mkV :: String -> [(S.Ref,String)] -> S.Stmt
+>         -- 0 args
+>         mkV ctnm [] = S.LetDecl (S.Binding (S.IdenP S.NoShadow ctnm)
+>                                  $ S.App
+>              (S.Iden "make-variant")
+>              [S.Sel (S.Str ctnm)
+>              ,mkListSel []])
 >         mkV ctnm fs = S.LetDecl (S.Binding (S.IdenP S.NoShadow ctnm)
 >                                  $ S.Lam (map (S.IdenP S.Shadow) $ map snd fs) $ S.App
 >              (S.Iden "make-variant")

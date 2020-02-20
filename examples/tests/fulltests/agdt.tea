@@ -47,6 +47,22 @@ check:
   
 end
 
+data MyOption:
+  | my-none
+  | my-some(a)
+end
+
+check:
+  fun f(a): cases(MyOption) a:
+      | my-none => "none"
+      | my-some(b) => "some" + tostring(b)
+    end
+  end
+  x = my-none
+  f(x) is "none"
+  y = my-some(1)
+  f(y) is "some1"
+end
 
 
 data BTree:
