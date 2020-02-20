@@ -15,6 +15,7 @@ once do imports, have an option to run all tests
 >               ,Value(..)
 >               ,CheckResult(..)
 >               ,renderCheckResults
+>               ,allCheckResultsPassed
 >               ,runChecks
 >               ,compileReport
 >               ,format
@@ -28,7 +29,10 @@ once do imports, have an option to run all tests
 > import Pretty (prettyProgram)
 > import Parse (parseProgram)
 > import Desugar (loadProgramImports, desugarProgram)
-> import Interpreter (runProgram, Value(..), CheckResult(..))
+> import Interpreter (runProgram
+>                    ,Value(..)
+>                    ,CheckResult(..)
+>                    ,allCheckResultsPassed)
 > import qualified Interpreter as I
 > import qualified InterpreterSyntax as I
 > import qualified PrettyInterpreter as I

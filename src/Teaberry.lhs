@@ -25,11 +25,14 @@ possibly run tests quietly and exit more noisily if there is a failure
 
 
 > import System.Environment (getArgs)
+> import System.Exit (exitFailure)
+> import Control.Monad (when)
 
 > import Engine (runCode
 >               ,runChecks
 >               ,renderCheckResults
 >               ,CheckResult(..)
+>               ,allCheckResultsPassed
 >               ,compileReport
 >               ,format
 >               ,Value(NothingV))
@@ -68,8 +71,10 @@ possibly run tests quietly and exit more noisily if there is a failure
 >           v <- runChecks fn cmd
 >           case v of
 >               Left e -> error e -- todo exit with error code
->               Right v1 -> putStrLn $ renderCheckResults v1
->           -- todo: exit with error code if all tests didn't pass
+>               Right v1 -> do
+>                   putStrLn $ renderCheckResults v1
+>                   when (not $ allCheckResultsPassed v1)
+>                       exitFailure
 >       help = putStrLn "-c to run code in arg, -f to run code in file"
 >       runX = putStrLn $ renderCheckResults
 >              [CheckResult "a first block"

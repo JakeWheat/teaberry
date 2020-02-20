@@ -26,6 +26,7 @@ using a hack sort of ffi for haskell.
 > module Interpreter (runProgram
 >                    ,CheckResult(..)
 >                    ,runChecks
+>                    ,allCheckResultsPassed
 >                    ,Value(..)
 >                    ,extractInt
 >                    ) where
@@ -34,6 +35,7 @@ using a hack sort of ffi for haskell.
 > import Control.Monad (void, forM_{-, when-})
 > import Control.Monad.IO.Class (liftIO)
 > import Control.Monad.Trans.RWS (RWST, runRWST, ask, get, {-put,-} local, {-tell,-} state)
+> import Data.Maybe (isNothing)
 > import Data.List (partition, intercalate, sortOn)
 > import Data.Scientific (Scientific)
 > --import Text.Show.Pretty (ppShow)
@@ -374,6 +376,11 @@ supported
 >                               [(String, Maybe String)]
 > -- the second is just if it is a fail, it contains the failure
 > -- message
+
+> allCheckResultsPassed :: [CheckResult] -> Bool
+> allCheckResultsPassed cs = all f cs
+>   where
+>     f (CheckResult _ rs) = all isNothing $ map snd rs
 
 > getCheckResults :: [TestResultLog] -> Interpreter [CheckResult]
 > getCheckResults lg' = do
