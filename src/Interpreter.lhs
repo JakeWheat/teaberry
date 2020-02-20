@@ -70,25 +70,25 @@ using a hack sort of ffi for haskell.
 
 quick exceptions, can come back to this
 
-> data MyException = MyException String -- a programming error -
->                                       --  represents something that
->                                       --  cannot be caught or tested
->                                       --  for (in the future will be
->                                       --  internal errors and
->                                       --  compile time errors only
->                                       --  or somthing)
->                  | ValueException Value -- used when 'raise' -ing in
+> data InterpreterException =
+>       UserException String -- a programming error - represents something
+>                            -- that cannot be caught or tested
+>                            --  for
+>     | InternalException String -- an error in this implementation
+>     | ValueException Value -- used when 'raise' -ing in
 >                                         --  language, something
 >                                         --  which testing can test
 >                                         --  for (and the hacky catch
 >                                         --  function can catch
 >     deriving Show
 
-> myExceptionToString :: MyException -> String
-> myExceptionToString (MyException s) = s
-> myExceptionToString (ValueException v) = torepr' v
+> instance Exception InterpreterException
 
-> instance Exception MyException
+> interpreterExceptionToString :: InterpreterException -> String
+> interpreterExceptionToString (UserException s) = s
+> interpreterExceptionToString (InternalException s) = "Internal error: " ++ s
+> interpreterExceptionToString (ValueException v) = torepr' v
+
 
 
 The env is used for read only bindings. The code distinguishes between
@@ -131,7 +131,7 @@ the store holds variable values
 > extendStore i v (Store xs) = Store ((i,v):xs)
 
 > fetchStore :: Int -> Store -> Interpreter Value
-> fetchStore i (Store xs) = maybe (throwM $ MyException $ "invalid fetch on store: " ++ show i) pure
+> fetchStore i (Store xs) = maybe (throwM $ InternalException $ "invalid fetch on store: " ++ show i) pure
 >                           $ lookup i xs
 
 > data InterpreterReader = InterpreterReader
@@ -204,7 +204,7 @@ a program doesn't have a value (in this way, at least)
 >         (InterpreterReader defaultEnv)
 >         defaultInterpreterState
 >     pure $ pure $ result
->     ) `catch` (\e -> pure $ Left $ myExceptionToString e)
+>     ) `catch` (\e -> pure $ Left $ interpreterExceptionToString e)
 
 --------------------------------------
 
@@ -220,7 +220,7 @@ interpreters for syntax nodes
 
 > interp (I.Iden e) = do
 >     rd <- ask
->     maybe (throwM $ MyException $ "Identifier not found: " ++ e)
+>     maybe (throwM $ UserException $ "Identifier not found: " ++ e)
 >         pure $ lookupEnv e (irEnv rd)
 >   
 > interp _x@(I.If c t e) = do
@@ -228,13 +228,13 @@ interpreters for syntax nodes
 >    case c' of
 >        BoolV True -> interp t
 >        BoolV False -> interp e
->        _ -> throwM $ MyException $ "expected bool in if test, got " ++ torepr' c'
+>        _ -> throwM $ UserException $ "expected bool in if test, got " ++ torepr' c'
 
 the AppHaskell is only used in the default ffi env, the desugarer never produces
 it
 
 > interp (I.AppHaskell nm exps) = do
->     f <- maybe (throwM $ MyException $ "ffi fn not found: " ++ nm) pure $ lookup nm haskellFunImpls
+>     f <- maybe (throwM $ InternalException $ "ffi fn not found: " ++ nm) pure $ lookup nm haskellFunImpls
 >     vs <- mapM interp exps
 >     f vs
 
@@ -267,7 +267,7 @@ it
 >         BoxV i -> do
 >                   st <- get
 >                   fetchStore i (isStore st)
->         v -> throwM $ MyException $ "Unbox on non box: " ++ torepr' v
+>         v -> throwM $ UserException $ "Unbox on non box: " ++ torepr' v
 
 
 > interp (I.Box e) = do
@@ -279,20 +279,20 @@ it
 >     v' <- interp v
 >     i <- case b' of
 >              BoxV i -> pure i
->              _ -> throwM $ MyException $ "attemped to setbox non box value: " ++ torepr' b'
+>              _ -> throwM $ UserException $ "attemped to setbox non box value: " ++ torepr' b'
 >     state $ \s ->
 >         ((), updateISStore (extendStore i v') s)
 >     pure v'
 
 
-> interp x@(I.LetDecl {}) = throwM $ MyException $ "Interpreter: block ends with let: " ++ prettyExpr x
+> interp x@(I.LetDecl {}) = throwM $ UserException $ "Interpreter: block ends with let: " ++ prettyExpr x
 
 > interp (I.Catch e c) = interp e `catch` (\case
->     -- is rethrowing an exception like this bad in haskell?
->     s@(MyException {}) -> throwM s
 >     ValueException v -> do
 >         cf <- interp c
->         app cf v)
+>         app cf v
+>     -- is rethrowing an exception like this bad in haskell?
+>     s -> throwM s)
 
 
 > --interp x = error $ "Interpreter: interp " ++ show x
@@ -314,9 +314,9 @@ it
 >         ClosV (I.LamVoid bdy) env' -> do
 >              case a of
 >                  NothingV -> local (updateIREnv (const env')) $ interp bdy
->                  _ -> throwM $ MyException $ "0 arg lambda called with something other than literal nothing: " ++ torepr' a
->         ClosV ee _ -> throwM $ MyException $ "non lambda in closure expression: " ++ prettyExpr ee
->         _ -> throwM $ MyException $ "non function in app position: " ++ torepr' f
+>                  _ -> throwM $ InternalException $ "0 arg lambda called with something other than literal nothing: " ++ torepr' a
+>         ClosV ee _ -> throwM $ InternalException $ "non lambda in closure expression: " ++ prettyExpr ee
+>         _ -> throwM $ UserException $ "non function in app position: " ++ torepr' f
 
 ------------------------------------------------------------------------------
 
@@ -391,7 +391,7 @@ supported
 >         gs <- mapM (\x -> (,) <$> blockID x <*> toCheckResult x) testresults
 >         let  gs' = partitionN gs
 >         ts <- mapM (\(tid,nm) -> case lookup tid blocknms of
->                                        Nothing -> throwM $ MyException $ "internal error block id"
+>                                        Nothing -> throwM $ InternalException $ "internal error block id"
 >                                        Just b -> pure $ CheckResult b nm) gs'
 >         pure ts
 >   where
@@ -399,10 +399,10 @@ supported
 >     isTestBlock _ = False
 >     blockID (TestPass x _) = pure x
 >     blockID (TestFail x _ _) = pure x
->     blockID (TestBlock {}) = throwM $ MyException $ "Interpreter: testblock in wrong place"
+>     blockID (TestBlock {}) = throwM $ InternalException $ "Interpreter: testblock in wrong place"
 >     toCheckResult (TestPass _ x) = pure (x,Nothing)
 >     toCheckResult (TestFail _ x m) = pure (x,Just m)
->     toCheckResult (TestBlock {}) = throwM $ MyException $ "Interpreter: testblock in wrong place b"
+>     toCheckResult (TestBlock {}) = throwM $ InternalException $ "Interpreter: testblock in wrong place b"
 
 > partitionN :: Eq a => [(a,b)] -> [(a,[b])]
 > partitionN [] = []
@@ -435,29 +435,28 @@ and try to put all these functions in pyret files
 
 
 
-
 > haskellFunImpls :: [(String, [Value] -> Interpreter Value)]
 > haskellFunImpls =
 >     [-- arithmetic
 >      ("+", \case
 >              [StrV a, StrV b] -> pure $ StrV (a ++ b)
 >              [NumV a, NumV b] -> pure $ NumV (a + b)
->              x -> throwM $ MyException $ "Interpreter: plus implementation" ++ listToRepr x)
+>              x -> throwM $ UserException $ "Interpreter: plus implementation" ++ listToRepr x)
 >     ,("-", \[NumV a, NumV b] -> pure $ NumV (a - b))
 >     ,("*", \case
 >              [NumV a, NumV b] -> pure $ NumV (a * b)
->              x -> throwM $ MyException $ "* needs two num args, got " ++ listToRepr x)
+>              x -> throwM $ UserException $ "* needs two num args, got " ++ listToRepr x)
 >     ,("/", \case
 >              [NumV a, NumV b] -> pure $ NumV (a / b)
->              x -> throwM $ MyException $ "/ needs two num args, got " ++ listToRepr x)
+>              x -> throwM $ UserException $ "/ needs two num args, got " ++ listToRepr x)
 >     -- comparisons - needs some work
 >     ,("<", \case
 >              [NumV a, NumV b] -> pure $ BoolV (a < b)
->              x -> throwM $ MyException $ "< needs two num args, got " ++ listToRepr x)
+>              x -> throwM $ UserException $ "< needs two num args, got " ++ listToRepr x)
 
 >     ,(">", \case
 >              [NumV a, NumV b] -> pure $ BoolV (a > b)
->              x -> throwM $ MyException $ "< needs two num args, got " ++ listToRepr x)
+>              x -> throwM $ UserException $ "< needs two num args, got " ++ listToRepr x)
 >     ,("==", \[a, b] -> pure $ BoolV $ valuesEqual a b)
 >     ,("<>", \[a, b] -> pure $ BoolV $ not $ valuesEqual a b)
 
@@ -473,10 +472,10 @@ and try to put all these functions in pyret files
 >     -- misc
 >     ,("raise", \case
 >                   [v] -> throwM $ ValueException v
->                   xs -> throwM $ MyException $ "expected 1 arg for raise, got " ++ show (length xs)
+>                   xs -> throwM $ UserException $ "expected 1 arg for raise, got " ++ show (length xs)
 >                                                ++ ", " ++ intercalate "," (map torepr' xs))
 >     ,("print", \[x] ->
->              let s = torepr' x
+>              let StrV s = tostring x
 >              in liftIO (putStrLn s) >> pure (StrV s))
 >     ,("torepr", \[x] -> pure $ torepr x)
 >     ,("to-repr", \[x] -> pure $ torepr x)
@@ -540,7 +539,7 @@ and try to put all these functions in pyret files
 >     ,("variant-name", variantName)
 >     ,("safe-variant-name", safeVariantName)
 >     ,("variant-field-get", \[v@(VariantV _ fs), StrV x] -> do
->              maybe (throwM $ MyException $ "variant field not found " ++ x ++ ": " ++ torepr' v)
+>              maybe (throwM $ UserException $ "variant field not found " ++ x ++ ": " ++ torepr' v)
 >                         pure
 >                         $ lookup x fs)
 
@@ -548,7 +547,7 @@ and try to put all these functions in pyret files
 
 > throwWrongArgs :: String -> Int -> [Value] -> Interpreter a
 > throwWrongArgs fnname want es = 
->     throwM $ MyException $ "expected " ++ show want ++ " arg for " ++ fnname ++ ", got " ++ show (length es)
+>     throwM $ UserException $ "expected " ++ show want ++ " arg for " ++ fnname ++ ", got " ++ show (length es)
 >     ++ ", " ++ intercalate "," (map torepr' es)
 
 
@@ -649,38 +648,37 @@ and try to put all these functions in pyret files
 >     let x = tostring e1
 >     pure $ BoolV $ valuesEqual e0 x
 
-> tostringEquals x = throwM $ MyException $ "tostring-equals called on " ++ show (length x) ++ " args, should be 2"
+> tostringEquals x = throwM $ UserException $ "tostring-equals called on " ++ show (length x) ++ " args, should be 2"
 
 
 > listLink :: [Value] -> Interpreter Value
 > listLink [v1, v2] = pure $ VariantV "link" [("first", v1)
 >                                            ,("rest", v2)]
-> listLink x = throwM $ MyException $ "link called on " ++ show (length x) ++ " args, should be 2"
+> listLink x = throwM $ UserException $ "link called on " ++ show (length x) ++ " args, should be 2"
 
 > listIsEmpty :: [Value] -> Interpreter Value
 > listIsEmpty [VariantV "empty" []] = pure $ BoolV True
 > listIsEmpty [_] = pure $ BoolV False
-> listIsEmpty x = throwM $ MyException $ "is-empty called on " ++ show (length x) ++ " args, should be 1"
+> listIsEmpty x = throwM $ UserException $ "is-empty called on " ++ show (length x) ++ " args, should be 1"
 
 > listIsLink :: [Value] -> Interpreter Value
 > listIsLink [VariantV "link" _] = pure $ BoolV True
 > listIsLink [_] = pure $ BoolV False
-> listIsLink x = throwM $ MyException $ "is-link called on " ++ show (length x) ++ " args, should be 1"
+> listIsLink x = throwM $ UserException $ "is-link called on " ++ show (length x) ++ " args, should be 1"
 
 > listIsList :: [Value] -> Interpreter Value
 > listIsList [VariantV x _] | x `elem` ["empty", "link"] = pure $ BoolV True
 > listIsList [_] = pure $ BoolV False
-> listIsList x = throwM $ MyException $ "is-list called on " ++ show (length x) ++ " args, should be 1"
-
+> listIsList x = throwM $ UserException $ "is-list called on " ++ show (length x) ++ " args, should be 1"
 > variantName :: [Value] -> Interpreter Value
 > variantName [VariantV x _] = pure $ StrV x
-> variantName [x] = throwM $ MyException $ "variant-name called on non variant: " ++ torepr' x
-> variantName x = throwM $ MyException $ "variant-name called on " ++ show (length x) ++ " args, should be 1"
+> variantName [x] = throwM $ UserException $ "variant-name called on non variant: " ++ torepr' x
+> variantName x = throwM $ UserException $ "variant-name called on " ++ show (length x) ++ " args, should be 1"
 
 > safeVariantName :: [Value] -> Interpreter Value
 > safeVariantName [VariantV x _] = pure $ StrV x
 > safeVariantName [_] = pure NothingV
-> safeVariantName x = throwM $ MyException $ "safe-variant-name called on " ++ show (length x) ++ " args, should be 1"
+> safeVariantName x = throwM $ UserException $ "safe-variant-name called on " ++ show (length x) ++ " args, should be 1"
 
 
 > makeVariant :: [Value] -> Interpreter Value
@@ -694,11 +692,11 @@ and try to put all these functions in pyret files
 >              then box v
 >              else pure v
 >         pure (nm,x)
->     unpackTuple (VariantV "tuple" x) = throwM $ MyException $ "value in list in make-variant, expected tuple of is-ref, name and val, got " ++ show (map (\(_,b) -> torepr' b) x)
->     unpackTuple x = throwM $ MyException $ "expected tuple in make-variant, got " ++ torepr' x
-> makeVariant x = throwM $ MyException $ "make-variant called on " ++ show (length x) ++ " args, should be 2"
+>     unpackTuple (VariantV "tuple" x) = throwM $ UserException $ "value in list in make-variant, expected tuple of is-ref, name and val, got " ++ show (map (\(_,b) -> torepr' b) x)
+>     unpackTuple x = throwM $ UserException $ "expected tuple in make-variant, got " ++ torepr' x
+> makeVariant x = throwM $ UserException $ "make-variant called on " ++ show (length x) ++ " args, should be 2"
 
 > listToHaskList :: Value -> Interpreter [Value]
 > listToHaskList (VariantV "empty" []) = pure []
 > listToHaskList (VariantV "link" [("first",v),("rest",x)]) = (v:) <$> listToHaskList x
-> listToHaskList x = throwM $ MyException $ "interpreter: listToHaskList: " ++ torepr' x
+> listToHaskList x = throwM $ UserException $ "interpreter: listToHaskList: " ++ torepr' x
