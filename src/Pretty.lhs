@@ -92,10 +92,11 @@
 > expr (DotExpr e i) = expr e <> text "." <> text i
 
 > expr (Cases ty e mats els) =
->     text "cases" <> parens (text ty) <+> expr e <> text ":"
->     <+> nest 2 (vcat (map mf mats ++
->                 [maybe empty (\x -> text "|" <+> text "else" <+> text "=>" <+> expr x) els]))
->     <+> text "end"
+>     vcat
+>     [text "cases" <> parens (text ty) <+> expr e <> text ":"
+>     ,nest 2 $ vcat (map mf mats ++
+>                 [maybe empty (\x -> text "|" <+> text "else" <+> text "=>" <+> expr x) els])
+>     ,text "end"]
 >   where
 >     mf (p, e1) = text "|" <+> pat p <+> text "=>" <+> expr e1
 
@@ -141,12 +142,15 @@
 >      ,text "end"]
 
 > stmt (DataDecl nm vs w ) =
->     text "data" <+> text nm <+> text ":"
->     <+> nest 2 (vcat $ map vf vs)
->     <+> maybe empty whereBlock w
->     <+> text "end"
+>     vcat
+>     [text "data" <+> text nm <+> text ":"
+>     ,nest 2 (vcat $ map vf vs)
+>     ,maybe empty whereBlock w
+>     ,text "end"]
 >   where
->       vf (VariantDecl vnm fs) = text "|" <+> text vnm <+> parens (commaSep $ map f fs)
+>       vf (VariantDecl vnm fs) = text "|" <+> text vnm <> case fs of
+>                                                              [] -> empty
+>                                                              _ -> parens (commaSep $ map f fs)
 >       f (m, x) = (case m of
 >                      Ref -> text "ref"
 >                      _ -> empty)
