@@ -582,7 +582,7 @@ when a fun or rec is seen, it will collect subsequent funs and recs
 
 
 > desugarStmt (S.StExpr (S.BinOp e0 "raises" e1)) = do
->   desugarStmt(S.StExpr (S.BinOp e0 "raises-satisfies" (S.App (S.Iden "torepr-equals") [e1])))
+>   desugarStmt(S.StExpr (S.BinOp e0 "raises-satisfies" (S.App (S.Iden "tostring-equals") [e1])))
 
 > desugarStmt (S.StExpr x@(S.BinOp e0 "raises-satisfies" e1)) = do
 >   let p = P.prettyExpr x

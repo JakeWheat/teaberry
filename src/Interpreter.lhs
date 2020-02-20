@@ -473,6 +473,46 @@ and try to put all these functions in pyret files
 >              in liftIO (putStrLn s) >> pure (StrV s))
 >     ,("torepr", \[x] -> pure $ torepr x)
 >     ,("to-repr", \[x] -> pure $ torepr x)
+>     ,("tostring", \[x] -> pure $ tostring x)
+>     ,("to-string", \[x] -> pure $ tostring x)
+>
+>     ,("is-boolean", \case
+>              [BoolV _] -> pure $ BoolV True
+>              [_] -> pure $ BoolV False
+>              es -> throwWrongArgs "is-boolean" 1 es)
+
+>     ,("is-string", \case
+>              [StrV _] -> pure $ BoolV True
+>              [_] -> pure $ BoolV False
+>              es -> throwWrongArgs "is-string" 1 es)
+
+>     ,("is-number", \case
+>              [NumV _] -> pure $ BoolV True
+>              [_] -> pure $ BoolV False
+>              es -> throwWrongArgs "is-number" 1 es)
+
+>     ,("is-function", \case
+>              [ClosV {}] -> pure $ BoolV True
+>              [_] -> pure $ BoolV False
+>              es -> throwWrongArgs "is-function" 1 es)
+
+>     ,("is-nothing", \case
+>              [NothingV] -> pure $ BoolV True
+>              [_] -> pure $ BoolV False
+>              es -> throwWrongArgs "is-nothing" 1 es)
+
+>     ,("is-tuple", \case
+>              [VariantV "tuple" _] -> pure $ BoolV True
+>              [_] -> pure $ BoolV False
+>              es -> throwWrongArgs "is-tuple" 1 es)
+
+>     ,("is-record", \case
+>              [VariantV "record" _] -> pure $ BoolV True
+>              [_] -> pure $ BoolV False
+>              es -> throwWrongArgs "is-record" 1 es)
+
+
+
 >
 >      -- lists hardcoded into the system to bootstrap since it needs them
 >      -- to be able to create agdt in the implementation used
@@ -486,7 +526,7 @@ and try to put all these functions in pyret files
 >     ,("log-test-pass", logTestPass)
 >     ,("log-test-fail", logTestFail)
 >     ,("add-tests", addTests)
->     ,("torepr-equals", toreprEquals)
+>     ,("tostring-equals", tostringEquals)
 >
 >
 >     ,("make-variant", makeVariant)
@@ -498,6 +538,12 @@ and try to put all these functions in pyret files
 >                         $ lookup x fs)
 
 >     ]
+
+> throwWrongArgs :: String -> Int -> [Value] -> Interpreter a
+> throwWrongArgs fnname want es = 
+>     throwM $ MyException $ "expected " ++ show want ++ " arg for " ++ fnname ++ ", got " ++ show (length es)
+>     ++ ", " ++ intercalate "," (map torepr' es)
+
 
 > defaultEnv :: Env
 > defaultEnv = extendsEnv
@@ -522,6 +568,8 @@ and try to put all these functions in pyret files
 >     ,liftUnOp "print"
 >     ,liftUnOp "torepr"
 >     ,liftUnOp "to-repr"
+>     ,liftUnOp "tostring"
+>     ,liftUnOp "to-string"
 >     ,liftBinOp "log-test-pass"
 >     ,liftTriOp "log-test-fail"
 >     ,liftBinOp "log-check-block"
@@ -533,8 +581,15 @@ and try to put all these functions in pyret files
 >     ,liftUnOp "is-list"
 >     ,liftUnOp "variant-name"
 >     ,liftUnOp "safe-variant-name"
+>     ,liftUnOp "is-boolean"
+>     ,liftUnOp "is-string"
+>     ,liftUnOp "is-function"
+>     ,liftUnOp "is-nothing"
+>     ,liftUnOp "is-tuple"
+>     ,liftUnOp "is-record"
+>     ,liftUnOp "is-number"
 >     ,liftBinOp "make-variant"
->     ,liftBinOp "torepr-equals"
+>     ,liftBinOp "tostring-equals"
 >     ] emptyEnv
 >   where
 >      liftUnOp f = (f, ClosV (I.Lam "a" (I.AppHaskell f [I.Iden "a"])) emptyEnv)
@@ -574,16 +629,20 @@ and try to put all these functions in pyret files
 
 > torepr' (BoxV x) = "Box " ++ show x
 
-> torepr' (StrV s) = s
+> torepr' (StrV s) = "\"" ++ s ++ "\""
 
 > torepr' NothingV = "nothing"
 
-> toreprEquals :: [Value] -> Interpreter Value
-> toreprEquals [e0, e1] = do
->     let x = torepr e1
+> tostring :: Value -> Value
+> tostring (StrV v) = StrV v
+> tostring x = torepr x
+
+> tostringEquals :: [Value] -> Interpreter Value
+> tostringEquals [e0, e1] = do
+>     let x = tostring e1
 >     pure $ BoolV $ valuesEqual e0 x
 
-> toreprEquals x = throwM $ MyException $ "torepr-equals called on " ++ show (length x) ++ " args, should be 2"
+> tostringEquals x = throwM $ MyException $ "tostring-equals called on " ++ show (length x) ++ " args, should be 2"
 
 
 > listLink :: [Value] -> Interpreter Value

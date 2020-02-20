@@ -1,0 +1,36 @@
+
+check:
+  
+  print("ok")
+  # should probably test for each built in type
+  # and a few others
+  torepr(1) is "1"
+  to-repr(1) is "1"
+  tostring(1) is "1"
+  to-string(1) is "1"
+
+  torepr("1") is '"1"'
+  to-repr("1") is '"1"'
+  tostring("1") is "1"
+  to-string("1") is "1"
+
+  
+  raise("test") raises "test"
+  is-boolean(true) is true
+  is-boolean(1) is false
+  is-number(true) is false
+  is-number(1) is true
+  is-nothing(1) is false
+  is-nothing(nothing) is true
+  is-string(1) is false
+  is-string("test") is true
+  is-function(1) is false
+  is-function(lam(a): a + 1 end) is true
+  is-tuple(1) is false
+  is-tuple({1;2}) is true
+  is-tuple({a:1, b:2}) is false
+  is-record(1) is false
+  is-record({1;2}) is false
+  is-record({a:1, b:2}) is true
+  
+end

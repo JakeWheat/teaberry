@@ -73,6 +73,7 @@ wrapper to lift tests written in the language into tests for the
 >     ,"lists-basics.tea"
 >     ,"agdt.tea"
 >     ,"ref.tea"
+>     ,"built-in-functions.tea"
 
 >     ,"empty.tea"
 >     ,"empty_check.tea"
