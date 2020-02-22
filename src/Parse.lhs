@@ -771,7 +771,7 @@ link(a,b) = x
 > pat = choice
 >       [(IdenP <$> ((option NoShadow (Shadow <$ keyword_ "shadow")) <?> "")
 >               <*> identifier) <**> option id vntPSuffix
->       ,TupleP <$> (symbol_ "{" *> xSep ';' pat <* symbol_ "}")]
+>       ,(TupleP <$> (symbol_ "{" *> xSep ';' pat <* symbol_ "}")) <?> ""]
 >       <**> option id asPatSuffix
 
 > asPatSuffix :: Parser (Pat -> Pat)
