@@ -213,7 +213,7 @@ consider what other numbers to support, e.g. integer, positive
 
 > num :: Parser String
 > num = lexeme (
->     choice [digits <**> choice [eSuffix,dotSuffixOnly,pure id]
+>     choice [digits <**> choice [eSuffix <?> "",dotSuffixOnly <?> "",pure id]
 >            ,myChar '.' <**> afterDot
 >            ]
 >    -- this is for definitely avoiding possibly ambiguous source
@@ -262,17 +262,17 @@ and make sure it doesn't parse newlines when it shouldn't
 >             <?> "string literal"
 
 > appSuffix :: Parser (Expr -> Expr)
-> appSuffix = flip App <$> parens (commaSep expr)
+> appSuffix = (flip App <$> parens (commaSep expr)) <?> ""
 
 
 > expr :: Parser Expr
 > expr = (term <**> option id binOpSuffix) <?> "expression"
 
 > binOpSuffix :: Parser (Expr -> Expr)
-> binOpSuffix = do
->     op <- binOpSym <?> "binary operator"
+> binOpSuffix = (do
+>     op <- binOpSym
 >     b <- expr
->     pure $ bo op b
+>     pure $ bo op b) <?> ""
 >   where
 >     bo op b a = BinOp a op b
 
@@ -450,9 +450,9 @@ todo: remove the trys by implementing a proper lexer or a lexer style
 
 
 > dotSuffix :: Parser (Expr -> Expr)
-> dotSuffix = symbol_ "." *>
+> dotSuffix = (symbol_ "." *>
 >     choice [flip TupleGet <$> (symbol_ "{" *> nonNegativeInteger <* symbol_ "}")
->            ,flip DotExpr <$> identifier]
+>            ,flip DotExpr <$> identifier]) <?> ""
 
 > cases :: Parser Expr
 > cases = do
@@ -491,7 +491,7 @@ y <- getexpression x
   and there is a getpattern also
 
 > unboxSuffix :: Parser (Expr -> Expr)
-> unboxSuffix = flip Unbox <$> (try (symbol_ "!" *> identifier))
+> unboxSuffix = (flip Unbox <$> (try (symbol_ "!" *> identifier))) <?> ""
 
 
 put all the parsers which start with a keyword first

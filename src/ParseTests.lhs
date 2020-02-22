@@ -187,6 +187,7 @@ todo: review all the whitespace rules that are being ignored
 
 >     ,("[list: 1,2,3]", Construct (Iden "list") [num 1, num 2, num 3])
 >     ,("[list: ]", Construct (Iden "list") [])
+>     ,("[list: 1,2,]", Construct (Iden "list") [num 1, num 2])
 
 >     --,("let {x; y}: {1; 2} in x + y end"
 >     -- ,Let [(TupleP [IdenP "x",IdenP "y"], Tuple [num 1, num 2])] (BinOp (Iden "x" "+" (Iden "y"))))

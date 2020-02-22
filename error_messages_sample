@@ -13,7 +13,7 @@ en
 5 | en
   | ^^
 unexpected "en"
-expecting "end", '!', '(', '.', or binary operator
+expecting "end"
 
 ^^^^^^^^^^^^^^^^^^^^^^^
 ask:
@@ -26,7 +26,7 @@ e
 5 | e
   | ^
 unexpected 'e'
-expecting "end", '!', '(', '.', or binary operator
+expecting "end"
 
 ^^^^^^^^^^^^^^^^^^^^^^^
 ask:
@@ -39,7 +39,7 @@ ask:
 5 | <empty line>
   | ^
 unexpected end of input
-expecting "end", '!', '(', '.', or binary operator
+expecting "end"
 
 ask:
   | x == 0 then: 1
@@ -50,7 +50,7 @@ ask:
 4 |   | otherwise: x * -1
   |                      ^
 unexpected end of input
-expecting "end", '!', '(', '.', 'e', or binary operator
+expecting "end"
 
 ask:
   | x == 0 then: 1
@@ -94,7 +94,7 @@ ask:
 4 |   | otherwise: x 
   |                  ^
 unexpected end of input
-expecting "end", '!', '(', '.', or binary operator
+expecting "end"
 
 ask:
   | x == 0 then: 1
@@ -105,7 +105,7 @@ ask:
 4 |   | otherwise: x
   |                 ^
 unexpected end of input
-expecting "end", '!', '(', '.', or binary operator
+expecting "end"
 
 ask:
   | x == 0 then: 1
@@ -149,7 +149,7 @@ ask:
 4 |   | otherwis
   |             ^
 unexpected end of input
-expecting "then", '!', '(', '.', or binary operator
+expecting "then"
 
 ask:
   | x == 0 then: 1
@@ -160,7 +160,7 @@ ask:
 4 |   | otherwi
   |            ^
 unexpected end of input
-expecting "then", '!', '(', '.', or binary operator
+expecting "then"
 
 ask:
   | x == 0 then: 1
@@ -171,7 +171,7 @@ ask:
 4 |   | otherw
   |           ^
 unexpected end of input
-expecting "then", '!', '(', '.', or binary operator
+expecting "then"
 
 ask:
   | x == 0 then: 1
@@ -182,7 +182,7 @@ ask:
 4 |   | other
   |          ^
 unexpected end of input
-expecting "then", '!', '(', '.', or binary operator
+expecting "then"
 
 ask:
   | x == 0 then: 1
@@ -193,7 +193,7 @@ ask:
 4 |   | othe
   |         ^
 unexpected end of input
-expecting "then", '!', '(', '.', or binary operator
+expecting "then"
 
 ask:
   | x == 0 then: 1
@@ -204,7 +204,7 @@ ask:
 4 |   | oth
   |        ^
 unexpected end of input
-expecting "then", '!', '(', '.', or binary operator
+expecting "then"
 
 ask:
   | x == 0 then: 1
@@ -215,7 +215,7 @@ ask:
 4 |   | ot
   |       ^
 unexpected end of input
-expecting "then", '!', '(', '.', or binary operator
+expecting "then"
 
 ask:
   | x == 0 then: 1
@@ -226,7 +226,7 @@ ask:
 4 |   | o
   |      ^
 unexpected end of input
-expecting "then", '!', '(', '.', or binary operator
+expecting "then"
 
 ask:
   | x == 0 then: 1
@@ -259,7 +259,7 @@ ask:
 4 |   
   |   ^
 unexpected end of input
-expecting "end", '!', '(', '.', '|', or binary operator
+expecting "end" or '|'
 
 ask:
   | x == 0 then: 1
@@ -270,7 +270,7 @@ ask:
 4 |  
   |  ^
 unexpected end of input
-expecting "end", '!', '(', '.', '|', or binary operator
+expecting "end" or '|'
 
 ask:
   | x == 0 then: 1
@@ -281,7 +281,7 @@ ask:
 4 | <empty line>
   | ^
 unexpected end of input
-expecting "end", '!', '(', '.', '|', or binary operator
+expecting "end" or '|'
 
 ask:
   | x == 0 then: 1
@@ -291,7 +291,7 @@ ask:
 3 |   | x > 0 then: x
   |                  ^
 unexpected end of input
-expecting "end", '!', '(', '.', '|', or binary operator
+expecting "end" or '|'
 
 ask:
   | x == 0 then: 1
@@ -331,7 +331,7 @@ ask:
 3 |   | x > 0 the
   |           ^^^
 unexpected "the"
-expecting "then", '!', '(', '.', or binary operator
+expecting "then"
 
 ^^^^^^^^^^^^^^^^^^^^^^^
 ask:
@@ -342,7 +342,7 @@ ask:
 3 |   | x > 0 th
   |           ^^
 unexpected "th"
-expecting "then", '!', '(', '.', or binary operator
+expecting "then"
 
 ^^^^^^^^^^^^^^^^^^^^^^^
 ask:
@@ -353,7 +353,7 @@ ask:
 3 |   | x > 0 t
   |           ^
 unexpected 't'
-expecting "then", '!', '(', '.', or binary operator
+expecting "then"
 
 ^^^^^^^^^^^^^^^^^^^^^^^
 ask:
@@ -364,7 +364,7 @@ ask:
 3 |   | x > 0 
   |           ^
 unexpected end of input
-expecting "then", '!', '(', '.', or binary operator
+expecting "then"
 
 ask:
   | x == 0 then: 1
@@ -374,7 +374,7 @@ ask:
 3 |   | x > 0
   |          ^
 unexpected end of input
-expecting "then", '!', '(', '.', 'e', or binary operator
+expecting "then"
 
 ask:
   | x == 0 then: 1
@@ -404,7 +404,7 @@ ask:
 3 |   | x 
   |       ^
 unexpected end of input
-expecting "then", '!', '(', '.', or binary operator
+expecting "then"
 
 ask:
   | x == 0 then: 1
@@ -414,7 +414,7 @@ ask:
 3 |   | x
   |      ^
 unexpected end of input
-expecting "then", '!', '(', '.', or binary operator
+expecting "then"
 
 ask:
   | x == 0 then: 1
@@ -444,7 +444,7 @@ ask:
 3 |   
   |   ^
 unexpected end of input
-expecting "end", '!', '(', '.', '|', or binary operator
+expecting "end" or '|'
 
 ask:
   | x == 0 then: 1
@@ -454,7 +454,7 @@ ask:
 3 |  
   |  ^
 unexpected end of input
-expecting "end", '!', '(', '.', '|', or binary operator
+expecting "end" or '|'
 
 ask:
   | x == 0 then: 1
@@ -464,7 +464,7 @@ ask:
 3 | <empty line>
   | ^
 unexpected end of input
-expecting "end", '!', '(', '.', '|', or binary operator
+expecting "end" or '|'
 
 ask:
   | x == 0 then: 1
@@ -473,7 +473,7 @@ ask:
 2 |   | x == 0 then: 1
   |                   ^
 unexpected end of input
-expecting "end", '!', '(', '.', 'e', '|', or binary operator
+expecting "end" or '|'
 
 ask:
   | x == 0 then: 
@@ -509,7 +509,7 @@ ask:
 2 |   | x == 0 the
   |            ^^^
 unexpected "the"
-expecting "then", '!', '(', '.', or binary operator
+expecting "then"
 
 ^^^^^^^^^^^^^^^^^^^^^^^
 ask:
@@ -519,7 +519,7 @@ ask:
 2 |   | x == 0 th
   |            ^^
 unexpected "th"
-expecting "then", '!', '(', '.', or binary operator
+expecting "then"
 
 ^^^^^^^^^^^^^^^^^^^^^^^
 ask:
@@ -529,7 +529,7 @@ ask:
 2 |   | x == 0 t
   |            ^
 unexpected 't'
-expecting "then", '!', '(', '.', or binary operator
+expecting "then"
 
 ^^^^^^^^^^^^^^^^^^^^^^^
 ask:
@@ -539,7 +539,7 @@ ask:
 2 |   | x == 0 
   |            ^
 unexpected end of input
-expecting "then", '!', '(', '.', or binary operator
+expecting "then"
 
 ask:
   | x == 0
@@ -548,7 +548,7 @@ ask:
 2 |   | x == 0
   |           ^
 unexpected end of input
-expecting "then", '!', '(', '.', 'e', or binary operator
+expecting "then"
 
 ask:
   | x == 
@@ -575,7 +575,7 @@ ask:
 2 |   | x =
   |       ^
 unexpected '='
-expecting "then", '!', '(', '.', or binary operator
+expecting "then"
 
 ^^^^^^^^^^^^^^^^^^^^^^^
 ask:
@@ -585,7 +585,7 @@ ask:
 2 |   | x 
   |       ^
 unexpected end of input
-expecting "then", '!', '(', '.', or binary operator
+expecting "then"
 
 ask:
   | x
@@ -594,7 +594,7 @@ ask:
 2 |   | x
   |      ^
 unexpected end of input
-expecting "then", '!', '(', '.', or binary operator
+expecting "then"
 
 ask:
   | 
@@ -681,7 +681,7 @@ en
 4 | en
   | ^^
 unexpected "en"
-expecting "end", '!', '(', '.', '|', or binary operator
+expecting "end" or '|'
 
 ^^^^^^^^^^^^^^^^^^^^^^^
 cases (Two) a:
@@ -693,7 +693,7 @@ e
 4 | e
   | ^
 unexpected 'e'
-expecting "end", '!', '(', '.', '|', or binary operator
+expecting "end" or '|'
 
 ^^^^^^^^^^^^^^^^^^^^^^^
 cases (Two) a:
@@ -705,7 +705,7 @@ cases (Two) a:
 4 | <empty line>
   | ^
 unexpected end of input
-expecting "end", '!', '(', '.', '|', or binary operator
+expecting "end" or '|'
 
 cases (Two) a:
   | pt1(x,y) => if n == 0: x else: y end
@@ -715,7 +715,7 @@ cases (Two) a:
 3 |   | pt2(x,y) => if n == 0: x else: y end
   |                                         ^
 unexpected end of input
-expecting "end", '!', '(', '.', '|', or binary operator
+expecting "end" or '|'
 
 cases (Two) a:
   | pt1(x,y) => if n == 0: x else: y end
@@ -725,7 +725,7 @@ cases (Two) a:
 3 |   | pt2(x,y) => if n == 0: x else: y en
   |                                      ^^
 unexpected "en"
-expecting "end", '!', '(', '.', or binary operator
+expecting "end"
 
 ^^^^^^^^^^^^^^^^^^^^^^^
 cases (Two) a:
@@ -736,7 +736,7 @@ cases (Two) a:
 3 |   | pt2(x,y) => if n == 0: x else: y e
   |                                      ^
 unexpected 'e'
-expecting "end", '!', '(', '.', or binary operator
+expecting "end"
 
 ^^^^^^^^^^^^^^^^^^^^^^^
 cases (Two) a:
@@ -747,7 +747,7 @@ cases (Two) a:
 3 |   | pt2(x,y) => if n == 0: x else: y 
   |                                      ^
 unexpected end of input
-expecting "end", '!', '(', '.', or binary operator
+expecting "end"
 
 cases (Two) a:
   | pt1(x,y) => if n == 0: x else: y end
@@ -757,7 +757,7 @@ cases (Two) a:
 3 |   | pt2(x,y) => if n == 0: x else: y
   |                                     ^
 unexpected end of input
-expecting "end", '!', '(', '.', or binary operator
+expecting "end"
 
 cases (Two) a:
   | pt1(x,y) => if n == 0: x else: y end
@@ -797,7 +797,7 @@ cases (Two) a:
 3 |   | pt2(x,y) => if n == 0: x els
   |                              ^^^
 unexpected "els"
-expecting "else", "end", '!', '(', '.', or binary operator
+expecting "else" or "end"
 
 ^^^^^^^^^^^^^^^^^^^^^^^
 cases (Two) a:
@@ -808,7 +808,7 @@ cases (Two) a:
 3 |   | pt2(x,y) => if n == 0: x el
   |                              ^^
 unexpected "el"
-expecting "else", "end", '!', '(', '.', or binary operator
+expecting "else" or "end"
 
 ^^^^^^^^^^^^^^^^^^^^^^^
 cases (Two) a:
@@ -819,7 +819,7 @@ cases (Two) a:
 3 |   | pt2(x,y) => if n == 0: x e
   |                              ^
 unexpected 'e'
-expecting "else", "end", '!', '(', '.', or binary operator
+expecting "else" or "end"
 
 ^^^^^^^^^^^^^^^^^^^^^^^
 cases (Two) a:
@@ -830,7 +830,7 @@ cases (Two) a:
 3 |   | pt2(x,y) => if n == 0: x 
   |                              ^
 unexpected end of input
-expecting "else", "end", '!', '(', '.', or binary operator
+expecting "else" or "end"
 
 cases (Two) a:
   | pt1(x,y) => if n == 0: x else: y end
@@ -840,7 +840,7 @@ cases (Two) a:
 3 |   | pt2(x,y) => if n == 0: x
   |                             ^
 unexpected end of input
-expecting "else", "end", '!', '(', '.', or binary operator
+expecting "else" or "end"
 
 cases (Two) a:
   | pt1(x,y) => if n == 0: x else: y end
@@ -870,7 +870,7 @@ cases (Two) a:
 3 |   | pt2(x,y) => if n == 0
   |                          ^
 unexpected end of input
-expecting '!', '(', '.', ':', 'e', or binary operator
+expecting ':'
 
 cases (Two) a:
   | pt1(x,y) => if n == 0: x else: y end
@@ -900,7 +900,7 @@ cases (Two) a:
 3 |   | pt2(x,y) => if n =
   |                      ^
 unexpected '='
-expecting '!', '(', '.', ':', or binary operator
+expecting ':'
 
 ^^^^^^^^^^^^^^^^^^^^^^^
 cases (Two) a:
@@ -911,7 +911,7 @@ cases (Two) a:
 3 |   | pt2(x,y) => if n 
   |                      ^
 unexpected end of input
-expecting '!', '(', '.', ':', or binary operator
+expecting ':'
 
 cases (Two) a:
   | pt1(x,y) => if n == 0: x else: y end
@@ -921,7 +921,7 @@ cases (Two) a:
 3 |   | pt2(x,y) => if n
   |                     ^
 unexpected end of input
-expecting '!', '(', '.', ':', or binary operator
+expecting ':'
 
 cases (Two) a:
   | pt1(x,y) => if n == 0: x else: y end
@@ -951,7 +951,7 @@ cases (Two) a:
 3 |   | pt2(x,y) => i
   |                  ^
 unexpected end of input
-expecting "end", '!', '(', '.', '|', or binary operator
+expecting "end" or '|'
 
 cases (Two) a:
   | pt1(x,y) => if n == 0: x else: y end
@@ -1102,7 +1102,7 @@ cases (Two) a:
 3 |   
   |   ^
 unexpected end of input
-expecting "end", '!', '(', '.', '|', or binary operator
+expecting "end" or '|'
 
 cases (Two) a:
   | pt1(x,y) => if n == 0: x else: y end
@@ -1112,7 +1112,7 @@ cases (Two) a:
 3 |  
   |  ^
 unexpected end of input
-expecting "end", '!', '(', '.', '|', or binary operator
+expecting "end" or '|'
 
 cases (Two) a:
   | pt1(x,y) => if n == 0: x else: y end
@@ -1122,7 +1122,7 @@ cases (Two) a:
 3 | <empty line>
   | ^
 unexpected end of input
-expecting "end", '!', '(', '.', '|', or binary operator
+expecting "end" or '|'
 
 cases (Two) a:
   | pt1(x,y) => if n == 0: x else: y end
@@ -1131,7 +1131,7 @@ cases (Two) a:
 2 |   | pt1(x,y) => if n == 0: x else: y end
   |                                         ^
 unexpected end of input
-expecting "end", '!', '(', '.', '|', or binary operator
+expecting "end" or '|'
 
 cases (Two) a:
   | pt1(x,y) => if n == 0: x else: y en
@@ -1140,7 +1140,7 @@ cases (Two) a:
 2 |   | pt1(x,y) => if n == 0: x else: y en
   |                                      ^^
 unexpected "en"
-expecting "end", '!', '(', '.', or binary operator
+expecting "end"
 
 ^^^^^^^^^^^^^^^^^^^^^^^
 cases (Two) a:
@@ -1150,7 +1150,7 @@ cases (Two) a:
 2 |   | pt1(x,y) => if n == 0: x else: y e
   |                                      ^
 unexpected 'e'
-expecting "end", '!', '(', '.', or binary operator
+expecting "end"
 
 ^^^^^^^^^^^^^^^^^^^^^^^
 cases (Two) a:
@@ -1160,7 +1160,7 @@ cases (Two) a:
 2 |   | pt1(x,y) => if n == 0: x else: y 
   |                                      ^
 unexpected end of input
-expecting "end", '!', '(', '.', or binary operator
+expecting "end"
 
 cases (Two) a:
   | pt1(x,y) => if n == 0: x else: y
@@ -1169,7 +1169,7 @@ cases (Two) a:
 2 |   | pt1(x,y) => if n == 0: x else: y
   |                                     ^
 unexpected end of input
-expecting "end", '!', '(', '.', or binary operator
+expecting "end"
 
 cases (Two) a:
   | pt1(x,y) => if n == 0: x else: 
@@ -1205,7 +1205,7 @@ cases (Two) a:
 2 |   | pt1(x,y) => if n == 0: x els
   |                              ^^^
 unexpected "els"
-expecting "else", "end", '!', '(', '.', or binary operator
+expecting "else" or "end"
 
 ^^^^^^^^^^^^^^^^^^^^^^^
 cases (Two) a:
@@ -1215,7 +1215,7 @@ cases (Two) a:
 2 |   | pt1(x,y) => if n == 0: x el
   |                              ^^
 unexpected "el"
-expecting "else", "end", '!', '(', '.', or binary operator
+expecting "else" or "end"
 
 ^^^^^^^^^^^^^^^^^^^^^^^
 cases (Two) a:
@@ -1225,7 +1225,7 @@ cases (Two) a:
 2 |   | pt1(x,y) => if n == 0: x e
   |                              ^
 unexpected 'e'
-expecting "else", "end", '!', '(', '.', or binary operator
+expecting "else" or "end"
 
 ^^^^^^^^^^^^^^^^^^^^^^^
 cases (Two) a:
@@ -1235,7 +1235,7 @@ cases (Two) a:
 2 |   | pt1(x,y) => if n == 0: x 
   |                              ^
 unexpected end of input
-expecting "else", "end", '!', '(', '.', or binary operator
+expecting "else" or "end"
 
 cases (Two) a:
   | pt1(x,y) => if n == 0: x
@@ -1244,7 +1244,7 @@ cases (Two) a:
 2 |   | pt1(x,y) => if n == 0: x
   |                             ^
 unexpected end of input
-expecting "else", "end", '!', '(', '.', or binary operator
+expecting "else" or "end"
 
 cases (Two) a:
   | pt1(x,y) => if n == 0: 
@@ -1271,7 +1271,7 @@ cases (Two) a:
 2 |   | pt1(x,y) => if n == 0
   |                          ^
 unexpected end of input
-expecting '!', '(', '.', ':', 'e', or binary operator
+expecting ':'
 
 cases (Two) a:
   | pt1(x,y) => if n == 
@@ -1298,7 +1298,7 @@ cases (Two) a:
 2 |   | pt1(x,y) => if n =
   |                      ^
 unexpected '='
-expecting '!', '(', '.', ':', or binary operator
+expecting ':'
 
 ^^^^^^^^^^^^^^^^^^^^^^^
 cases (Two) a:
@@ -1308,7 +1308,7 @@ cases (Two) a:
 2 |   | pt1(x,y) => if n 
   |                      ^
 unexpected end of input
-expecting '!', '(', '.', ':', or binary operator
+expecting ':'
 
 cases (Two) a:
   | pt1(x,y) => if n
@@ -1317,7 +1317,7 @@ cases (Two) a:
 2 |   | pt1(x,y) => if n
   |                     ^
 unexpected end of input
-expecting '!', '(', '.', ':', or binary operator
+expecting ':'
 
 cases (Two) a:
   | pt1(x,y) => if 
@@ -1344,7 +1344,7 @@ cases (Two) a:
 2 |   | pt1(x,y) => i
   |                  ^
 unexpected end of input
-expecting "end", '!', '(', '.', '|', or binary operator
+expecting "end" or '|'
 
 cases (Two) a:
   | pt1(x,y) => 
@@ -1514,7 +1514,7 @@ cases (Two) a
 1 | cases (Two) a
   |              ^
 unexpected end of input
-expecting '!', '(', '.', ':', or binary operator
+expecting ':'
 
 cases (Two) 
 1:13:
@@ -1598,7 +1598,7 @@ example2 = {
 4 | <empty line>
   | ^
 unexpected end of input
-expecting '!', '(', ',', '.', '}', or binary operator
+expecting ',' or '}'
 
 example2 = {
   make: lam(args): link(42,args) end,
@@ -1608,7 +1608,7 @@ example2 = {
 3 |   make8: lam(a,b,c,d,e,f,g,h): [list: 8,a,b,c,d,e,f,g,h] end
   |                                                             ^
 unexpected end of input
-expecting '!', '(', ',', '.', '}', or binary operator
+expecting ',' or '}'
 
 example2 = {
   make: lam(args): link(42,args) end,
@@ -1618,7 +1618,7 @@ example2 = {
 3 |   make8: lam(a,b,c,d,e,f,g,h): [list: 8,a,b,c,d,e,f,g,h] en
   |                                                          ^^
 unexpected "en"
-expecting "end", '!', '(', '.', or binary operator
+expecting "end"
 
 ^^^^^^^^^^^^^^^^^^^^^^^
 example2 = {
@@ -1629,7 +1629,7 @@ example2 = {
 3 |   make8: lam(a,b,c,d,e,f,g,h): [list: 8,a,b,c,d,e,f,g,h] e
   |                                                          ^
 unexpected 'e'
-expecting "end", '!', '(', '.', or binary operator
+expecting "end"
 
 ^^^^^^^^^^^^^^^^^^^^^^^
 example2 = {
@@ -1640,7 +1640,7 @@ example2 = {
 3 |   make8: lam(a,b,c,d,e,f,g,h): [list: 8,a,b,c,d,e,f,g,h] 
   |                                                          ^
 unexpected end of input
-expecting "end", '!', '(', '.', or binary operator
+expecting "end"
 
 example2 = {
   make: lam(args): link(42,args) end,
@@ -1650,7 +1650,7 @@ example2 = {
 3 |   make8: lam(a,b,c,d,e,f,g,h): [list: 8,a,b,c,d,e,f,g,h]
   |                                                         ^
 unexpected end of input
-expecting "end", '!', '(', '.', or binary operator
+expecting "end"
 
 example2 = {
   make: lam(args): link(42,args) end,
@@ -1660,7 +1660,7 @@ example2 = {
 3 |   make8: lam(a,b,c,d,e,f,g,h): [list: 8,a,b,c,d,e,f,g,h
   |                                                        ^
 unexpected end of input
-expecting '!', '(', ',', '.', ']', or binary operator
+expecting ',' or ']'
 
 example2 = {
   make: lam(args): link(42,args) end,
@@ -1680,7 +1680,7 @@ example2 = {
 3 |   make8: lam(a,b,c,d,e,f,g,h): [list: 8,a,b,c,d,e,f,g
   |                                                      ^
 unexpected end of input
-expecting '!', '(', ',', '.', ']', or binary operator
+expecting ',' or ']'
 
 example2 = {
   make: lam(args): link(42,args) end,
@@ -1700,7 +1700,7 @@ example2 = {
 3 |   make8: lam(a,b,c,d,e,f,g,h): [list: 8,a,b,c,d,e,f
   |                                                    ^
 unexpected end of input
-expecting '!', '(', ',', '.', ']', or binary operator
+expecting ',' or ']'
 
 example2 = {
   make: lam(args): link(42,args) end,
@@ -1720,7 +1720,7 @@ example2 = {
 3 |   make8: lam(a,b,c,d,e,f,g,h): [list: 8,a,b,c,d,e
   |                                                  ^
 unexpected end of input
-expecting '!', '(', ',', '.', ']', or binary operator
+expecting ',' or ']'
 
 example2 = {
   make: lam(args): link(42,args) end,
@@ -1740,7 +1740,7 @@ example2 = {
 3 |   make8: lam(a,b,c,d,e,f,g,h): [list: 8,a,b,c,d
   |                                                ^
 unexpected end of input
-expecting '!', '(', ',', '.', ']', or binary operator
+expecting ',' or ']'
 
 example2 = {
   make: lam(args): link(42,args) end,
@@ -1760,7 +1760,7 @@ example2 = {
 3 |   make8: lam(a,b,c,d,e,f,g,h): [list: 8,a,b,c
   |                                              ^
 unexpected end of input
-expecting '!', '(', ',', '.', ']', or binary operator
+expecting ',' or ']'
 
 example2 = {
   make: lam(args): link(42,args) end,
@@ -1780,7 +1780,7 @@ example2 = {
 3 |   make8: lam(a,b,c,d,e,f,g,h): [list: 8,a,b
   |                                            ^
 unexpected end of input
-expecting '!', '(', ',', '.', ']', or binary operator
+expecting ',' or ']'
 
 example2 = {
   make: lam(args): link(42,args) end,
@@ -1800,7 +1800,7 @@ example2 = {
 3 |   make8: lam(a,b,c,d,e,f,g,h): [list: 8,a
   |                                          ^
 unexpected end of input
-expecting '!', '(', ',', '.', ']', or binary operator
+expecting ',' or ']'
 
 example2 = {
   make: lam(args): link(42,args) end,
@@ -1820,7 +1820,7 @@ example2 = {
 3 |   make8: lam(a,b,c,d,e,f,g,h): [list: 8
   |                                        ^
 unexpected end of input
-expecting '!', '(', ',', '.', ']', 'e', or binary operator
+expecting ',' or ']'
 
 example2 = {
   make: lam(args): link(42,args) end,
@@ -2100,7 +2100,7 @@ example2 = {
 3 |   make8: la
   |            ^
 unexpected end of input
-expecting '!', '(', ',', '.', '}', or binary operator
+expecting ',' or '}'
 
 example2 = {
   make: lam(args): link(42,args) end,
@@ -2110,7 +2110,7 @@ example2 = {
 3 |   make8: l
   |           ^
 unexpected end of input
-expecting '!', '(', ',', '.', '}', or binary operator
+expecting ',' or '}'
 
 example2 = {
   make: lam(args): link(42,args) end,
@@ -2228,7 +2228,7 @@ example2 = {
 2 |   make: lam(args): link(42,args) end
   |                                     ^
 unexpected end of input
-expecting '!', '(', ',', '.', '}', or binary operator
+expecting ',' or '}'
 
 example2 = {
   make: lam(args): link(42,args) en
@@ -2237,7 +2237,7 @@ example2 = {
 2 |   make: lam(args): link(42,args) en
   |                                  ^^
 unexpected "en"
-expecting "end", '!', '(', '.', or binary operator
+expecting "end"
 
 ^^^^^^^^^^^^^^^^^^^^^^^
 example2 = {
@@ -2247,7 +2247,7 @@ example2 = {
 2 |   make: lam(args): link(42,args) e
   |                                  ^
 unexpected 'e'
-expecting "end", '!', '(', '.', or binary operator
+expecting "end"
 
 ^^^^^^^^^^^^^^^^^^^^^^^
 example2 = {
@@ -2257,7 +2257,7 @@ example2 = {
 2 |   make: lam(args): link(42,args) 
   |                                  ^
 unexpected end of input
-expecting "end", '!', '(', '.', or binary operator
+expecting "end"
 
 example2 = {
   make: lam(args): link(42,args)
@@ -2266,7 +2266,7 @@ example2 = {
 2 |   make: lam(args): link(42,args)
   |                                 ^
 unexpected end of input
-expecting "end", '!', '(', '.', or binary operator
+expecting "end"
 
 example2 = {
   make: lam(args): link(42,args
@@ -2275,7 +2275,7 @@ example2 = {
 2 |   make: lam(args): link(42,args
   |                                ^
 unexpected end of input
-expecting '!', '(', ')', ',', '.', or binary operator
+expecting ')' or ','
 
 example2 = {
   make: lam(args): link(42,arg
@@ -2284,7 +2284,7 @@ example2 = {
 2 |   make: lam(args): link(42,arg
   |                               ^
 unexpected end of input
-expecting '!', '(', ')', ',', '.', or binary operator
+expecting ')' or ','
 
 example2 = {
   make: lam(args): link(42,ar
@@ -2293,7 +2293,7 @@ example2 = {
 2 |   make: lam(args): link(42,ar
   |                              ^
 unexpected end of input
-expecting '!', '(', ')', ',', '.', or binary operator
+expecting ')' or ','
 
 example2 = {
   make: lam(args): link(42,a
@@ -2302,7 +2302,7 @@ example2 = {
 2 |   make: lam(args): link(42,a
   |                             ^
 unexpected end of input
-expecting '!', '(', ')', ',', '.', or binary operator
+expecting ')' or ','
 
 example2 = {
   make: lam(args): link(42,
@@ -2320,7 +2320,7 @@ example2 = {
 2 |   make: lam(args): link(42
   |                           ^
 unexpected end of input
-expecting '!', '(', ')', ',', '.', 'e', or binary operator
+expecting ')' or ','
 
 example2 = {
   make: lam(args): link(4
@@ -2329,7 +2329,7 @@ example2 = {
 2 |   make: lam(args): link(4
   |                          ^
 unexpected end of input
-expecting '!', '(', ')', ',', '.', 'e', or binary operator
+expecting ')' or ','
 
 example2 = {
   make: lam(args): link(
@@ -2347,7 +2347,7 @@ example2 = {
 2 |   make: lam(args): link
   |                        ^
 unexpected end of input
-expecting "end", '!', '(', '.', or binary operator
+expecting "end"
 
 example2 = {
   make: lam(args): lin
@@ -2356,7 +2356,7 @@ example2 = {
 2 |   make: lam(args): lin
   |                       ^
 unexpected end of input
-expecting "end", '!', '(', '.', or binary operator
+expecting "end"
 
 example2 = {
   make: lam(args): li
@@ -2365,7 +2365,7 @@ example2 = {
 2 |   make: lam(args): li
   |                      ^
 unexpected end of input
-expecting "end", '!', '(', '.', or binary operator
+expecting "end"
 
 example2 = {
   make: lam(args): l
@@ -2374,7 +2374,7 @@ example2 = {
 2 |   make: lam(args): l
   |                     ^
 unexpected end of input
-expecting "end", '!', '(', '.', or binary operator
+expecting "end"
 
 example2 = {
   make: lam(args): 
@@ -2464,7 +2464,7 @@ example2 = {
 2 |   make: la
   |           ^
 unexpected end of input
-expecting '!', '(', ',', '.', '}', or binary operator
+expecting ',' or '}'
 
 example2 = {
   make: l
@@ -2473,7 +2473,7 @@ example2 = {
 2 |   make: l
   |          ^
 unexpected end of input
-expecting '!', '(', ',', '.', '}', or binary operator
+expecting ',' or '}'
 
 example2 = {
   make: 
@@ -2500,7 +2500,7 @@ example2 = {
 2 |   make
   |       ^
 unexpected end of input
-expecting '!', '(', '.', ':', ';', '}', or binary operator
+expecting ':', ';', or '}'
 
 example2 = {
   mak
@@ -2509,7 +2509,7 @@ example2 = {
 2 |   mak
   |      ^
 unexpected end of input
-expecting '!', '(', '.', ':', ';', '}', or binary operator
+expecting ':', ';', or '}'
 
 example2 = {
   ma
@@ -2518,7 +2518,7 @@ example2 = {
 2 |   ma
   |     ^
 unexpected end of input
-expecting '!', '(', '.', ':', ';', '}', or binary operator
+expecting ':', ';', or '}'
 
 example2 = {
   m
@@ -2527,7 +2527,7 @@ example2 = {
 2 |   m
   |    ^
 unexpected end of input
-expecting '!', '(', '.', ':', ';', '}', or binary operator
+expecting ':', ';', or '}'
 
 example2 = {
   
