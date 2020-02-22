@@ -746,12 +746,12 @@ link(a,b) = x
 > epExpr :: Parser EPExpr
 > epExpr = do
 >     x <- choice
->         [EPShadowIden <$> (keyword_ "shadow" *> identifier)
->         ,EPParens <$> parens epExpr
+>         [(EPShadowIden <$> (keyword_ "shadow" *> identifier)) <?> ""
+>         ,(EPParens <$> parens epExpr) <?> ""
 >         ,tupleOrRecordP
 >         ,EPExpr <$> expr]
->     choice [EPAsP x <$> (keyword_ "as" *> option NoShadow (Shadow <$ keyword_ "shadow"))
->                     <*> identifier
+>     choice [(EPAsP x <$> (keyword_ "as" *> option NoShadow (Shadow <$ keyword_ "shadow"))
+>                     <*> identifier) <?> ""
 >            ,pure x]
 
 
@@ -769,21 +769,21 @@ link(a,b) = x
 
 > pat :: Parser Pat
 > pat = choice
->       [(IdenP <$> option NoShadow (Shadow <$ keyword_ "shadow")
+>       [(IdenP <$> ((option NoShadow (Shadow <$ keyword_ "shadow")) <?> "")
 >               <*> identifier) <**> option id vntPSuffix
 >       ,TupleP <$> (symbol_ "{" *> xSep ';' pat <* symbol_ "}")]
 >       <**> option id asPatSuffix
 
 > asPatSuffix :: Parser (Pat -> Pat)
-> asPatSuffix = f <$> (keyword_ "as" *> option NoShadow (Shadow <$ keyword_ "shadow"))
->                 <*> identifier
+> asPatSuffix = (f <$> (keyword_ "as" *> option NoShadow (Shadow <$ keyword_ "shadow"))
+>                 <*> identifier) <?> ""
 >    where
 >      f a b c = AsP c a b
 
 > vntPSuffix :: Parser (Pat -> Pat)
-> vntPSuffix = do
+> vntPSuffix = (do
 >     x <- parens (commaSep pat)
->     pure (\(IdenP NoShadow y) -> VariantP y x)
+>     pure (\(IdenP NoShadow y) -> VariantP y x)) <?> ""
 
 otherwise, it's an expr
 

@@ -981,7 +981,7 @@ cases (Two) a:
 3 |   | pt2(x,y) =
   |              ^
 unexpected '='
-expecting "=>" or "as"
+expecting "=>"
 
 ^^^^^^^^^^^^^^^^^^^^^^^
 cases (Two) a:
@@ -992,7 +992,7 @@ cases (Two) a:
 3 |   | pt2(x,y) 
   |              ^
 unexpected end of input
-expecting "=>" or "as"
+expecting "=>"
 
 cases (Two) a:
   | pt1(x,y) => if n == 0: x else: y end
@@ -1002,7 +1002,7 @@ cases (Two) a:
 3 |   | pt2(x,y)
   |             ^
 unexpected end of input
-expecting "=>" or "as"
+expecting "=>"
 
 cases (Two) a:
   | pt1(x,y) => if n == 0: x else: y end
@@ -1012,7 +1012,7 @@ cases (Two) a:
 3 |   | pt2(x,y
   |            ^
 unexpected end of input
-expecting "as", '(', ')', or ','
+expecting ')' or ','
 
 cases (Two) a:
   | pt1(x,y) => if n == 0: x else: y end
@@ -1022,7 +1022,7 @@ cases (Two) a:
 3 |   | pt2(x,
   |           ^
 unexpected end of input
-expecting "shadow", '{', or identifier
+expecting '{' or identifier
 
 cases (Two) a:
   | pt1(x,y) => if n == 0: x else: y end
@@ -1032,7 +1032,7 @@ cases (Two) a:
 3 |   | pt2(x
   |          ^
 unexpected end of input
-expecting "as", '(', ')', or ','
+expecting ')' or ','
 
 cases (Two) a:
   | pt1(x,y) => if n == 0: x else: y end
@@ -1042,7 +1042,7 @@ cases (Two) a:
 3 |   | pt2(
   |         ^
 unexpected end of input
-expecting "shadow", ')', '{', or identifier
+expecting ')', '{', or identifier
 
 cases (Two) a:
   | pt1(x,y) => if n == 0: x else: y end
@@ -1052,7 +1052,7 @@ cases (Two) a:
 3 |   | pt2
   |        ^
 unexpected end of input
-expecting "=>", "as", or '('
+expecting "=>"
 
 cases (Two) a:
   | pt1(x,y) => if n == 0: x else: y end
@@ -1062,7 +1062,7 @@ cases (Two) a:
 3 |   | pt
   |       ^
 unexpected end of input
-expecting "=>", "as", or '('
+expecting "=>"
 
 cases (Two) a:
   | pt1(x,y) => if n == 0: x else: y end
@@ -1072,7 +1072,7 @@ cases (Two) a:
 3 |   | p
   |      ^
 unexpected end of input
-expecting "=>", "as", or '('
+expecting "=>"
 
 cases (Two) a:
   | pt1(x,y) => if n == 0: x else: y end
@@ -1082,7 +1082,7 @@ cases (Two) a:
 3 |   | 
   |     ^
 unexpected end of input
-expecting "else", "shadow", '{', or identifier
+expecting "else", '{', or identifier
 
 cases (Two) a:
   | pt1(x,y) => if n == 0: x else: y end
@@ -1092,7 +1092,7 @@ cases (Two) a:
 3 |   |
   |    ^
 unexpected end of input
-expecting "else", "shadow", '{', or identifier
+expecting "else", '{', or identifier
 
 cases (Two) a:
   | pt1(x,y) => if n == 0: x else: y end
@@ -1371,7 +1371,7 @@ cases (Two) a:
 2 |   | pt1(x,y) =
   |              ^
 unexpected '='
-expecting "=>" or "as"
+expecting "=>"
 
 ^^^^^^^^^^^^^^^^^^^^^^^
 cases (Two) a:
@@ -1381,7 +1381,7 @@ cases (Two) a:
 2 |   | pt1(x,y) 
   |              ^
 unexpected end of input
-expecting "=>" or "as"
+expecting "=>"
 
 cases (Two) a:
   | pt1(x,y)
@@ -1390,7 +1390,7 @@ cases (Two) a:
 2 |   | pt1(x,y)
   |             ^
 unexpected end of input
-expecting "=>" or "as"
+expecting "=>"
 
 cases (Two) a:
   | pt1(x,y
@@ -1399,7 +1399,7 @@ cases (Two) a:
 2 |   | pt1(x,y
   |            ^
 unexpected end of input
-expecting "as", '(', ')', or ','
+expecting ')' or ','
 
 cases (Two) a:
   | pt1(x,
@@ -1408,7 +1408,7 @@ cases (Two) a:
 2 |   | pt1(x,
   |           ^
 unexpected end of input
-expecting "shadow", '{', or identifier
+expecting '{' or identifier
 
 cases (Two) a:
   | pt1(x
@@ -1417,7 +1417,7 @@ cases (Two) a:
 2 |   | pt1(x
   |          ^
 unexpected end of input
-expecting "as", '(', ')', or ','
+expecting ')' or ','
 
 cases (Two) a:
   | pt1(
@@ -1426,7 +1426,7 @@ cases (Two) a:
 2 |   | pt1(
   |         ^
 unexpected end of input
-expecting "shadow", ')', '{', or identifier
+expecting ')', '{', or identifier
 
 cases (Two) a:
   | pt1
@@ -1435,7 +1435,7 @@ cases (Two) a:
 2 |   | pt1
   |        ^
 unexpected end of input
-expecting "=>", "as", or '('
+expecting "=>"
 
 cases (Two) a:
   | pt
@@ -1444,7 +1444,7 @@ cases (Two) a:
 2 |   | pt
   |       ^
 unexpected end of input
-expecting "=>", "as", or '('
+expecting "=>"
 
 cases (Two) a:
   | p
@@ -1453,7 +1453,7 @@ cases (Two) a:
 2 |   | p
   |      ^
 unexpected end of input
-expecting "=>", "as", or '('
+expecting "=>"
 
 cases (Two) a:
   | 
@@ -1462,7 +1462,7 @@ cases (Two) a:
 2 |   | 
   |     ^
 unexpected end of input
-expecting "else", "shadow", '{', or identifier
+expecting "else", '{', or identifier
 
 cases (Two) a:
   |
@@ -1471,7 +1471,7 @@ cases (Two) a:
 2 |   |
   |    ^
 unexpected end of input
-expecting "else", "shadow", '{', or identifier
+expecting "else", '{', or identifier
 
 cases (Two) a:
   
@@ -1930,7 +1930,7 @@ example2 = {
 3 |   make8: lam(a,b,c,d,e,f,g,h
   |                             ^
 unexpected end of input
-expecting "as", '(', ')', or ','
+expecting ')' or ','
 
 example2 = {
   make: lam(args): link(42,args) end,
@@ -1940,7 +1940,7 @@ example2 = {
 3 |   make8: lam(a,b,c,d,e,f,g,
   |                            ^
 unexpected end of input
-expecting "shadow", '{', or identifier
+expecting '{' or identifier
 
 example2 = {
   make: lam(args): link(42,args) end,
@@ -1950,7 +1950,7 @@ example2 = {
 3 |   make8: lam(a,b,c,d,e,f,g
   |                           ^
 unexpected end of input
-expecting "as", '(', ')', or ','
+expecting ')' or ','
 
 example2 = {
   make: lam(args): link(42,args) end,
@@ -1960,7 +1960,7 @@ example2 = {
 3 |   make8: lam(a,b,c,d,e,f,
   |                          ^
 unexpected end of input
-expecting "shadow", '{', or identifier
+expecting '{' or identifier
 
 example2 = {
   make: lam(args): link(42,args) end,
@@ -1970,7 +1970,7 @@ example2 = {
 3 |   make8: lam(a,b,c,d,e,f
   |                         ^
 unexpected end of input
-expecting "as", '(', ')', or ','
+expecting ')' or ','
 
 example2 = {
   make: lam(args): link(42,args) end,
@@ -1980,7 +1980,7 @@ example2 = {
 3 |   make8: lam(a,b,c,d,e,
   |                        ^
 unexpected end of input
-expecting "shadow", '{', or identifier
+expecting '{' or identifier
 
 example2 = {
   make: lam(args): link(42,args) end,
@@ -1990,7 +1990,7 @@ example2 = {
 3 |   make8: lam(a,b,c,d,e
   |                       ^
 unexpected end of input
-expecting "as", '(', ')', or ','
+expecting ')' or ','
 
 example2 = {
   make: lam(args): link(42,args) end,
@@ -2000,7 +2000,7 @@ example2 = {
 3 |   make8: lam(a,b,c,d,
   |                      ^
 unexpected end of input
-expecting "shadow", '{', or identifier
+expecting '{' or identifier
 
 example2 = {
   make: lam(args): link(42,args) end,
@@ -2010,7 +2010,7 @@ example2 = {
 3 |   make8: lam(a,b,c,d
   |                     ^
 unexpected end of input
-expecting "as", '(', ')', or ','
+expecting ')' or ','
 
 example2 = {
   make: lam(args): link(42,args) end,
@@ -2020,7 +2020,7 @@ example2 = {
 3 |   make8: lam(a,b,c,
   |                    ^
 unexpected end of input
-expecting "shadow", '{', or identifier
+expecting '{' or identifier
 
 example2 = {
   make: lam(args): link(42,args) end,
@@ -2030,7 +2030,7 @@ example2 = {
 3 |   make8: lam(a,b,c
   |                   ^
 unexpected end of input
-expecting "as", '(', ')', or ','
+expecting ')' or ','
 
 example2 = {
   make: lam(args): link(42,args) end,
@@ -2040,7 +2040,7 @@ example2 = {
 3 |   make8: lam(a,b,
   |                  ^
 unexpected end of input
-expecting "shadow", '{', or identifier
+expecting '{' or identifier
 
 example2 = {
   make: lam(args): link(42,args) end,
@@ -2050,7 +2050,7 @@ example2 = {
 3 |   make8: lam(a,b
   |                 ^
 unexpected end of input
-expecting "as", '(', ')', or ','
+expecting ')' or ','
 
 example2 = {
   make: lam(args): link(42,args) end,
@@ -2060,7 +2060,7 @@ example2 = {
 3 |   make8: lam(a,
   |                ^
 unexpected end of input
-expecting "shadow", '{', or identifier
+expecting '{' or identifier
 
 example2 = {
   make: lam(args): link(42,args) end,
@@ -2070,7 +2070,7 @@ example2 = {
 3 |   make8: lam(a
   |               ^
 unexpected end of input
-expecting "as", '(', ')', or ','
+expecting ')' or ','
 
 example2 = {
   make: lam(args): link(42,args) end,
@@ -2080,7 +2080,7 @@ example2 = {
 3 |   make8: lam(
   |              ^
 unexpected end of input
-expecting "shadow", ')', '{', or identifier
+expecting ')', '{', or identifier
 
 example2 = {
   make: lam(args): link(42,args) end,
@@ -2410,7 +2410,7 @@ example2 = {
 2 |   make: lam(args
   |                 ^
 unexpected end of input
-expecting "as", '(', ')', or ','
+expecting ')' or ','
 
 example2 = {
   make: lam(arg
@@ -2419,7 +2419,7 @@ example2 = {
 2 |   make: lam(arg
   |                ^
 unexpected end of input
-expecting "as", '(', ')', or ','
+expecting ')' or ','
 
 example2 = {
   make: lam(ar
@@ -2428,7 +2428,7 @@ example2 = {
 2 |   make: lam(ar
   |               ^
 unexpected end of input
-expecting "as", '(', ')', or ','
+expecting ')' or ','
 
 example2 = {
   make: lam(a
@@ -2437,7 +2437,7 @@ example2 = {
 2 |   make: lam(a
   |              ^
 unexpected end of input
-expecting "as", '(', ')', or ','
+expecting ')' or ','
 
 example2 = {
   make: lam(
@@ -2446,7 +2446,7 @@ example2 = {
 2 |   make: lam(
   |             ^
 unexpected end of input
-expecting "shadow", ')', '{', or identifier
+expecting ')', '{', or identifier
 
 example2 = {
   make: lam
