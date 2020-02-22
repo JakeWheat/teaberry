@@ -48,6 +48,7 @@ library
                        Pretty
                        PrettyInterpreter
                        Engine
+                       Parserize
                        Paths_teaberry
   autogen-modules:     Paths_teaberry
 
@@ -61,6 +62,7 @@ common library-modules
                        Pretty
                        PrettyInterpreter
                        Engine
+                       Parserize
                        Paths_teaberry
   autogen-modules:     Paths_teaberry
 

@@ -37,6 +37,8 @@ possibly run tests quietly and exit more noisily if there is a failure
 >               ,format
 >               ,Value(NothingV))
 
+> import qualified Parserize
+
 
 > main :: IO ()
 > main = do
@@ -58,6 +60,11 @@ possibly run tests quietly and exit more noisily if there is a failure
 >         ["-p", fn] -> do
 >             cmd <- readFile fn
 >             putStrLn $ either id id $ format fn cmd
+>         ["--parserize", fn] -> do
+>             src <- readFile fn
+>             putStrLn $ parserize fn src
+>         ["--parserize-c", src] -> do
+>             putStrLn $ parserize "" src
 >         _ -> help
 >     --let cmd = "a = 5\nprint(a + 4)\na"
 >   where
@@ -75,6 +82,8 @@ possibly run tests quietly and exit more noisily if there is a failure
 >                   putStrLn $ renderCheckResults v1
 >                   when (not $ allCheckResultsPassed v1)
 >                       exitFailure
+>       parserize fn src = do
+>           Parserize.parserize fn src
 >       help = putStrLn "-c to run code in arg, -f to run code in file"
 >       runX = putStrLn $ renderCheckResults
 >              [CheckResult "a first block"

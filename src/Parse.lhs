@@ -266,7 +266,7 @@ and make sure it doesn't parse newlines when it shouldn't
 
 
 > expr :: Parser Expr
-> expr = term <**> option id binOpSuffix
+> expr = (term <**> option id binOpSuffix) <?> "expression"
 
 > binOpSuffix :: Parser (Expr -> Expr)
 > binOpSuffix = do
@@ -524,9 +524,9 @@ put all the parsers which start with a keyword first
 >     termSuffixes y
 
 > exprSuffix :: Expr -> Parser Expr
-> exprSuffix x = do
+> exprSuffix x = (do
 >     y <- termSuffixes x
->     pure y <**> option id binOpSuffix
+>     pure y <**> option id binOpSuffix) <?> ""
 
 ------------------------------------------------------------------------------
 
@@ -668,8 +668,22 @@ shadow
 >                                         ,pure StExpr]]]
 >            
 
-
 very hacky
+
+how to deal with this awful mess?
+1. don't be lazy and wrap expr like epexpr does
+just reproduce the whole ast of expr and pattern in a new type
+2. don't be lazy and try to wrap this around the expr parser
+refactor all the parsing to parse patterns or expressions
+then can add the guards and wrappers to be able to parse either, or
+only parse on or the other depending on the context. switching might
+need to be scoped?
+this will be a little dynamic, because we will assume when e.g. it's
+in expression only mode, it will parse something that will convert to
+an expr without the possibility of failing, which the type system
+won't check. I think the alternative is a lot more duplication of
+parsing code, which is worse, but either method is viable
+
 
 > data EPExpr = EPExpr Expr
 >             | EPSel EPSelector
