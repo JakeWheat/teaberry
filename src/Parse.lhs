@@ -475,7 +475,7 @@ todo: remove the trys by implementing a proper lexer or a lexer style
 >         symbol_ "|"
 >         choice
 >             [Right <$> (keyword_ "else" *> symbol_ "=>" *> expr)
->             ,Left <$> ((,) <$> pat <*> (symbol_ "=>" *> expr))]
+>             ,Left <$> ((,) <$> (pat <?> "pattern") <*> (symbol_ "=>" *> expr))]
 >     endCase ty t cs el = keyword_ "end" *> pure (Cases ty t (reverse cs) el)
 
 todo: try remove this try

@@ -1082,7 +1082,7 @@ cases (Two) a:
 3 |   | 
   |     ^
 unexpected end of input
-expecting "else" or identifier
+expecting "else" or pattern
 
 cases (Two) a:
   | pt1(x,y) => if n == 0: x else: y end
@@ -1092,7 +1092,7 @@ cases (Two) a:
 3 |   |
   |    ^
 unexpected end of input
-expecting "else" or identifier
+expecting "else" or pattern
 
 cases (Two) a:
   | pt1(x,y) => if n == 0: x else: y end
@@ -1462,7 +1462,7 @@ cases (Two) a:
 2 |   | 
   |     ^
 unexpected end of input
-expecting "else" or identifier
+expecting "else" or pattern
 
 cases (Two) a:
   |
@@ -1471,7 +1471,7 @@ cases (Two) a:
 2 |   |
   |    ^
 unexpected end of input
-expecting "else" or identifier
+expecting "else" or pattern
 
 cases (Two) a:
   
