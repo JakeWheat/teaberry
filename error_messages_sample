@@ -1144,3 +1144,711 @@ exampl OK
 exam OK
 ex OK
 
+fun apply-twice(f, x):
+  f(f(x))
+where:
+  apply-twice(square, 3) is 81
+end OK
+fun apply-twice(f, x):
+  f(f(x))
+where:
+  apply-twice(square, 3) is 81
+e
+5:2:
+  |
+5 | e
+  |  ^
+unexpected end of input
+expecting "end", '=', or statement
+
+fun apply-twice(f, x):
+  f(f(x))
+where:
+  apply-twice(square, 3) is 81
+4:31:
+  |
+4 |   apply-twice(square, 3) is 81
+  |                               ^
+unexpected end of input
+expecting "end"
+
+fun apply-twice(f, x):
+  f(f(x))
+where:
+  apply-twice(square, 3) is 
+4:29:
+  |
+4 |   apply-twice(square, 3) is 
+  |                             ^
+unexpected end of input
+expecting expression
+
+fun apply-twice(f, x):
+  f(f(x))
+where:
+  apply-twice(square, 3) 
+4:26:
+  |
+4 |   apply-twice(square, 3) 
+  |                          ^
+unexpected end of input
+expecting "end"
+
+fun apply-twice(f, x):
+  f(f(x))
+where:
+  apply-twice(square, 
+4:23:
+  |
+4 |   apply-twice(square, 
+  |                       ^
+unexpected end of input
+expecting expression
+
+fun apply-twice(f, x):
+  f(f(x))
+where:
+  apply-twice(squar
+4:20:
+  |
+4 |   apply-twice(squar
+  |                    ^
+unexpected end of input
+expecting ')' or ','
+
+fun apply-twice(f, x):
+  f(f(x))
+where:
+  apply-twice(squ
+4:18:
+  |
+4 |   apply-twice(squ
+  |                  ^
+unexpected end of input
+expecting ')' or ','
+
+fun apply-twice(f, x):
+  f(f(x))
+where:
+  apply-twice(s
+4:16:
+  |
+4 |   apply-twice(s
+  |                ^
+unexpected end of input
+expecting ')' or ','
+
+fun apply-twice(f, x):
+  f(f(x))
+where:
+  apply-twice
+4:14:
+  |
+4 |   apply-twice
+  |              ^
+unexpected end of input
+expecting "end", '=', or statement
+
+fun apply-twice(f, x):
+  f(f(x))
+where:
+  apply-twi
+4:12:
+  |
+4 |   apply-twi
+  |            ^
+unexpected end of input
+expecting "end", '=', or statement
+
+fun apply-twice(f, x):
+  f(f(x))
+where:
+  apply-t
+4:10:
+  |
+4 |   apply-t
+  |          ^
+unexpected end of input
+expecting "end", '=', or statement
+
+fun apply-twice(f, x):
+  f(f(x))
+where:
+  apply
+4:8:
+  |
+4 |   apply
+  |        ^
+unexpected end of input
+expecting "end", '=', or statement
+
+fun apply-twice(f, x):
+  f(f(x))
+where:
+  app
+4:6:
+  |
+4 |   app
+  |      ^
+unexpected end of input
+expecting "end", '=', or statement
+
+fun apply-twice(f, x):
+  f(f(x))
+where:
+  a
+4:4:
+  |
+4 |   a
+  |    ^
+unexpected end of input
+expecting "end", '=', or statement
+
+fun apply-twice(f, x):
+  f(f(x))
+where:
+ 
+4:2:
+  |
+4 |  
+  |  ^
+unexpected end of input
+expecting "end"
+
+fun apply-twice(f, x):
+  f(f(x))
+wher
+3:5:
+  |
+3 | wher
+  |     ^
+unexpected end of input
+expecting ":=", "end", '=', or statement
+
+fun apply-twice(f, x):
+  f(f(x))
+wh
+3:3:
+  |
+3 | wh
+  |   ^
+unexpected end of input
+expecting ":=", "end", '=', or statement
+
+fun apply-twice(f, x):
+  f(f(x))
+
+3:1:
+  |
+3 | <empty line>
+  | ^
+unexpected end of input
+expecting "end", '=', or statement
+
+fun apply-twice(f, x):
+  f(f(x
+2:8:
+  |
+2 |   f(f(x
+  |        ^
+unexpected end of input
+expecting ')' or ','
+
+fun apply-twice(f, x):
+  f(f
+2:6:
+  |
+2 |   f(f
+  |      ^
+unexpected end of input
+expecting ')' or ','
+
+fun apply-twice(f, x):
+  f
+2:4:
+  |
+2 |   f
+  |    ^
+unexpected end of input
+expecting ":=", "end", '=', or statement
+
+fun apply-twice(f, x):
+ 
+2:2:
+  |
+2 |  
+  |  ^
+unexpected end of input
+expecting statement
+
+fun apply-twice(f, x
+1:21:
+  |
+1 | fun apply-twice(f, x
+  |                     ^
+unexpected end of input
+expecting ')' or ','
+
+fun apply-twice(f,
+1:19:
+  |
+1 | fun apply-twice(f,
+  |                   ^
+unexpected end of input
+expecting identifier
+
+fun apply-twice(
+1:17:
+  |
+1 | fun apply-twice(
+  |                 ^
+unexpected end of input
+expecting ')' or identifier
+
+fun apply-twic
+1:15:
+  |
+1 | fun apply-twic
+  |               ^
+unexpected end of input
+expecting '('
+
+fun apply-tw
+1:13:
+  |
+1 | fun apply-tw
+  |             ^
+unexpected end of input
+expecting '('
+
+fun apply-
+1:11:
+  |
+1 | fun apply-
+  |           ^
+unexpected end of input
+expecting '('
+
+fun appl
+1:9:
+  |
+1 | fun appl
+  |         ^
+unexpected end of input
+expecting '('
+
+fun ap
+1:7:
+  |
+1 | fun ap
+  |       ^
+unexpected end of input
+expecting '('
+
+fun 
+1:5:
+  |
+1 | fun 
+  |     ^
+unexpected end of input
+expecting identifier
+
+f OK
+
+check "x":
+  f(1) is true
+  raise("hello") raises "hello"
+  raise(1) raises-satisfies is_one
+end OK
+check "x":
+  f(1) is true
+  raise("hello") raises "hello"
+  raise(1) raises-satisfies is_one
+e
+5:2:
+  |
+5 | e
+  |  ^
+unexpected end of input
+expecting ":=", "end", '=', or statement
+
+check "x":
+  f(1) is true
+  raise("hello") raises "hello"
+  raise(1) raises-satisfies is_one
+4:35:
+  |
+4 |   raise(1) raises-satisfies is_one
+  |                                   ^
+unexpected end of input
+expecting "end" or statement
+
+check "x":
+  f(1) is true
+  raise("hello") raises "hello"
+  raise(1) raises-satisfies is_o
+4:33:
+  |
+4 |   raise(1) raises-satisfies is_o
+  |                                 ^
+unexpected end of input
+expecting "end" or statement
+
+check "x":
+  f(1) is true
+  raise("hello") raises "hello"
+  raise(1) raises-satisfies is
+4:31:
+  |
+4 |   raise(1) raises-satisfies is
+  |                               ^
+unexpected end of input
+expecting "end" or statement
+
+check "x":
+  f(1) is true
+  raise("hello") raises "hello"
+  raise(1) raises-satisfies 
+4:29:
+  |
+4 |   raise(1) raises-satisfies 
+  |                             ^
+unexpected end of input
+expecting expression
+
+check "x":
+  f(1) is true
+  raise("hello") raises "hello"
+  raise(1) raises-satisfi
+4:26:
+  |
+4 |   raise(1) raises-satisfi
+  |                          ^
+unexpected end of input
+expecting ":=", "end", '=', or statement
+
+check "x":
+  f(1) is true
+  raise("hello") raises "hello"
+  raise(1) raises-satis
+4:24:
+  |
+4 |   raise(1) raises-satis
+  |                        ^
+unexpected end of input
+expecting ":=", "end", '=', or statement
+
+check "x":
+  f(1) is true
+  raise("hello") raises "hello"
+  raise(1) raises-sat
+4:22:
+  |
+4 |   raise(1) raises-sat
+  |                      ^
+unexpected end of input
+expecting ":=", "end", '=', or statement
+
+check "x":
+  f(1) is true
+  raise("hello") raises "hello"
+  raise(1) raises-s
+4:20:
+  |
+4 |   raise(1) raises-s
+  |                    ^
+unexpected end of input
+expecting ":=", "end", '=', or statement
+
+check "x":
+  f(1) is true
+  raise("hello") raises "hello"
+  raise(1) raises
+4:18:
+  |
+4 |   raise(1) raises
+  |                  ^
+unexpected end of input
+expecting expression
+
+check "x":
+  f(1) is true
+  raise("hello") raises "hello"
+  raise(1) rais
+4:16:
+  |
+4 |   raise(1) rais
+  |                ^
+unexpected end of input
+expecting ":=", "end", '=', or statement
+
+check "x":
+  f(1) is true
+  raise("hello") raises "hello"
+  raise(1) ra
+4:14:
+  |
+4 |   raise(1) ra
+  |              ^
+unexpected end of input
+expecting ":=", "end", '=', or statement
+
+check "x":
+  f(1) is true
+  raise("hello") raises "hello"
+  raise(1) 
+4:12:
+  |
+4 |   raise(1) 
+  |            ^
+unexpected end of input
+expecting "end" or statement
+
+check "x":
+  f(1) is true
+  raise("hello") raises "hello"
+  raise(
+4:9:
+  |
+4 |   raise(
+  |         ^
+unexpected end of input
+expecting ')' or expression
+
+check "x":
+  f(1) is true
+  raise("hello") raises "hello"
+  rais
+4:7:
+  |
+4 |   rais
+  |       ^
+unexpected end of input
+expecting ":=", "end", '=', or statement
+
+check "x":
+  f(1) is true
+  raise("hello") raises "hello"
+  ra
+4:5:
+  |
+4 |   ra
+  |     ^
+unexpected end of input
+expecting ":=", "end", '=', or statement
+
+check "x":
+  f(1) is true
+  raise("hello") raises "hello"
+  
+4:3:
+  |
+4 |   
+  |   ^
+unexpected end of input
+expecting "end" or statement
+
+check "x":
+  f(1) is true
+  raise("hello") raises "hell
+3:30:
+  |
+3 |   raise("hello") raises "hell
+  |                              ^
+unexpected end of input
+expecting '"'
+
+check "x":
+  f(1) is true
+  raise("hello") raises "he
+3:28:
+  |
+3 |   raise("hello") raises "he
+  |                            ^
+unexpected end of input
+expecting '"'
+
+check "x":
+  f(1) is true
+  raise("hello") raises "
+3:26:
+  |
+3 |   raise("hello") raises "
+  |                          ^
+unexpected end of input
+expecting '"'
+
+check "x":
+  f(1) is true
+  raise("hello") raises
+3:24:
+  |
+3 |   raise("hello") raises
+  |                        ^
+unexpected end of input
+expecting expression
+
+check "x":
+  f(1) is true
+  raise("hello") rais
+3:22:
+  |
+3 |   raise("hello") rais
+  |                      ^
+unexpected end of input
+expecting ":=", "end", '=', or statement
+
+check "x":
+  f(1) is true
+  raise("hello") ra
+3:20:
+  |
+3 |   raise("hello") ra
+  |                    ^
+unexpected end of input
+expecting ":=", "end", '=', or statement
+
+check "x":
+  f(1) is true
+  raise("hello") 
+3:18:
+  |
+3 |   raise("hello") 
+  |                  ^
+unexpected end of input
+expecting "end" or statement
+
+check "x":
+  f(1) is true
+  raise("hello
+3:15:
+  |
+3 |   raise("hello
+  |               ^
+unexpected end of input
+expecting '"'
+
+check "x":
+  f(1) is true
+  raise("hel
+3:13:
+  |
+3 |   raise("hel
+  |             ^
+unexpected end of input
+expecting '"'
+
+check "x":
+  f(1) is true
+  raise("h
+3:11:
+  |
+3 |   raise("h
+  |           ^
+unexpected end of input
+expecting '"'
+
+check "x":
+  f(1) is true
+  raise(
+3:9:
+  |
+3 |   raise(
+  |         ^
+unexpected end of input
+expecting ')' or expression
+
+check "x":
+  f(1) is true
+  rais
+3:7:
+  |
+3 |   rais
+  |       ^
+unexpected end of input
+expecting ":=", "end", '=', or statement
+
+check "x":
+  f(1) is true
+  ra
+3:5:
+  |
+3 |   ra
+  |     ^
+unexpected end of input
+expecting ":=", "end", '=', or statement
+
+check "x":
+  f(1) is true
+  
+3:3:
+  |
+3 |   
+  |   ^
+unexpected end of input
+expecting "end" or statement
+
+check "x":
+  f(1) is tr
+2:13:
+  |
+2 |   f(1) is tr
+  |             ^
+unexpected end of input
+expecting "end" or statement
+
+check "x":
+  f(1) is 
+2:11:
+  |
+2 |   f(1) is 
+  |           ^
+unexpected end of input
+expecting expression
+
+check "x":
+  f(1) 
+2:8:
+  |
+2 |   f(1) 
+  |        ^
+unexpected end of input
+expecting "end" or statement
+
+check "x":
+  f(
+2:5:
+  |
+2 |   f(
+  |     ^
+unexpected end of input
+expecting ')' or expression
+
+check "x":
+  
+2:3:
+  |
+2 |   
+  |   ^
+unexpected end of input
+expecting "end" or statement
+
+check "x
+1:9:
+  |
+1 | check "x
+  |         ^
+unexpected end of input
+expecting '"'
+
+check 
+1:7:
+  |
+1 | check 
+  |       ^
+unexpected end of input
+expecting ':' or check block name
+
+che OK
+c OK
+

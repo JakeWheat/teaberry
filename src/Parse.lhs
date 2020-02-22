@@ -27,6 +27,30 @@ case that it's too permissive compared with pyret. It doesn't use a
 fixity parser either
 
 
+imroving the error messages:
+
+use 'eof <?> ""' to avoid '... or end of input' in error messages
+
+whenever there is some sort of optional suffix, use '<?> ""' to hide
+   it from error messages
+  I prefer to try to use it at the use point, than in the suffix parser
+    function itself
+same if there is something embedded that's optional
+  option NoShadow (Shadow <$ keyword_ "shadow")
+  ->
+  (option NoShadow (Shadow <$ keyword_ "shadow")) <?> ""
+  probably better with a helper function
+
+for things like expressions, patterns, terms, etc.
+  use <?> "expression" or whatever, to describe the node expected next,
+  and avoid a long list of the possibilities this could be
+  e.g.
+  expecting "ask", "block", "cases", "if", "lam", "let", "letrec", '(', '-', '[', '{', identifier, number, or string literal
+  -> expecting expression
+
+
+<?> "expression"
+
 > {-# LANGUAGE TupleSections,ScopedTypeVariables, MultiWayIf #-}
 > module Parse (parseExpr
 >              ,parseStmt
@@ -103,14 +127,31 @@ fixity parser either
 > parseProgram fn src = either (Left . errorBundlePretty) Right $
 >                     parse (whiteSpace *> program <* myEof) fn src
 
-> myEof :: Parser ()
-> myEof = eof <?> ""
-
 ------------------------------------------------------------------------------
 
 = boilerplate
 
 > type Parser = Parsec Void String
+
+------------------------------------------------------------------------------
+
+error message helpers
+
+> myEof :: Parser ()
+> myEof = eof <?> ""
+
+> boption :: a -> Parser a -> Parser a
+> boption v p = (option v p) <?> ""
+>  
+> boptional :: Parser a -> Parser (Maybe a)
+> boptional p = optional p <?> ""
+
+> bchoice :: [Parser a] -> Parser a
+> bchoice cs = choice $ addEmpty cs
+>   where
+>     addEmpty (x:xs@(_:_)) = (x <?> "") : addEmpty xs
+>     addEmpty [x] = [x]
+>     addEmpty [] = []
 
 ------------------------------------------------------------------------------
 
@@ -216,7 +257,7 @@ consider what other numbers to support, e.g. integer, positive
 
 > num :: Parser String
 > num = lexeme (
->     choice [digits <**> choice [eSuffix <?> "",dotSuffixOnly <?> "",pure id]
+>     choice [digits <**> bchoice [eSuffix,dotSuffixOnly,pure id]
 >            ,myChar '.' <**> afterDot
 >            ]
 >    -- this is for definitely avoiding possibly ambiguous source
@@ -226,12 +267,12 @@ consider what other numbers to support, e.g. integer, positive
 >     -- parse one or more 0-9
 >     digits = takeWhile1P Nothing isDigit
 >     -- parse .[digits][e[+-]digits]
->     dotSuffixOnly = append <$> (myChar '.' <**> choice [afterDot, eSuffix, pure id])
+>     dotSuffixOnly = (append <$> (myChar '.' <**> bchoice [afterDot, eSuffix, pure id])) <?> ""
 >     -- parse digits[e[+-]digits], used after the .
->     afterDot = append <$> (digits <**> choice [eSuffix, pure id])
+>     afterDot = (append <$> (digits <**> bchoice [eSuffix, pure id])) <?> ""
 >     -- parse e[+-]digits
->     eSuffix = append <$> concatA [myChar 'e', optionalPlusOrMinus,digits]
->     optionalPlusOrMinus = option "" (myChar '+' <|> myChar '-')
+>     eSuffix = (append <$> concatA [myChar 'e', optionalPlusOrMinus,digits]) <?> ""
+>     optionalPlusOrMinus = boption "" (myChar '+' <|> myChar '-')
 >     -- parse a char, return it as a string
 >     myChar c = [c] <$ char_ c
 >     -- concat in applicative
@@ -257,7 +298,7 @@ and make sure it doesn't parse newlines when it shouldn't
 
 > stringRaw :: Parser String
 > stringRaw = choice [char_ '\'' *> takeWhileP Nothing (/='\'') <* lexeme_ (char_ '\'')
->                          ,char_ '"' *> takeWhileP Nothing (/='"') <* lexeme_ (char_ '"')]
+>                    ,char_ '"' *> takeWhileP Nothing (/='"') <* lexeme_ (char_ '"')]
 >             <?> "string literal"
 
 > stringE :: Parser Expr
@@ -269,7 +310,7 @@ and make sure it doesn't parse newlines when it shouldn't
 
 
 > expr :: Parser Expr
-> expr = (term <**> option id binOpSuffix) <?> "expression"
+> expr = (term <**> boption id binOpSuffix) <?> "expression"
 
 > binOpSuffix :: Parser (Expr -> Expr)
 > binOpSuffix = (do
@@ -453,9 +494,9 @@ todo: remove the trys by implementing a proper lexer or a lexer style
 
 
 > dotSuffix :: Parser (Expr -> Expr)
-> dotSuffix = (symbol_ "." *>
->     choice [flip TupleGet <$> (symbol_ "{" *> nonNegativeInteger <* symbol_ "}")
->            ,flip DotExpr <$> identifier]) <?> ""
+> dotSuffix = symbol_ "." *>
+>     bchoice [flip TupleGet <$> (symbol_ "{" *> nonNegativeInteger <* symbol_ "}")
+>            ,flip DotExpr <$> identifier]
 
 > cases :: Parser Expr
 > cases = do
@@ -500,7 +541,7 @@ y <- getexpression x
 put all the parsers which start with a keyword first
 
 > term :: Parser Expr
-> term = do
+> term = (do
 >     x <- choice [unaryMinus
 >                 ,lamE
 >                 ,expressionLetRec
@@ -516,20 +557,20 @@ put all the parsers which start with a keyword first
 >                 ,construct
 >                 ,tupleOrRecord
 >                 ]
->     choice [termSuffixes x, pure x]
+>     bchoice [termSuffixes x, pure x]) <?> "expression"
 
 
 > termSuffixes :: Expr -> Parser Expr
-> termSuffixes x = option x $ do
+> termSuffixes x = boption x $ do
 >     y <- choice [pure x <**> appSuffix
 >                 ,pure x <**> dotSuffix 
 >                 ,pure x <**> unboxSuffix]
 >     termSuffixes y
 
 > exprSuffix :: Expr -> Parser Expr
-> exprSuffix x = (do
+> exprSuffix x = do
 >     y <- termSuffixes x
->     pure y <**> option id binOpSuffix) <?> ""
+>     pure y <**> boption id binOpSuffix
 
 ------------------------------------------------------------------------------
 
@@ -575,7 +616,7 @@ xproper ast and produces any errors
 >     ,expr <**> choice [testPost
 >                       ,setRef
 >                       ,pure StExpr]-}
->     ]
+>     ] <?> "statement"
 
 
 parsing a statement left factored (for good error messages)
@@ -662,13 +703,13 @@ shadow
 >          pure $ LetDecl (Binding p e)
 >         ,do
 >          Just ex' <- pure $ epExprToExpr ex
->          choice
+>          bchoice
 >             [do
 >              let rf = (,) <$> identifier <*> (symbol_ ":" *> expr)
 >              SetRef ex' <$> (symbol_ "!{" *> commaSep1 rf <* symbol "}")
 >             ,do
->              exprSuffix ex' <**> choice [testPost
->                                         ,pure StExpr]]]
+>              exprSuffix ex' <**> bchoice [testPost
+>                                          ,pure StExpr]]]
 >            
 
 very hacky
@@ -745,13 +786,13 @@ link(a,b) = x
 
 > epExpr :: Parser EPExpr
 > epExpr = do
->     x <- choice
->         [(EPShadowIden <$> (keyword_ "shadow" *> identifier)) <?> ""
->         ,(EPParens <$> parens epExpr) <?> ""
+>     x <- bchoice
+>         [(EPShadowIden <$> (keyword_ "shadow" *> identifier))
+>         ,(EPParens <$> parens epExpr)
 >         ,tupleOrRecordP
 >         ,EPExpr <$> expr]
->     choice [(EPAsP x <$> (keyword_ "as" *> option NoShadow (Shadow <$ keyword_ "shadow"))
->                     <*> identifier) <?> ""
+>     bchoice [(EPAsP x <$> (keyword_ "as" *> boption NoShadow (Shadow <$ keyword_ "shadow"))
+>                     <*> identifier)
 >            ,pure x]
 
 
@@ -769,21 +810,21 @@ link(a,b) = x
 
 > pat :: Parser Pat
 > pat = choice
->       [(IdenP <$> ((option NoShadow (Shadow <$ keyword_ "shadow")) <?> "")
->               <*> identifier) <**> option id vntPSuffix
+>       [(IdenP <$> boption NoShadow (Shadow <$ keyword_ "shadow")
+>               <*> identifier) <**> boption id vntPSuffix
 >       ,(TupleP <$> (symbol_ "{" *> xSep ';' pat <* symbol_ "}")) <?> ""]
->       <**> option id asPatSuffix
+>       <**> boption id asPatSuffix
 
 > asPatSuffix :: Parser (Pat -> Pat)
-> asPatSuffix = (f <$> (keyword_ "as" *> option NoShadow (Shadow <$ keyword_ "shadow"))
->                 <*> identifier) <?> ""
+> asPatSuffix = f <$> (keyword_ "as" *> boption NoShadow (Shadow <$ keyword_ "shadow"))
+>                 <*> identifier
 >    where
 >      f a b c = AsP c a b
 
 > vntPSuffix :: Parser (Pat -> Pat)
-> vntPSuffix = (do
+> vntPSuffix = do
 >     x <- parens (commaSep pat)
->     pure (\(IdenP NoShadow y) -> VariantP y x)) <?> ""
+>     pure (\(IdenP NoShadow y) -> VariantP y x)
 
 otherwise, it's an expr
 
@@ -849,7 +890,7 @@ get slightly better parse error messages
 >     <*> parens (commaSep pat)
 >     <*> (symbol_ ":" *> (unwrapSingle <$>
 >          (Block <$> some stmt)))
->     <*> (optional whereBlock <* keyword_ "end")
+>     <*> (boptional whereBlock <* keyword_ "end")
 >     
 >   where
 >       unwrapSingle (Block [StExpr (a)]) = a
@@ -862,14 +903,14 @@ get slightly better parse error messages
 > dataDecl = DataDecl
 >     <$> (keyword_ "data" *> identifier <* symbol_ ":")
 >     <*> (((:[]) <$> singleVariant) <|> some variant)
->     <*> (optional whereBlock <* keyword_ "end")
+>     <*> (boptional whereBlock <* keyword_ "end")
 >   where
 >     singleVariant = VariantDecl
->                     <$> identifier <*> option [] (parens (commaSep fld))
+>                     <$> identifier <*> boption [] (parens (commaSep fld))
 >     variant = VariantDecl
 >               <$> (symbol_ "|" *> identifier)
->               <*> option [] (parens (commaSep fld))
->     fld = (,) <$> option Con (Ref <$ keyword_ "ref") <*> identifier
+>               <*> boption [] (parens (commaSep fld))
+>     fld = (,) <$> boption Con (Ref <$ keyword_ "ref") <*> identifier
 
 > {-letDecl :: Parser (Pat -> Stmt)
 > letDecl = f <$> (symbol_ "=" *> expr)
@@ -882,15 +923,15 @@ get slightly better parse error messages
 > testPost = choice [isPred, postOp, inf]
 >   where
 >       isPred = do
->           t <- (keyword "is%" <|> keyword "is-not%") <?> "test operator"
+>           t <- (keyword "is%" <|> keyword "is-not%") <?> ""
 >           p <- parens expr
 >           e2 <- expr
 >           pure (\x -> TPred x t p e2)
 >       postOp = do
->           keyword_ "does-not-raise" <?> "test operator"
+>           keyword_ "does-not-raise" <?> ""
 >           pure (flip TPostfixOp "does-not-raise")
 >       inf = do
->           k <- choice (map keyword tks) <?> "test operator"
+>           k <- choice (map keyword tks) <?> ""
 >           e <- expr
 >           pure (\x -> StExpr $ BinOp x k e)
 >       tks = ["is-not", "is"
@@ -915,7 +956,7 @@ get slightly better parse error messages
 >     [ProvideAll <$ symbol_ "*"
 >     ,do
 >      a <- identifier
->      choice [ProvideAlias a <$> (keyword_ "as" *> identifier)
+>      bchoice [ProvideAlias a <$> (keyword_ "as" *> identifier)
 >             ,pure $ ProvideName a]
 >     ]
 
@@ -930,8 +971,8 @@ get slightly better parse error messages
 > importSource :: Parser ImportSource
 > importSource = do
 >     a <- identifier
->     choice [ImportSpecial a <$> parens (commaSep stringRaw)
->            ,pure $ ImportName a]
+>     bchoice [ImportSpecial a <$> parens (commaSep stringRaw)
+>             ,pure $ ImportName a]
 
 
 todo: try remove this try

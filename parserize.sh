@@ -27,9 +27,35 @@ example2 = {
 END
 )
 
+FUNDECL=$(cat <<-END
+fun apply-twice(f, x):
+  f(f(x))
+where:
+  apply-twice(square, 3) is 81
+end
+END
+)
+
+
+CHECK=$(cat <<-END
+check "x":
+  f(1) is true
+  raise("hello") raises "hello"
+  raise(1) raises-satisfies is_one
+end
+END
+)
+
+
+
+
+
 
 cabal run -v0 teaberry --disable-optimization -- --parserize-c "$ASK"
 cabal run -v0 teaberry --disable-optimization -- --parserize-c "$CASES"
 cabal run -v0 teaberry --disable-optimization -- --parserize-c "$CONSTR"
+cabal run -v0 teaberry --disable-optimization -- --parserize-c "$FUNDECL"
+cabal run -v0 teaberry --disable-optimization -- --parserize-c "$CHECK"
+
 
 
