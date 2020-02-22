@@ -378,15 +378,37 @@ todo: remove the trys by implementing a proper lexer or a lexer style
 > construct = Construct <$> (symbol_ "[" *> (Iden <$> identifier) <* symbol_ ":")
 >             <*> (commaSep expr <* symbol_ "]")
 >
-> -- optional here doesn't work, need to refactor it
-> -- also should left factor this, especially the try
-> -- as used here will make the error messages worse
-> -- todo: try definitely remove this try
 > tupleOrRecord :: Parser Expr
-> tupleOrRecord =
->     choice [try ((Sel . Tuple) <$> (symbol_ "{" *> xSep ';' expr <* optional (symbol_ ";") <* symbol_ "}"))
->            ,(Sel . Record) <$> (symbol_ "{" *> commaSep fld <* symbol_ "}")]
+> tupleOrRecord = do
+>     symbol_ "{"
+>     choice [-- {} is an empty record, not an empty tuple
+>             symbol_ "}" *> pure (Sel $ Record [])
+>            ,eitherElement]
 >   where
+>     eitherElement = do
+>         x <- expr
+>         case x of
+>             Iden i -> choice
+>                 [do
+>                  symbol_ ":"
+>                  e <- expr
+>                  moreRecord [(i,e)]
+>                 ,moreTuple [x]]
+>             _ -> moreTuple [x]
+>     moreTuple ts = choice
+>         [symbol_ "}" *> pure (Sel $ Tuple (reverse ts))
+>         ,symbol ";" *> choice
+>              [symbol_ "}" *> pure (Sel $ Tuple (reverse ts))
+>              ,do
+>               te <- expr
+>               moreTuple (te:ts)]]
+>     moreRecord fs = choice
+>         [symbol_ "}" *> pure (Sel $ Record (reverse fs))
+>         ,symbol "," *> choice
+>              [symbol_ "}" *> pure (Sel $ Record (reverse fs))
+>              ,do
+>               f <- fld
+>               moreRecord (f:fs)]]
 >     fld = (,) <$> (identifier <* symbol_ ":") <*> expr
 
 

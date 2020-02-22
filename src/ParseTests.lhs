@@ -191,14 +191,18 @@ todo: review all the whitespace rules that are being ignored
 >     --,("let {x; y}: {1; 2} in x + y end"
 >     -- ,Let [(TupleP [IdenP "x",IdenP "y"], Tuple [num 1, num 2])] (BinOp (Iden "x" "+" (Iden "y"))))
 
->     -- needs some work in the parser to ignore the trailing ;
->     -- ,("{1; 2;}", Sel $ Tuple [num 1, num 2])
+>     ,("{1; 2;}", Sel $ Tuple [num 1, num 2])
 >     ,("{1; 2}", Sel $ Tuple [num 1, num 2])
+
+>     ,("{a; b}", Sel $ Tuple [Iden "a", Iden "b"])
 
 >     ,("{a: \"one\", b : 2, c : x }"
 >      ,Sel $ Record [("a", Sel $ Str "one")
 >                    ,("b", num 2)
 >                    ,("c", Iden "x")])
+>     ,("{a: 1,}"
+>      ,Sel $ Record [("a", num 1)])
+
 
 >     ,("[list: {\"a\"; 1}, {\"b\"; 2}, {\"c\"; 3}]"
 >      ,Construct (Iden "list") [Sel $ Tuple [Sel $ Str "a",num 1]
