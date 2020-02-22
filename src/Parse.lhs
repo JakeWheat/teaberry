@@ -321,17 +321,33 @@ todo: remove the trys by implementing a proper lexer or a lexer style
 
 
 > ifE :: Parser Expr
-> ifE = If <$> (keyword_ "if" *> ((:) <$> cond <*> many elseif))
->          <*> (optional elseE <* keyword_ "end")
->     where
->         cond = (,) <$> expr <*> (symbol_ ":" *> expr)
->         elseif = (try (keyword_ "else" *> keyword_ "if") *> cond)
->         elseE = keyword_ "else" *> symbol ":" *> expr
+> ifE = do
+>     keyword_ "if"
+>     ife <- cond
+>     nextBranch [ife]
+>   where
+>     cond = (,) <$> expr <*> (symbol_ ":" *> expr)
+>     nextBranch bs = do
+>         choice [do
+>                 x <- elsePart
+>                 case x of
+>                     Right el -> endif bs (Just el)
+>                     Left b -> nextBranch (b:bs)
+>                ,endif bs Nothing]
+>     elsePart :: Parser (Either (Expr,Expr) Expr)
+>     elsePart = do
+>         keyword_ "else"
+>         choice
+>             [Right <$> (symbol_ ":" *> expr)
+>             ,Left <$> (keyword_ "if" *> cond)
+>             ]
+>     endif bs el = keyword_ "end" *> pure (If (reverse bs) el)
 
 > ask :: Parser Expr
 > ask = Ask <$> (keyword_ "ask" *> symbol_ ":" *> many branch)
 >           <*> (optional ow <* keyword_ "end")
 >   where
+>       -- todo: try remove this try
 >       branch = (,) <$> try (symbol_ "|" *> expr <* keyword "then" <* symbol_ ":")
 >                    <*> expr
 >       ow = symbol_ "|" *> keyword_ "otherwise" *> symbol_ ":" *> expr
@@ -351,6 +367,7 @@ todo: remove the trys by implementing a proper lexer or a lexer style
 > -- optional here doesn't work, need to refactor it
 > -- also should left factor this, especially the try
 > -- as used here will make the error messages worse
+> -- todo: try definitely remove this try
 > tupleOrRecord :: Parser Expr
 > tupleOrRecord =
 >     choice [try ((Sel . Tuple) <$> (symbol_ "{" *> xSep ';' expr <* optional (symbol_ ";") <* symbol_ "}"))
@@ -370,6 +387,7 @@ todo: remove the trys by implementing a proper lexer or a lexer style
 >               <*> some cas
 >               <*> (optional els <* keyword_ "end")
 >   where
+>      -- todo: try remove this try
 >      cas = (,) <$> try (symbol_ "|" *> pat)
 >                <*> (symbol_ "=>" *> expr)
 >      els = symbol_ "|" *> keyword_ "else" *> symbol_ "=>" *> expr
@@ -391,6 +409,21 @@ todo: remove the trys by implementing a proper lexer or a lexer style
 > vntPSuffix = do
 >     x <- parens (commaSep pat)
 >     pure (\(IdenP NoShadow y) -> VariantP y x)
+
+todo: try remove this try
+can parse a set box also then give a nice error message?
+some options:
+support statements, expressions and check expressions more flexibly in
+the syntax so that can give nicer error messages
+try to do the same thing, without putting it in the syntax
+giving up on applicative parsing combinators and just doing monadic
+stuff will make the second option more feasible
+using monadic parsing will allow something like this:
+x <- parsepatternorexpression
+y <- getexpression x
+  this will do a fail "pattern in expression context"
+  if it can't be converted to an expression
+  and there is a getpattern also
 
 > unboxSuffix :: Parser (Expr -> Expr)
 > unboxSuffix = flip Unbox <$> (try (symbol_ "!" *> identifier))
@@ -448,6 +481,16 @@ did all this hard work, but still ended up needing the try ...
 need to change pat to patOrExpression
   so it can parse stuff that starts like a pattern
   but then can only be an expression after that
+todo: try must get rid of this try
+
+maybe can allow patterns and expressions in every context for either
+in the syntax and then give errors later. this will definitely make
+it easy to give better error messages, but will make working with the
+syntax more tedious
+
+one option which concentrates the tediousness in one place, is to make
+a parse syntax just for the parser, and then this converts to the
+xproper ast and produces any errors
 
 >     ,try $ do
 >      x <- pat
@@ -493,9 +536,13 @@ works
 > varDecl :: Parser Stmt
 > varDecl = VarDecl <$> (keyword_ "var" *> binding)
 
+todo: try can remove this try?
+it's not awful atm, but if the try is removed, might still
+get slightly better parse error messages
+
 > setVarStmt :: Parser Stmt
-> setVarStmt = try (SetVar <$> identifier
->            <*> (symbol_ ":=" *> expr))
+> setVarStmt = try (SetVar <$> (identifier <* symbol_ ":=")
+>            <*> expr)
 
 > setRef :: Parser (Expr -> Stmt)
 > setRef = flip SetRef
@@ -603,6 +650,9 @@ works
 >     a <- identifier
 >     choice [ImportSpecial a <$> parens (commaSep stringRaw)
 >            ,pure $ ImportName a]
+
+
+todo: try remove this try
 
 > importItem :: Parser PreludeItem
 > importItem = keyword_ "import" *> (try importFrom <|> importAs)

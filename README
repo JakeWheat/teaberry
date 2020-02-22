@@ -8,8 +8,7 @@ roughly along the lines of 'Python, but with proper functional
 programming and types', and Pyret is very close to this, so I'm mostly
 copying Pyret for the time being.
 
-Not ready for human consumption yet. There is almost no error
-handling, lots of mistakes will be ignored and cause weird behaviour.
+Not ready for human consumption yet.
 
 Demonstration of most supported features:
 https://github.com/JakeWheat/teaberry/tree/master/examples/tests/fulltests/tour.tea
@@ -48,9 +47,9 @@ PAPL):
 https://www.plai.org/
 
 I found PLAI and PAPL to be much easier for learning how to implement
-languages than the other usual suspects.
+programming languages than the other usual suspects.
 
-This language will probably start to diverge from Pyret in some ways.
+This language will diverge from Pyret.
 
 # sketch of early approximate target
 
@@ -58,14 +57,14 @@ mostly pyret syntax to start with
 strict/eager
 basic functional programming: functions as values + closures
 algebraic data types + pattern binding
-typed only, with inference
+typed only, with inference (will remain untyped for a while yet)
 parametric polymorphism
 type classes
 non whitespace significant (except maybe copying some of pyret, but
   not indentation significant)
 no purity tracking in the type system
   (to be reviewed)
-exceptions
+exceptions (to be reviewed)
 garbage collection
 resource management
 control flow: break, continue, goto ?
