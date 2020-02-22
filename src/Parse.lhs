@@ -49,8 +49,6 @@ for things like expressions, patterns, terms, etc.
   -> expecting expression
 
 
-<?> "expression"
-
 > {-# LANGUAGE TupleSections,ScopedTypeVariables, MultiWayIf #-}
 > module Parse (parseExpr
 >              ,parseStmt
@@ -310,13 +308,13 @@ and make sure it doesn't parse newlines when it shouldn't
 
 
 > expr :: Parser Expr
-> expr = (term <**> boption id binOpSuffix) <?> "expression"
+> expr = term <**> boption id binOpSuffix
 
 > binOpSuffix :: Parser (Expr -> Expr)
-> binOpSuffix = (do
+> binOpSuffix = do
 >     op <- binOpSym
 >     b <- expr
->     pure $ bo op b) <?> ""
+>     pure $ bo op b
 >   where
 >     bo op b a = BinOp a op b
 
@@ -344,7 +342,7 @@ todo: remove the trys by implementing a proper lexer or a lexer style
 > 
 
 > unaryMinus :: Parser Expr
-> unaryMinus = UnaryMinus <$> (symbol "-" *> (term <?> "expression"))
+> unaryMinus = UnaryMinus <$> (symbol "-" *> term)
 
 > lamE :: Parser Expr
 > lamE = Lam <$> (keyword_ "lam" *> parens (commaSep pat) <* symbol_ ":")
@@ -416,7 +414,7 @@ todo: remove the trys by implementing a proper lexer or a lexer style
 > block :: Parser Expr
 > block = Block <$>
 >     (keyword_ "block" *> symbol_ ":" *>
->     some stmt
+>     many stmt -- todo: an empty block should be an error later, not during parsing
 >     <* keyword_ "end")
 >     
 
@@ -496,7 +494,7 @@ todo: remove the trys by implementing a proper lexer or a lexer style
 > dotSuffix :: Parser (Expr -> Expr)
 > dotSuffix = symbol_ "." *>
 >     bchoice [flip TupleGet <$> (symbol_ "{" *> nonNegativeInteger <* symbol_ "}")
->            ,flip DotExpr <$> identifier]
+>             ,flip DotExpr <$> identifier]
 
 > cases :: Parser Expr
 > cases = do
@@ -535,7 +533,7 @@ y <- getexpression x
   and there is a getpattern also
 
 > unboxSuffix :: Parser (Expr -> Expr)
-> unboxSuffix = (flip Unbox <$> (try (symbol_ "!" *> identifier))) <?> ""
+> unboxSuffix = flip Unbox <$> (try (symbol_ "!" *> identifier))
 
 
 put all the parsers which start with a keyword first
@@ -585,37 +583,6 @@ put all the parsers which start with a keyword first
 >     ,dataDecl
 >     ,checkBlock
 >     ,startsWithExprOrPattern
->     --,setVarStmt
-
-did all this hard work, but still ended up needing the try ...
-need to change pat to patOrExpression
-  so it can parse stuff that starts like a pattern
-  but then can only be an expression after that
-todo: try must get rid of this try
-
-maybe can allow patterns and expressions in every context for either
-in the syntax and then give errors later. this will definitely make
-it easy to give better error messages, but will make working with the
-syntax more tedious
-
-one option which concentrates the tediousness in one place, is to make
-a parse syntax just for the parser, and then this converts to the
-xproper ast and produces any errors
-
->     {-,try $ do
->      x <- pat
->      choice [pure x <**> letDecl 
->             ,do
->              es <- exprSuffix (patternSyntaxToExpr x)
->              bb <- choice [testPost
->                           ,setRef
->                           ,pure StExpr]
->              pure (bb es)
->             ]
->      
->     ,expr <**> choice [testPost
->                       ,setRef
->                       ,pure StExpr]-}
 >     ] <?> "statement"
 
 
@@ -782,7 +749,11 @@ parsing code, which is worse, but either method is viable
 > epExprToPat (EPShadowIden i) = Just $ IdenP Shadow i
 > epExprToPat _ = Nothing
 
-link(a,b) = x
+todo: when the flags are added to tell the parser whether to accept
+expressions or patterns or both, the error message should say
+'expression' if expressions are accepted, and if only patterns are
+accepted, it should say 'pattern', so if both are possible, it
+should just say expression
 
 > epExpr :: Parser EPExpr
 > epExpr = do
@@ -793,7 +764,7 @@ link(a,b) = x
 >         ,EPExpr <$> expr]
 >     bchoice [(EPAsP x <$> (keyword_ "as" *> boption NoShadow (Shadow <$ keyword_ "shadow"))
 >                     <*> identifier)
->            ,pure x]
+>             ,pure x]
 
 
 1. create ExprOrPattern
@@ -809,10 +780,10 @@ link(a,b) = x
 
 
 > pat :: Parser Pat
-> pat = choice
->       [(IdenP <$> boption NoShadow (Shadow <$ keyword_ "shadow")
->               <*> identifier) <**> boption id vntPSuffix
->       ,(TupleP <$> (symbol_ "{" *> xSep ';' pat <* symbol_ "}")) <?> ""]
+> pat = bchoice
+>       [TupleP <$> ((symbol_ "{" <?> "") *> xSep ';' pat <* symbol_ "}")
+>       ,(IdenP <$> boption NoShadow (Shadow <$ keyword_ "shadow")
+>               <*> identifier) <**> boption id vntPSuffix]
 >       <**> boption id asPatSuffix
 
 > asPatSuffix :: Parser (Pat -> Pat)
@@ -826,53 +797,12 @@ link(a,b) = x
 >     x <- parens (commaSep pat)
 >     pure (\(IdenP NoShadow y) -> VariantP y x)
 
-otherwise, it's an expr
-
-
-
-anything that starts with a keyword is not possible at this point
-
-> {-exprToPattern :: Expr -> Maybe Pat
-> exprToPattern (Iden x) = Just $ IdenP NoShadow x
-> exprToPattern (Parens x) = exprToPattern x
-> exprToPattern (App (Iden f) es) = do
->     es' <- mapM exprToPattern es
->     pure $ VariantP f es'
-> exprToPattern (Sel (Tuple es)) = do
->     es' <- mapM exprToPattern es
->     pure $ TupleP es'
-> exprToPattern _ = Nothing-}
-
-
-> {-patternSyntaxToExpr :: Pat -> Expr
-> patternSyntaxToExpr (IdenP NoShadow s) = Iden s
-> patternSyntaxToExpr (VariantP s p) = App (Iden s) $ map patternSyntaxToExpr p
-> patternSyntaxToExpr (TupleP es) = Sel $ Tuple $ map patternSyntaxToExpr es
-> patternSyntaxToExpr (AsP {}) = Nothing-}
-
-
-
 > whenStmt :: Parser Stmt
 > whenStmt = When <$> (keyword_ "when" *> expr)
 >            <*> (symbol_ ":" *> expr <* keyword_ "end")
 
 > varDecl :: Parser Stmt
 > varDecl = VarDecl <$> (keyword_ "var" *> binding)
-
-todo: try can remove this try?
-it's not awful atm, but if the try is removed, might still
-get slightly better parse error messages
-
-> {-setVarStmt :: Parser Stmt
-> setVarStmt = try (SetVar <$> (identifier <* symbol_ ":=")
->            <*> expr)-}
-
-> {-setRef :: Parser (Expr -> Stmt)
-> setRef = flip SetRef
->          <$> (symbol_ "!{" *> commaSep1 rf <* symbol "}")
->   where
->     rf = (,) <$> identifier <*> (symbol_ ":" *> expr)
->          -}
 
 > checkBlock :: Parser Stmt
 > checkBlock = Check
@@ -911,11 +841,6 @@ get slightly better parse error messages
 >               <$> (symbol_ "|" *> identifier)
 >               <*> boption [] (parens (commaSep fld))
 >     fld = (,) <$> boption Con (Ref <$ keyword_ "ref") <*> identifier
-
-> {-letDecl :: Parser (Pat -> Stmt)
-> letDecl = f <$> (symbol_ "=" *> expr)
->    where
->        f y x = LetDecl (Binding x y)-}
 
 -----------------------------------------
 
