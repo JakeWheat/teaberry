@@ -327,7 +327,7 @@ todo: remove the trys by implementing a proper lexer or a lexer style
 >     nextBranch [ife]
 >   where
 >     cond = (,) <$> expr <*> (symbol_ ":" *> expr)
->     nextBranch bs = do
+>     nextBranch bs =
 >         choice [do
 >                 x <- elsePart
 >                 case x of
@@ -344,14 +344,28 @@ todo: remove the trys by implementing a proper lexer or a lexer style
 >     endif bs el = keyword_ "end" *> pure (If (reverse bs) el)
 
 > ask :: Parser Expr
-> ask = Ask <$> (keyword_ "ask" *> symbol_ ":" *> many branch)
->           <*> (optional ow <* keyword_ "end")
+> ask = do
+>     keyword_ "ask"
+>     symbol_ ":"
+>     nextBranch []
 >   where
->       -- todo: try remove this try
->       branch = (,) <$> try (symbol_ "|" *> expr <* keyword "then" <* symbol_ ":")
->                    <*> expr
->       ow = symbol_ "|" *> keyword_ "otherwise" *> symbol_ ":" *> expr
-> 
+>     nextBranch bs =
+>         choice [do
+>                 x <- branchPart
+>                 case x of
+>                     Right ot -> endask bs (Just ot)
+>                     Left b -> nextBranch (b:bs)
+>                ,endask bs Nothing]
+>     branchPart :: Parser (Either (Expr,Expr) Expr)
+>     branchPart = do
+>         symbol_ "|"
+>         choice
+>             [Right <$> (keyword_ "otherwise" *> symbol_ ":" *> expr)
+>             ,Left <$> ((,) <$> (expr <* keyword "then" <* symbol_ ":")
+>                           <*> expr)
+>             ]
+>     endask bs ot = keyword_ "end" *> pure (Ask (reverse bs) ot)     
+>
 
 > block :: Parser Expr
 > block = Block <$>
