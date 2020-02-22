@@ -3,6 +3,7 @@
 > 
 > import Parse (parseProgram)
 > import Data.List (isInfixOf)
+> import Data.Char (isSpace)
 
 The idea with this code is to take some source code which may or may
 not be valid, and mess with it, and output the variations and whether
@@ -11,9 +12,13 @@ generate text file reports, which can be reviewed for the error
 message quality, and compared to see how changes to the parsing
 affect the error messages.
 
-Two main ways to do this are to lex the source, then remove one token
-at a time from the end and parse again each time, and to remove one
-or more tokens from random places and parse again.
+Things to do, lex the source, then:
+
+remove one token at a time from the end and parse again each time
+
+remove one or more tokens from random places and parse again
+
+add a token in each place and parse again
 
 There's no lexer atm, so start with something that takes a text, then
 removes one char at a time from the end and reparses.
@@ -31,9 +36,12 @@ try to skip comments
 >                       in s ++ (case ast of
 >                                    Right _ -> " OK\n"
 >                                    Left e -> "\n" ++ f e ++ "\n")
->                          ++ doAnother (reverse $ drop 1 $ reverse s)
+>                          ++ doAnother (reverse $ drop 1 $ keepDroppingWhitespace $ reverse s)
 >     in doAnother src
 >   where
+>     keepDroppingWhitespace (x:xs) | isSpace x = keepDroppingWhitespace xs
+>                                   | otherwise = xs
+>     keepDroppingWhitespace [] = []
 >     f s = if not (isInfixOf "unexpected end of input" s)
 >           then s ++ "\n^^^^^^^^^^^^^^^^^^^^^^^"
 >           else s
