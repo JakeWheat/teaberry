@@ -266,11 +266,11 @@ consider what other numbers to support, e.g. integer, positive
 >     -- parse one or more 0-9
 >     digits = takeWhile1P Nothing isDigit
 >     -- parse .[digits][e[+-]digits]
->     dotSuffixOnly = (append <$> (myChar '.' <**> bchoice [afterDot, eSuffix, pure id])) <?> ""
+>     dotSuffixOnly = append <$> (myChar '.' <**> bchoice [afterDot, eSuffix, pure id])
 >     -- parse digits[e[+-]digits], used after the .
->     afterDot = (append <$> (digits <**> bchoice [eSuffix, pure id])) <?> ""
+>     afterDot = append <$> (digits <**> bchoice [eSuffix, pure id])
 >     -- parse e[+-]digits
->     eSuffix = (append <$> concatA [myChar 'e', optionalPlusOrMinus,digits]) <?> ""
+>     eSuffix = append <$> concatA [myChar 'e', optionalPlusOrMinus,digits]
 >     optionalPlusOrMinus = boption "" (myChar '+' <|> myChar '-')
 >     -- parse a char, return it as a string
 >     myChar c = [c] <$ char_ c
