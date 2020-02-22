@@ -27,11 +27,13 @@ case that it's too permissive compared with pyret. It doesn't use a
 fixity parser either
 
 
-> {-# LANGUAGE TupleSections,ScopedTypeVariables #-}
+> {-# LANGUAGE TupleSections,ScopedTypeVariables, MultiWayIf #-}
 > module Parse (parseExpr
 >              ,parseStmt
 >              ,parseProgram) where
 
+> --import Debug.Trace(trace)
+> --import Text.Show.Pretty (ppShow)
 
 > import Text.Megaparsec (Parsec
 >                        ,many
@@ -122,7 +124,7 @@ fixity parser either
 > blockComment :: Parser ()
 > blockComment = startComment *> ctu
 >   where
->     startComment = void $ try (string "#|")
+>     startComment = void (try (string "#|") <?> "")
 >     endComment = void $ try (string "|#")
 >     ctu = endComment <|> ((blockComment <|> void anySingle) *> ctu)
 
@@ -268,7 +270,7 @@ and make sure it doesn't parse newlines when it shouldn't
 
 > binOpSuffix :: Parser (Expr -> Expr)
 > binOpSuffix = do
->     op <- binOpSym
+>     op <- binOpSym <?> "binary operator"
 >     b <- expr
 >     pure $ bo op b
 >   where
@@ -412,6 +414,41 @@ todo: remove the trys by implementing a proper lexer or a lexer style
 >     fld = (,) <$> (identifier <* symbol_ ":") <*> expr
 
 
+> tupleOrRecordP :: Parser EPExpr
+> tupleOrRecordP = do
+>     symbol_ "{"
+>     choice [-- {} is an empty record, not an empty tuple
+>             symbol_ "}" *> pure (EPExpr $ Sel $ Record [])
+>            ,eitherElement]
+>   where
+>     eitherElement = do
+>         x <- epExpr
+>         case x of
+>             (EPExpr (Iden i)) -> choice
+>                 [do
+>                  symbol_ ":"
+>                  e <- expr
+>                  moreRecord [(i,e)]
+>                 ,moreTuple [x]]
+>             _ -> moreTuple [x]
+>     moreTuple ts = choice
+>         [symbol_ "}" *> pure (EPSel $ EPTupleP (reverse ts))
+>         ,symbol ";" *> choice
+>              [symbol_ "}" *> pure (EPSel $ EPTupleP (reverse ts))
+>              ,do
+>               te <- epExpr
+>               moreTuple (te:ts)]]
+>     moreRecord fs = choice
+>         [symbol_ "}" *> pure (EPExpr $ Sel $ Record (reverse fs))
+>         ,symbol "," *> choice
+>              [symbol_ "}" *> pure (EPExpr $ Sel $ Record (reverse fs))
+>              ,do
+>               f <- fld
+>               moreRecord (f:fs)]]
+>     fld = (,) <$> (identifier <* symbol_ ":") <*> expr
+
+
+
 > dotSuffix :: Parser (Expr -> Expr)
 > dotSuffix = symbol_ "." *>
 >     choice [flip TupleGet <$> (symbol_ "{" *> nonNegativeInteger <* symbol_ "}")
@@ -438,24 +475,6 @@ todo: remove the trys by implementing a proper lexer or a lexer style
 >             ,Left <$> ((,) <$> pat <*> (symbol_ "=>" *> expr))]
 >     endCase ty t cs el = keyword_ "end" *> pure (Cases ty t (reverse cs) el)
 
-> pat :: Parser Pat
-> pat = choice
->       [(IdenP <$> option NoShadow (Shadow <$ keyword_ "shadow")
->               <*> identifier) <**> option id vntPSuffix
->       ,TupleP <$> (symbol_ "{" *> xSep ';' pat <* symbol_ "}")]
->       <**> option id asPatSuffix
-
-> asPatSuffix :: Parser (Pat -> Pat)
-> asPatSuffix = f <$> (keyword_ "as" *> option NoShadow (Shadow <$ keyword_ "shadow"))
->                 <*> identifier
->    where
->      f a b c = AsP c a b
-
-> vntPSuffix :: Parser (Pat -> Pat)
-> vntPSuffix = do
->     x <- parens (commaSep pat)
->     pure (\(IdenP NoShadow y) -> VariantP y x)
-
 todo: try remove this try
 can parse a set box also then give a nice error message?
 some options:
@@ -480,20 +499,20 @@ put all the parsers which start with a keyword first
 > term :: Parser Expr
 > term = do
 >     x <- choice [unaryMinus
->               ,lamE
->               ,expressionLetRec
->               ,expressionLet
->               ,ifE
->               ,ask
->               ,block
->               ,cases
->               ,Iden <$> identifier
->               ,numE
->               ,stringE
->               ,parensE
->               ,construct
->               ,tupleOrRecord
->               ]
+>                 ,lamE
+>                 ,expressionLetRec
+>                 ,expressionLet
+>                 ,ifE
+>                 ,ask
+>                 ,block
+>                 ,cases
+>                 ,Iden <$> identifier
+>                 ,numE
+>                 ,stringE
+>                 ,parensE
+>                 ,construct
+>                 ,tupleOrRecord
+>                 ]
 >     choice [termSuffixes x, pure x]
 
 
@@ -521,7 +540,8 @@ put all the parsers which start with a keyword first
 >     ,varDecl
 >     ,dataDecl
 >     ,checkBlock
->     ,setVarStmt
+>     ,startsWithExprOrPattern
+>     --,setVarStmt
 
 did all this hard work, but still ended up needing the try ...
 need to change pat to patOrExpression
@@ -538,7 +558,7 @@ one option which concentrates the tediousness in one place, is to make
 a parse syntax just for the parser, and then this converts to the
 xproper ast and produces any errors
 
->     ,try $ do
+>     {-,try $ do
 >      x <- pat
 >      choice [pure x <**> letDecl 
 >             ,do
@@ -551,29 +571,228 @@ xproper ast and produces any errors
 >      
 >     ,expr <**> choice [testPost
 >                       ,setRef
->                       ,pure StExpr]
+>                       ,pure StExpr]-}
 >     ]
 
-parsing let decls:
 
-a lot of patterns before a =, look just like expressions. we can't
-tell which one it is until later. to avoid massive use of try, left
-factor this,
+parsing a statement left factored (for good error messages)
 
-so there is a 'pattern or expression' parser which can then become
-either depending on what follows. this means having to maintain an
-extra data type just for the parsing here that has to be kept in sync
-with the syntax (the parser itself has to be kept in sync also)
+1. parse a pattern or expression - need a new syntax for this
 
-if there are no patterns that can't be expressions also,
-then can just use the pattern syntax here. do that until it no longer
-works
+what can start with this:
+let decl (incl. pattern binding (if it looks like a pattern)
+set var (if it looks like an iden)
+setref (if it looks like an expression)
+statement expressions:
+  iden (if it looks like an iden)
+  tupleget (if it looks like an expr)
+  dotexpr (if it looks like an expr)
+  app (if it looks like an expr)
+  binop (if it looks like an expr)
+  unbox (if it looks like an expr)
 
-> patternSyntaxToExpr :: Pat -> Expr
+need to run through this path, trying to disambiguate
+three classes:
+  parse a pattern or expression
+  then ask: can it be an iden, can it be an expr, can it be a pattern
+    assume it could be any combination of these
+let decl -> '=' is next
+set var ':=' is next
+setref '!{' is next
+
+  tupleget '.{' is next
+  unbox '!' is next
+  dotexpr '.' is next
+  app '(' is next
+  binop an operator is next
+how can we choose, and hook into stuff
+we have a parser which continues an expression
+  with app, binop, tupleget, dotexpr, unbox
+  all the statemnt expressions
+so:
+can it be a pattern:
+  = -> let decl
+can it be an iden -> := -> set var
+can it be an expr -> !{ -> setref
+can it be an expr ->
+  optional exprsuffix
+
+use guard for these 'can it be' sections
+a guard won't commit so doesn't need try
+
+the pattern or expr parser has to replace the expr parser
+in expr only contexts, create a wrapper which does a fail "pattern in
+expr context" or something?
+there are plenty of times when we know we only want a expr and then
+we can say 'pattern in expr context' in the parser
+maybe can do this with patterns as well?
+if there's an error, it's more ok to try to restart that part with a
+  different parser that is designed to give good error messages,
+  once you know more about the context
+
+what do patterns parse that exprs don't:
+_ - this already parses as an identifier
+as x
+shadow
+
+1. create a new data to parse these pattern or expressions
+2. adjust the parser to be able to parse these
+  is this a big job?
+  don't adjust the parser to add 'as x' yet, get the rest working first
+  then come back to this when everything else is done
+  the new data type is expr with just asP added as a ctor
+  which won't be hit until this is added to the parsing
+3. create the wrapper to convert to an expression with a fail
+4. implement the above branching
+
+> startsWithExprOrPattern :: Parser Stmt
+> startsWithExprOrPattern = do
+>     ex <- epExpr
+>     --trace (ppShow ex) $
+>     choice
+>         [do
+>          EPExpr (Iden i) <- pure ex
+>          SetVar i <$> (symbol_ ":=" *> expr)
+>         ,do
+>          Just p <- pure $ epExprToPat ex
+>          e <- (symbol_ "=" *> expr)
+>          pure $ LetDecl (Binding p e)
+>         ,do
+>          Just ex' <- pure $ epExprToExpr ex
+>          choice
+>             [do
+>              let rf = (,) <$> identifier <*> (symbol_ ":" *> expr)
+>              SetRef ex' <$> (symbol_ "!{" *> commaSep1 rf <* symbol "}")
+>             ,do
+>              exprSuffix ex' <**> choice [testPost
+>                                         ,pure StExpr]]]
+>            
+
+
+very hacky
+
+> data EPExpr = EPExpr Expr
+>             | EPSel EPSelector
+>             | EPParens EPExpr
+>             | EPApp Expr [EPExpr]
+>             | EPShadowIden String
+>             | EPAsP EPExpr Shadow String
+>             deriving (Eq,Show) 
+
+> data EPSelector = EPTupleP [EPExpr]
+>                 | EPSelector Selector
+>             deriving (Eq,Show) 
+
+> epSelToSel :: EPSelector -> Maybe Selector
+> epSelToSel (EPSelector s) = Just s
+> epSelToSel (EPTupleP es) = do
+>     es' <- mapM epExprToExpr es
+>     pure $ Tuple es'
+
+> epExprToExpr :: EPExpr -> Maybe Expr
+> epExprToExpr (EPExpr e) = Just e
+> epExprToExpr (EPSel s) = Sel <$> epSelToSel s
+> epExprToExpr (EPParens e) = Parens <$> epExprToExpr e
+> epExprToExpr (EPApp e es) = do
+>     es' <- mapM epExprToExpr es
+>     pure $ App e es'
+> epExprToExpr (EPShadowIden {}) = Nothing
+> epExprToExpr (EPAsP {}) = Nothing
+
+
+> epExprToPat :: EPExpr -> Maybe Pat
+> epExprToPat (EPExpr (Iden i)) = Just $ IdenP NoShadow i
+> epExprToPat (EPApp (Iden f) ps) = do
+>     ps' <- mapM epExprToPat ps
+>     pure $ VariantP f ps'
+> epExprToPat (EPSel (EPTupleP ps)) = do
+>     ps' <- mapM epExprToPat ps
+>     pure $ TupleP ps'
+> epExprToPat (EPSel (EPSelector (Tuple es))) = do
+>     ps' <- mapM (epExprToPat . EPExpr) es
+>     pure $ TupleP ps'
+> epExprToPat (EPExpr (Sel (Tuple es))) = do
+>     ps' <- mapM (epExprToPat . EPExpr) es
+>     pure $ TupleP ps'
+> epExprToPat (EPExpr (App (Iden f) es)) = do
+>     ps' <- mapM (epExprToPat . EPExpr) es
+>     pure $ VariantP f ps'
+
+> epExprToPat (EPAsP p s i) = do
+>     p' <- epExprToPat p
+>     pure $ AsP p' s i
+> epExprToPat (EPShadowIden i) = Just $ IdenP Shadow i
+> epExprToPat _ = Nothing
+
+link(a,b) = x
+
+> epExpr :: Parser EPExpr
+> epExpr = do
+>     x <- choice
+>         [EPShadowIden <$> (keyword_ "shadow" *> identifier)
+>         ,EPParens <$> parens epExpr
+>         ,tupleOrRecordP
+>         ,EPExpr <$> expr]
+>     choice [EPAsP x <$> (keyword_ "as" *> option NoShadow (Shadow <$ keyword_ "shadow"))
+>                     <*> identifier
+>            ,pure x]
+
+
+1. create ExprOrPattern
+   add as, shadow iden
+2. rewrite the exprToPattern to work on this
+3. write eorptoExpr
+4. see everything work5
+5. add wrappers for just expr and just pattern
+   switch them in
+   adjust to use a flag in the parser to allow either either, just
+   exprs or just patterns?
+   can also add a flag to allow test operators or not
+
+
+> pat :: Parser Pat
+> pat = choice
+>       [(IdenP <$> option NoShadow (Shadow <$ keyword_ "shadow")
+>               <*> identifier) <**> option id vntPSuffix
+>       ,TupleP <$> (symbol_ "{" *> xSep ';' pat <* symbol_ "}")]
+>       <**> option id asPatSuffix
+
+> asPatSuffix :: Parser (Pat -> Pat)
+> asPatSuffix = f <$> (keyword_ "as" *> option NoShadow (Shadow <$ keyword_ "shadow"))
+>                 <*> identifier
+>    where
+>      f a b c = AsP c a b
+
+> vntPSuffix :: Parser (Pat -> Pat)
+> vntPSuffix = do
+>     x <- parens (commaSep pat)
+>     pure (\(IdenP NoShadow y) -> VariantP y x)
+
+otherwise, it's an expr
+
+
+
+anything that starts with a keyword is not possible at this point
+
+> {-exprToPattern :: Expr -> Maybe Pat
+> exprToPattern (Iden x) = Just $ IdenP NoShadow x
+> exprToPattern (Parens x) = exprToPattern x
+> exprToPattern (App (Iden f) es) = do
+>     es' <- mapM exprToPattern es
+>     pure $ VariantP f es'
+> exprToPattern (Sel (Tuple es)) = do
+>     es' <- mapM exprToPattern es
+>     pure $ TupleP es'
+> exprToPattern _ = Nothing-}
+
+
+> {-patternSyntaxToExpr :: Pat -> Expr
 > patternSyntaxToExpr (IdenP NoShadow s) = Iden s
 > patternSyntaxToExpr (VariantP s p) = App (Iden s) $ map patternSyntaxToExpr p
 > patternSyntaxToExpr (TupleP es) = Sel $ Tuple $ map patternSyntaxToExpr es
-> --patternSyntaxToExpr (AsP {}) = Nothing
+> patternSyntaxToExpr (AsP {}) = Nothing-}
+
+
 
 > whenStmt :: Parser Stmt
 > whenStmt = When <$> (keyword_ "when" *> expr)
@@ -586,16 +805,16 @@ todo: try can remove this try?
 it's not awful atm, but if the try is removed, might still
 get slightly better parse error messages
 
-> setVarStmt :: Parser Stmt
+> {-setVarStmt :: Parser Stmt
 > setVarStmt = try (SetVar <$> (identifier <* symbol_ ":=")
->            <*> expr)
+>            <*> expr)-}
 
-> setRef :: Parser (Expr -> Stmt)
+> {-setRef :: Parser (Expr -> Stmt)
 > setRef = flip SetRef
 >          <$> (symbol_ "!{" *> commaSep1 rf <* symbol "}")
 >   where
 >     rf = (,) <$> identifier <*> (symbol_ ":" *> expr)
->          
+>          -}
 
 > checkBlock :: Parser Stmt
 > checkBlock = Check
@@ -635,10 +854,10 @@ get slightly better parse error messages
 >               <*> option [] (parens (commaSep fld))
 >     fld = (,) <$> option Con (Ref <$ keyword_ "ref") <*> identifier
 
-> letDecl :: Parser (Pat -> Stmt)
+> {-letDecl :: Parser (Pat -> Stmt)
 > letDecl = f <$> (symbol_ "=" *> expr)
 >    where
->        f y x = LetDecl (Binding x y)
+>        f y x = LetDecl (Binding x y)-}
 
 -----------------------------------------
 
@@ -646,15 +865,15 @@ get slightly better parse error messages
 > testPost = choice [isPred, postOp, inf]
 >   where
 >       isPred = do
->           t <- keyword "is%" <|> keyword "is-not%"
+>           t <- (keyword "is%" <|> keyword "is-not%") <?> "test operator"
 >           p <- parens expr
 >           e2 <- expr
 >           pure (\x -> TPred x t p e2)
 >       postOp = do
->           keyword_ "does-not-raise"
+>           keyword_ "does-not-raise" <?> "test operator"
 >           pure (flip TPostfixOp "does-not-raise")
 >       inf = do
->           k <- choice $ map keyword tks
+>           k <- choice (map keyword tks) <?> "test operator"
 >           e <- expr
 >           pure (\x -> StExpr $ BinOp x k e)
 >       tks = ["is-not", "is"

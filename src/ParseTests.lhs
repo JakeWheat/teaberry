@@ -256,11 +256,11 @@ todo: review all the whitespace rules that are being ignored
 >      ,LetDecl (Binding (TupleP [IdenP NoShadow "x", IdenP NoShadow "y"])
 >       (Sel $ Tuple [num 1, num 2])))
 
->     ,("{{w; x}; {y; z}} = x"
+>     ,("{{w; x}; {y; z}} = x154"
 >      ,LetDecl (Binding
 >                (TupleP [TupleP [IdenP NoShadow "w", IdenP NoShadow "x"]
 >                        ,TupleP [IdenP NoShadow "y", IdenP NoShadow "z"]])
->                (Iden "x")))
+>                (Iden "x154")))
 >
 >     ,("{w; x} as wx = z"
 >      ,LetDecl (Binding (AsP (TupleP [IdenP NoShadow "w", IdenP NoShadow "x"]) NoShadow "wx")
