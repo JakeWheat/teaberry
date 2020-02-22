@@ -418,15 +418,25 @@ todo: remove the trys by implementing a proper lexer or a lexer style
 >            ,flip DotExpr <$> identifier]
 
 > cases :: Parser Expr
-> cases = Cases <$> (keyword_ "cases" *> parens identifier)
->               <*> (expr <* symbol_ ":")
->               <*> some cas
->               <*> (optional els <* keyword_ "end")
+> cases = do
+>     ty <- keyword_ "cases" *> parens identifier
+>     t <- (expr <* symbol_ ":")
+>     nextCase ty t []
 >   where
->      -- todo: try remove this try
->      cas = (,) <$> try (symbol_ "|" *> pat)
->                <*> (symbol_ "=>" *> expr)
->      els = symbol_ "|" *> keyword_ "else" *> symbol_ "=>" *> expr
+>     nextCase ty t cs =
+>         choice [do
+>                 x <- casePart
+>                 case x of
+>                     Right el -> endCase ty t cs (Just el)
+>                     Left c -> nextCase ty t (c:cs)
+>                ,endCase ty t cs Nothing]
+>     casePart :: Parser (Either (Pat,Expr) Expr)
+>     casePart = do
+>         symbol_ "|"
+>         choice
+>             [Right <$> (keyword_ "else" *> symbol_ "=>" *> expr)
+>             ,Left <$> ((,) <$> pat <*> (symbol_ "=>" *> expr))]
+>     endCase ty t cs el = keyword_ "end" *> pure (Cases ty t (reverse cs) el)
 
 > pat :: Parser Pat
 > pat = choice
