@@ -1,41 +1,42 @@
-
 basic untyped pyret dialect
 
+get imports for data types working
 
-ability to run scripts in the language as part of the system automated
-  testing
+fill in some built in modules
 
-tuples
-records
-import and provides
-data, cases, boxes
+relational values and algebra
+in memory transactions
+durable vars
+constraints
 annotations, contracts
+
+try out what typeclasses could look like
+
+fix whitespace handling - at least don't allow multiple statements per line
+  and don't allow spaces between function app ( and the preceding token
 
 plenty of example scripts
 
-finish rec
-top level rec handling
-api/ux/ffi another pass
-scripting front end
+work on ffi to haskell
+work on cli
+
 a quick standard lib
 
-table stuff
+concurrency - serializable transactions, threads/processes + queues
+
+much better testing
+
+refactor source code
+
+documentation, website and stuff
+
+finish off import support
 
 
 types
 
-...
+garbage collection
 
-
-better ffi
-calling exes
-standard lib
-docs/website
-
-
-start writing more serious stuff and see what comes up
-
-think about garbage collection
 think about a lower level interpreter (keep the high level one too)
   1. prep for llvm compilation
   2. optimisation

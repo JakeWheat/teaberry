@@ -42,11 +42,12 @@ same if there is something embedded that's optional
   probably better with a helper function
 
 for things like expressions, patterns, terms, etc.
-  use <?> "expression" or whatever, to describe the node expected next,
-  and avoid a long list of the possibilities this could be
+  use <?> "expression" or whatever, to describe the next expected node,
+  and avoid a long list of each possibility
   e.g.
   expecting "ask", "block", "cases", "if", "lam", "let", "letrec", '(', '-', '[', '{', identifier, number, or string literal
-  -> expecting expression
+  ->
+  expecting expression
 
 
 > {-# LANGUAGE TupleSections,ScopedTypeVariables, MultiWayIf #-}

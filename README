@@ -142,6 +142,7 @@ types
     field access in a case
   recursive functions
   recursive data types
+  parametric polymorphism
   type classes
   extensible records
   ...
