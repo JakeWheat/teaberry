@@ -426,7 +426,6 @@ as
 1 | as
   | ^
 unexpected 'a'
-expecting "import", "include", or "provide"
 
 ^^^^^^^^^^^^^^^^^^^^^^^
 a OK
@@ -1716,7 +1715,7 @@ en
 5 | en
   |   ^
 unexpected end of input
-expecting "end", '=', or statement
+expecting "end"
 
 fun apply-twice(f, x):
   f(f(x))
@@ -1728,7 +1727,7 @@ e
 5 | e
   |  ^
 unexpected end of input
-expecting "end", '=', or statement
+expecting "end"
 
 fun apply-twice(f, x):
   f(f(x))
@@ -1773,7 +1772,7 @@ where:
 4 |   apply-twice(square, 3) i
   |                           ^
 unexpected end of input
-expecting "end", '=', or statement
+expecting "end"
 
 fun apply-twice(f, x):
   f(f(x))
@@ -1894,7 +1893,7 @@ where:
 4 |   apply-twice
   |              ^
 unexpected end of input
-expecting "end", '=', or statement
+expecting "end"
 
 fun apply-twice(f, x):
   f(f(x))
@@ -1905,7 +1904,7 @@ where:
 4 |   apply-twic
   |             ^
 unexpected end of input
-expecting "end", '=', or statement
+expecting "end"
 
 fun apply-twice(f, x):
   f(f(x))
@@ -1916,7 +1915,7 @@ where:
 4 |   apply-twi
   |            ^
 unexpected end of input
-expecting "end", '=', or statement
+expecting "end"
 
 fun apply-twice(f, x):
   f(f(x))
@@ -1927,7 +1926,7 @@ where:
 4 |   apply-tw
   |           ^
 unexpected end of input
-expecting "end", '=', or statement
+expecting "end"
 
 fun apply-twice(f, x):
   f(f(x))
@@ -1938,7 +1937,7 @@ where:
 4 |   apply-t
   |          ^
 unexpected end of input
-expecting "end", '=', or statement
+expecting "end"
 
 fun apply-twice(f, x):
   f(f(x))
@@ -1949,7 +1948,7 @@ where:
 4 |   apply-
   |         ^
 unexpected end of input
-expecting "end", '=', or statement
+expecting "end"
 
 fun apply-twice(f, x):
   f(f(x))
@@ -1960,7 +1959,7 @@ where:
 4 |   apply
   |        ^
 unexpected end of input
-expecting "end", '=', or statement
+expecting "end"
 
 fun apply-twice(f, x):
   f(f(x))
@@ -1971,7 +1970,7 @@ where:
 4 |   appl
   |       ^
 unexpected end of input
-expecting "end", '=', or statement
+expecting "end"
 
 fun apply-twice(f, x):
   f(f(x))
@@ -1982,7 +1981,7 @@ where:
 4 |   app
   |      ^
 unexpected end of input
-expecting "end", '=', or statement
+expecting "end"
 
 fun apply-twice(f, x):
   f(f(x))
@@ -1993,7 +1992,7 @@ where:
 4 |   ap
   |     ^
 unexpected end of input
-expecting "end", '=', or statement
+expecting "end"
 
 fun apply-twice(f, x):
   f(f(x))
@@ -2004,7 +2003,7 @@ where:
 4 |   a
   |    ^
 unexpected end of input
-expecting "end", '=', or statement
+expecting "end"
 
 fun apply-twice(f, x):
   f(f(x))
@@ -2035,7 +2034,7 @@ wher
 3 | wher
   |     ^
 unexpected end of input
-expecting ":=", "end", '=', or statement
+expecting "end" or statement
 
 fun apply-twice(f, x):
   f(f(x))
@@ -2045,7 +2044,7 @@ whe
 3 | whe
   |    ^
 unexpected end of input
-expecting ":=", "end", '=', or statement
+expecting "end" or statement
 
 fun apply-twice(f, x):
   f(f(x))
@@ -2055,7 +2054,7 @@ wh
 3 | wh
   |   ^
 unexpected end of input
-expecting ":=", "end", '=', or statement
+expecting "end" or statement
 
 fun apply-twice(f, x):
   f(f(x))
@@ -2065,7 +2064,7 @@ w
 3 | w
   |  ^
 unexpected end of input
-expecting ":=", "end", '=', or statement
+expecting "end" or statement
 
 fun apply-twice(f, x):
   f(f(x))
@@ -2075,7 +2074,7 @@ fun apply-twice(f, x):
 3 | <empty line>
   | ^
 unexpected end of input
-expecting "end", '=', or statement
+expecting "end" or statement
 
 fun apply-twice(f, x):
   f(f(x)
@@ -2129,7 +2128,7 @@ fun apply-twice(f, x):
 2 |   f
   |    ^
 unexpected end of input
-expecting ":=", "end", '=', or statement
+expecting "end" or statement
 
 fun apply-twice(f, x):
   
@@ -2294,7 +2293,7 @@ en
 5 | en
   |   ^
 unexpected end of input
-expecting ":=", "end", '=', or statement
+expecting "end" or statement
 
 check "x":
   f(1) is true
@@ -2306,7 +2305,7 @@ e
 5 | e
   |  ^
 unexpected end of input
-expecting ":=", "end", '=', or statement
+expecting "end" or statement
 
 check "x":
   f(1) is true
@@ -2395,7 +2394,7 @@ check "x":
 4 |   raise(1) raises-satisfie
   |                           ^
 unexpected end of input
-expecting ":=", "end", '=', or statement
+expecting "end" or statement
 
 check "x":
   f(1) is true
@@ -2406,7 +2405,7 @@ check "x":
 4 |   raise(1) raises-satisfi
   |                          ^
 unexpected end of input
-expecting ":=", "end", '=', or statement
+expecting "end" or statement
 
 check "x":
   f(1) is true
@@ -2417,7 +2416,7 @@ check "x":
 4 |   raise(1) raises-satisf
   |                         ^
 unexpected end of input
-expecting ":=", "end", '=', or statement
+expecting "end" or statement
 
 check "x":
   f(1) is true
@@ -2428,7 +2427,7 @@ check "x":
 4 |   raise(1) raises-satis
   |                        ^
 unexpected end of input
-expecting ":=", "end", '=', or statement
+expecting "end" or statement
 
 check "x":
   f(1) is true
@@ -2439,7 +2438,7 @@ check "x":
 4 |   raise(1) raises-sati
   |                       ^
 unexpected end of input
-expecting ":=", "end", '=', or statement
+expecting "end" or statement
 
 check "x":
   f(1) is true
@@ -2450,7 +2449,7 @@ check "x":
 4 |   raise(1) raises-sat
   |                      ^
 unexpected end of input
-expecting ":=", "end", '=', or statement
+expecting "end" or statement
 
 check "x":
   f(1) is true
@@ -2461,7 +2460,7 @@ check "x":
 4 |   raise(1) raises-sa
   |                     ^
 unexpected end of input
-expecting ":=", "end", '=', or statement
+expecting "end" or statement
 
 check "x":
   f(1) is true
@@ -2472,7 +2471,7 @@ check "x":
 4 |   raise(1) raises-s
   |                    ^
 unexpected end of input
-expecting ":=", "end", '=', or statement
+expecting "end" or statement
 
 check "x":
   f(1) is true
@@ -2483,7 +2482,7 @@ check "x":
 4 |   raise(1) raises-
   |                   ^
 unexpected end of input
-expecting ":=", "end", '=', or statement
+expecting "end" or statement
 
 check "x":
   f(1) is true
@@ -2505,7 +2504,7 @@ check "x":
 4 |   raise(1) raise
   |                 ^
 unexpected end of input
-expecting ":=", "end", '=', or statement
+expecting "end" or statement
 
 check "x":
   f(1) is true
@@ -2516,7 +2515,7 @@ check "x":
 4 |   raise(1) rais
   |                ^
 unexpected end of input
-expecting ":=", "end", '=', or statement
+expecting "end" or statement
 
 check "x":
   f(1) is true
@@ -2527,7 +2526,7 @@ check "x":
 4 |   raise(1) rai
   |               ^
 unexpected end of input
-expecting ":=", "end", '=', or statement
+expecting "end" or statement
 
 check "x":
   f(1) is true
@@ -2538,7 +2537,7 @@ check "x":
 4 |   raise(1) ra
   |              ^
 unexpected end of input
-expecting ":=", "end", '=', or statement
+expecting "end" or statement
 
 check "x":
   f(1) is true
@@ -2549,7 +2548,7 @@ check "x":
 4 |   raise(1) r
   |             ^
 unexpected end of input
-expecting ":=", "end", '=', or statement
+expecting "end" or statement
 
 check "x":
   f(1) is true
@@ -2593,7 +2592,7 @@ check "x":
 4 |   raise
   |        ^
 unexpected end of input
-expecting ":=", "end", '=', or statement
+expecting "end" or statement
 
 check "x":
   f(1) is true
@@ -2604,7 +2603,7 @@ check "x":
 4 |   rais
   |       ^
 unexpected end of input
-expecting ":=", "end", '=', or statement
+expecting "end" or statement
 
 check "x":
   f(1) is true
@@ -2615,7 +2614,7 @@ check "x":
 4 |   rai
   |      ^
 unexpected end of input
-expecting ":=", "end", '=', or statement
+expecting "end" or statement
 
 check "x":
   f(1) is true
@@ -2626,7 +2625,7 @@ check "x":
 4 |   ra
   |     ^
 unexpected end of input
-expecting ":=", "end", '=', or statement
+expecting "end" or statement
 
 check "x":
   f(1) is true
@@ -2637,7 +2636,7 @@ check "x":
 4 |   r
   |    ^
 unexpected end of input
-expecting ":=", "end", '=', or statement
+expecting "end" or statement
 
 check "x":
   f(1) is true
@@ -2728,7 +2727,7 @@ check "x":
 3 |   raise("hello") raise
   |                       ^
 unexpected end of input
-expecting ":=", "end", '=', or statement
+expecting "end" or statement
 
 check "x":
   f(1) is true
@@ -2738,7 +2737,7 @@ check "x":
 3 |   raise("hello") rais
   |                      ^
 unexpected end of input
-expecting ":=", "end", '=', or statement
+expecting "end" or statement
 
 check "x":
   f(1) is true
@@ -2748,7 +2747,7 @@ check "x":
 3 |   raise("hello") rai
   |                     ^
 unexpected end of input
-expecting ":=", "end", '=', or statement
+expecting "end" or statement
 
 check "x":
   f(1) is true
@@ -2758,7 +2757,7 @@ check "x":
 3 |   raise("hello") ra
   |                    ^
 unexpected end of input
-expecting ":=", "end", '=', or statement
+expecting "end" or statement
 
 check "x":
   f(1) is true
@@ -2768,7 +2767,7 @@ check "x":
 3 |   raise("hello") r
   |                   ^
 unexpected end of input
-expecting ":=", "end", '=', or statement
+expecting "end" or statement
 
 check "x":
   f(1) is true
@@ -2868,7 +2867,7 @@ check "x":
 3 |   raise
   |        ^
 unexpected end of input
-expecting ":=", "end", '=', or statement
+expecting "end" or statement
 
 check "x":
   f(1) is true
@@ -2878,7 +2877,7 @@ check "x":
 3 |   rais
   |       ^
 unexpected end of input
-expecting ":=", "end", '=', or statement
+expecting "end" or statement
 
 check "x":
   f(1) is true
@@ -2888,7 +2887,7 @@ check "x":
 3 |   rai
   |      ^
 unexpected end of input
-expecting ":=", "end", '=', or statement
+expecting "end" or statement
 
 check "x":
   f(1) is true
@@ -2898,7 +2897,7 @@ check "x":
 3 |   ra
   |     ^
 unexpected end of input
-expecting ":=", "end", '=', or statement
+expecting "end" or statement
 
 check "x":
   f(1) is true
@@ -2908,7 +2907,7 @@ check "x":
 3 |   r
   |    ^
 unexpected end of input
-expecting ":=", "end", '=', or statement
+expecting "end" or statement
 
 check "x":
   f(1) is true
@@ -2963,7 +2962,7 @@ check "x":
 2 |   f(1) i
   |         ^
 unexpected end of input
-expecting ":=", "end", '=', or statement
+expecting "end" or statement
 
 check "x":
   f(1) 
@@ -2999,7 +2998,7 @@ check "x":
 2 |   f
   |    ^
 unexpected end of input
-expecting ":=", "end", '=', or statement
+expecting "end" or statement
 
 check "x":
   

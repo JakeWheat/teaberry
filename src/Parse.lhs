@@ -663,10 +663,10 @@ shadow
 >     choice
 >         [do
 >          EPExpr (Iden i) <- pure ex
->          SetVar i <$> (symbol_ ":=" *> expr)
+>          SetVar i <$> ((symbol_ ":=" <?> "") *> expr)
 >         ,do
 >          Just p <- pure $ epExprToPat ex
->          e <- (symbol_ "=" *> expr)
+>          e <- ((symbol_ "=" <?> "") *> expr)
 >          pure $ LetDecl (Binding p e)
 >         ,do
 >          Just ex' <- pure $ epExprToExpr ex
@@ -867,7 +867,7 @@ should just say expression
 > program = Program <$> many preludeItem <*> many stmt
 
 > preludeItem :: Parser PreludeItem
-> preludeItem = provide <|> include <|> importItem
+> preludeItem = (provide <|> include <|> importItem) <?> ""
 
 
 > provide :: Parser PreludeItem
