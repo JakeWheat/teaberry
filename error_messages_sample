@@ -61,7 +61,7 @@ ask:
 4 |   | otherwise: x * -
   |                     ^
 unexpected end of input
-expecting "ask", "block", "cases", "if", "lam", "let", "letrec", '(', '-', '[', '{', identifier, number, or string literal
+expecting expression
 
 ask:
   | x == 0 then: 1

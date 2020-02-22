@@ -300,7 +300,7 @@ todo: remove the trys by implementing a proper lexer or a lexer style
 > 
 
 > unaryMinus :: Parser Expr
-> unaryMinus = UnaryMinus <$> (symbol "-" *> term)
+> unaryMinus = UnaryMinus <$> (symbol "-" *> (term <?> "expression"))
 
 > lamE :: Parser Expr
 > lamE = Lam <$> (keyword_ "lam" *> parens (commaSep pat) <* symbol_ ":")
