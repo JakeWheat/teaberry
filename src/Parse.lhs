@@ -91,17 +91,20 @@ fixity parser either
 
 > parseExpr :: FilePath -> String -> Either String Expr
 > parseExpr fn src = either (Left . errorBundlePretty) Right $
->                    parse (whiteSpace *> expr <* eof) fn src
+>                    parse (whiteSpace *> expr <* myEof) fn src
 
 > parseStmt :: FilePath -> String -> Either String Stmt
 > parseStmt fn src = either (Left . errorBundlePretty) Right $
->                    parse (whiteSpace *> stmt <* eof) fn src
+>                    parse (whiteSpace *> stmt <* myEof) fn src
 
 
 
 > parseProgram :: FilePath -> String -> Either String Program
 > parseProgram fn src = either (Left . errorBundlePretty) Right $
->                     parse (whiteSpace *> program <* eof) fn src
+>                     parse (whiteSpace *> program <* myEof) fn src
+
+> myEof :: Parser ()
+> myEof = eof <?> ""
 
 ------------------------------------------------------------------------------
 

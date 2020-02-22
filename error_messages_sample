@@ -663,7 +663,7 @@ as
 1 | as
   | ^
 unexpected 'a'
-expecting "import", "include", "provide", or end of input
+expecting "import", "include", or "provide"
 
 ^^^^^^^^^^^^^^^^^^^^^^^
 a OK
