@@ -44,6 +44,17 @@ expecting "end"
 ask:
   | x == 0 then: 1
   | x > 0 then: x
+  | otherwise: x * -1
+4:22:
+  |
+4 |   | otherwise: x * -1
+  |                      ^
+unexpected end of input
+expecting "end"
+
+ask:
+  | x == 0 then: 1
+  | x > 0 then: x
   | otherwise: x * -
 4:21:
   |
@@ -66,6 +77,17 @@ expecting expression
 ask:
   | x == 0 then: 1
   | x > 0 then: x
+  | otherwise: x *
+4:19:
+  |
+4 |   | otherwise: x *
+  |                   ^
+unexpected end of input
+expecting expression
+
+ask:
+  | x == 0 then: 1
+  | x > 0 then: x
   | otherwise: x 
 4:18:
   |
@@ -77,11 +99,33 @@ expecting "end"
 ask:
   | x == 0 then: 1
   | x > 0 then: x
+  | otherwise: x
+4:17:
+  |
+4 |   | otherwise: x
+  |                 ^
+unexpected end of input
+expecting "end"
+
+ask:
+  | x == 0 then: 1
+  | x > 0 then: x
   | otherwise: 
 4:16:
   |
 4 |   | otherwise: 
   |                ^
+unexpected end of input
+expecting expression
+
+ask:
+  | x == 0 then: 1
+  | x > 0 then: x
+  | otherwise:
+4:15:
+  |
+4 |   | otherwise:
+  |               ^
 unexpected end of input
 expecting expression
 
@@ -198,6 +242,17 @@ expecting "otherwise" or expression
 ask:
   | x == 0 then: 1
   | x > 0 then: x
+  |
+4:4:
+  |
+4 |   |
+  |    ^
+unexpected end of input
+expecting "otherwise" or expression
+
+ask:
+  | x == 0 then: 1
+  | x > 0 then: x
   
 4:3:
   |
@@ -208,11 +263,31 @@ expecting "end" or '|'
 
 ask:
   | x == 0 then: 1
+  | x > 0 then: x
+3:18:
+  |
+3 |   | x > 0 then: x
+  |                  ^
+unexpected end of input
+expecting "end" or '|'
+
+ask:
+  | x == 0 then: 1
   | x > 0 then: 
 3:17:
   |
 3 |   | x > 0 then: 
   |                 ^
+unexpected end of input
+expecting expression
+
+ask:
+  | x == 0 then: 1
+  | x > 0 then:
+3:16:
+  |
+3 |   | x > 0 then:
+  |                ^
 unexpected end of input
 expecting expression
 
@@ -271,11 +346,31 @@ expecting "then"
 
 ask:
   | x == 0 then: 1
+  | x > 0
+3:10:
+  |
+3 |   | x > 0
+  |          ^
+unexpected end of input
+expecting "then"
+
+ask:
+  | x == 0 then: 1
   | x > 
 3:9:
   |
 3 |   | x > 
   |         ^
+unexpected end of input
+expecting expression
+
+ask:
+  | x == 0 then: 1
+  | x >
+3:8:
+  |
+3 |   | x >
+  |        ^
 unexpected end of input
 expecting expression
 
@@ -291,11 +386,31 @@ expecting "then"
 
 ask:
   | x == 0 then: 1
+  | x
+3:6:
+  |
+3 |   | x
+  |      ^
+unexpected end of input
+expecting "then"
+
+ask:
+  | x == 0 then: 1
   | 
 3:5:
   |
 3 |   | 
   |     ^
+unexpected end of input
+expecting "otherwise" or expression
+
+ask:
+  | x == 0 then: 1
+  |
+3:4:
+  |
+3 |   |
+  |    ^
 unexpected end of input
 expecting "otherwise" or expression
 
@@ -310,11 +425,29 @@ unexpected end of input
 expecting "end" or '|'
 
 ask:
+  | x == 0 then: 1
+2:19:
+  |
+2 |   | x == 0 then: 1
+  |                   ^
+unexpected end of input
+expecting "end" or '|'
+
+ask:
   | x == 0 then: 
 2:18:
   |
 2 |   | x == 0 then: 
   |                  ^
+unexpected end of input
+expecting expression
+
+ask:
+  | x == 0 then:
+2:17:
+  |
+2 |   | x == 0 then:
+  |                 ^
 unexpected end of input
 expecting expression
 
@@ -367,11 +500,29 @@ unexpected end of input
 expecting "then"
 
 ask:
+  | x == 0
+2:11:
+  |
+2 |   | x == 0
+  |           ^
+unexpected end of input
+expecting "then"
+
+ask:
   | x == 
 2:10:
   |
 2 |   | x == 
   |          ^
+unexpected end of input
+expecting expression
+
+ask:
+  | x ==
+2:9:
+  |
+2 |   | x ==
+  |         ^
 unexpected end of input
 expecting expression
 
@@ -395,6 +546,15 @@ unexpected end of input
 expecting "then"
 
 ask:
+  | x
+2:6:
+  |
+2 |   | x
+  |      ^
+unexpected end of input
+expecting "then"
+
+ask:
   | 
 2:5:
   |
@@ -404,11 +564,28 @@ unexpected end of input
 expecting "otherwise" or expression
 
 ask:
+  |
+2:4:
+  |
+2 |   |
+  |    ^
+unexpected end of input
+expecting "otherwise" or expression
+
+ask:
   
 2:3:
   |
 2 |   
   |   ^
+unexpected end of input
+expecting "end" or '|'
+
+ask:
+1:5:
+  |
+1 | ask:
+  |     ^
 unexpected end of input
 expecting "end" or '|'
 
@@ -471,6 +648,16 @@ expecting "end" or '|'
 
 cases (Two) a:
   | pt1(x,y) => if n == 0: x else: y end
+  | pt2(x,y) => if n == 0: x else: y end
+3:41:
+  |
+3 |   | pt2(x,y) => if n == 0: x else: y end
+  |                                         ^
+unexpected end of input
+expecting "end" or '|'
+
+cases (Two) a:
+  | pt1(x,y) => if n == 0: x else: y end
   | pt2(x,y) => if n == 0: x else: y en
 3:38:
   |
@@ -503,11 +690,31 @@ expecting "end"
 
 cases (Two) a:
   | pt1(x,y) => if n == 0: x else: y end
+  | pt2(x,y) => if n == 0: x else: y
+3:37:
+  |
+3 |   | pt2(x,y) => if n == 0: x else: y
+  |                                     ^
+unexpected end of input
+expecting "end"
+
+cases (Two) a:
+  | pt1(x,y) => if n == 0: x else: y end
   | pt2(x,y) => if n == 0: x else: 
 3:36:
   |
 3 |   | pt2(x,y) => if n == 0: x else: 
   |                                    ^
+unexpected end of input
+expecting expression
+
+cases (Two) a:
+  | pt1(x,y) => if n == 0: x else: y end
+  | pt2(x,y) => if n == 0: x else:
+3:35:
+  |
+3 |   | pt2(x,y) => if n == 0: x else:
+  |                                   ^
 unexpected end of input
 expecting expression
 
@@ -566,11 +773,31 @@ expecting "else" or "end"
 
 cases (Two) a:
   | pt1(x,y) => if n == 0: x else: y end
+  | pt2(x,y) => if n == 0: x
+3:29:
+  |
+3 |   | pt2(x,y) => if n == 0: x
+  |                             ^
+unexpected end of input
+expecting "else" or "end"
+
+cases (Two) a:
+  | pt1(x,y) => if n == 0: x else: y end
   | pt2(x,y) => if n == 0: 
 3:28:
   |
 3 |   | pt2(x,y) => if n == 0: 
   |                            ^
+unexpected end of input
+expecting expression
+
+cases (Two) a:
+  | pt1(x,y) => if n == 0: x else: y end
+  | pt2(x,y) => if n == 0:
+3:27:
+  |
+3 |   | pt2(x,y) => if n == 0:
+  |                           ^
 unexpected end of input
 expecting expression
 
@@ -591,6 +818,16 @@ cases (Two) a:
   |
 3 |   | pt2(x,y) => if n == 
   |                         ^
+unexpected end of input
+expecting expression
+
+cases (Two) a:
+  | pt1(x,y) => if n == 0: x else: y end
+  | pt2(x,y) => if n ==
+3:24:
+  |
+3 |   | pt2(x,y) => if n ==
+  |                        ^
 unexpected end of input
 expecting expression
 
@@ -617,11 +854,31 @@ expecting ':'
 
 cases (Two) a:
   | pt1(x,y) => if n == 0: x else: y end
+  | pt2(x,y) => if n
+3:21:
+  |
+3 |   | pt2(x,y) => if n
+  |                     ^
+unexpected end of input
+expecting ':'
+
+cases (Two) a:
+  | pt1(x,y) => if n == 0: x else: y end
   | pt2(x,y) => if 
 3:20:
   |
 3 |   | pt2(x,y) => if 
   |                    ^
+unexpected end of input
+expecting expression
+
+cases (Two) a:
+  | pt1(x,y) => if n == 0: x else: y end
+  | pt2(x,y) => if
+3:19:
+  |
+3 |   | pt2(x,y) => if
+  |                   ^
 unexpected end of input
 expecting expression
 
@@ -647,6 +904,16 @@ expecting expression
 
 cases (Two) a:
   | pt1(x,y) => if n == 0: x else: y end
+  | pt2(x,y) =>
+3:16:
+  |
+3 |   | pt2(x,y) =>
+  |                ^
+unexpected end of input
+expecting expression
+
+cases (Two) a:
+  | pt1(x,y) => if n == 0: x else: y end
   | pt2(x,y) =
 3:14:
   |
@@ -663,6 +930,16 @@ cases (Two) a:
   |
 3 |   | pt2(x,y) 
   |              ^
+unexpected end of input
+expecting "=>"
+
+cases (Two) a:
+  | pt1(x,y) => if n == 0: x else: y end
+  | pt2(x,y)
+3:13:
+  |
+3 |   | pt2(x,y)
+  |             ^
 unexpected end of input
 expecting "=>"
 
@@ -748,11 +1025,30 @@ expecting "else" or pattern
 
 cases (Two) a:
   | pt1(x,y) => if n == 0: x else: y end
+  |
+3:4:
+  |
+3 |   |
+  |    ^
+unexpected end of input
+expecting "else" or pattern
+
+cases (Two) a:
+  | pt1(x,y) => if n == 0: x else: y end
   
 3:3:
   |
 3 |   
   |   ^
+unexpected end of input
+expecting "end" or '|'
+
+cases (Two) a:
+  | pt1(x,y) => if n == 0: x else: y end
+2:41:
+  |
+2 |   | pt1(x,y) => if n == 0: x else: y end
+  |                                         ^
 unexpected end of input
 expecting "end" or '|'
 
@@ -786,11 +1082,29 @@ unexpected end of input
 expecting "end"
 
 cases (Two) a:
+  | pt1(x,y) => if n == 0: x else: y
+2:37:
+  |
+2 |   | pt1(x,y) => if n == 0: x else: y
+  |                                     ^
+unexpected end of input
+expecting "end"
+
+cases (Two) a:
   | pt1(x,y) => if n == 0: x else: 
 2:36:
   |
 2 |   | pt1(x,y) => if n == 0: x else: 
   |                                    ^
+unexpected end of input
+expecting expression
+
+cases (Two) a:
+  | pt1(x,y) => if n == 0: x else:
+2:35:
+  |
+2 |   | pt1(x,y) => if n == 0: x else:
+  |                                   ^
 unexpected end of input
 expecting expression
 
@@ -843,11 +1157,29 @@ unexpected end of input
 expecting "else" or "end"
 
 cases (Two) a:
+  | pt1(x,y) => if n == 0: x
+2:29:
+  |
+2 |   | pt1(x,y) => if n == 0: x
+  |                             ^
+unexpected end of input
+expecting "else" or "end"
+
+cases (Two) a:
   | pt1(x,y) => if n == 0: 
 2:28:
   |
 2 |   | pt1(x,y) => if n == 0: 
   |                            ^
+unexpected end of input
+expecting expression
+
+cases (Two) a:
+  | pt1(x,y) => if n == 0:
+2:27:
+  |
+2 |   | pt1(x,y) => if n == 0:
+  |                           ^
 unexpected end of input
 expecting expression
 
@@ -866,6 +1198,15 @@ cases (Two) a:
   |
 2 |   | pt1(x,y) => if n == 
   |                         ^
+unexpected end of input
+expecting expression
+
+cases (Two) a:
+  | pt1(x,y) => if n ==
+2:24:
+  |
+2 |   | pt1(x,y) => if n ==
+  |                        ^
 unexpected end of input
 expecting expression
 
@@ -889,11 +1230,29 @@ unexpected end of input
 expecting ':'
 
 cases (Two) a:
+  | pt1(x,y) => if n
+2:21:
+  |
+2 |   | pt1(x,y) => if n
+  |                     ^
+unexpected end of input
+expecting ':'
+
+cases (Two) a:
   | pt1(x,y) => if 
 2:20:
   |
 2 |   | pt1(x,y) => if 
   |                    ^
+unexpected end of input
+expecting expression
+
+cases (Two) a:
+  | pt1(x,y) => if
+2:19:
+  |
+2 |   | pt1(x,y) => if
+  |                   ^
 unexpected end of input
 expecting expression
 
@@ -916,6 +1275,15 @@ unexpected end of input
 expecting expression
 
 cases (Two) a:
+  | pt1(x,y) =>
+2:16:
+  |
+2 |   | pt1(x,y) =>
+  |                ^
+unexpected end of input
+expecting expression
+
+cases (Two) a:
   | pt1(x,y) =
 2:14:
   |
@@ -931,6 +1299,15 @@ cases (Two) a:
   |
 2 |   | pt1(x,y) 
   |              ^
+unexpected end of input
+expecting "=>"
+
+cases (Two) a:
+  | pt1(x,y)
+2:13:
+  |
+2 |   | pt1(x,y)
+  |             ^
 unexpected end of input
 expecting "=>"
 
@@ -1007,11 +1384,28 @@ unexpected end of input
 expecting "else" or pattern
 
 cases (Two) a:
+  |
+2:4:
+  |
+2 |   |
+  |    ^
+unexpected end of input
+expecting "else" or pattern
+
+cases (Two) a:
   
 2:3:
   |
 2 |   
   |   ^
+unexpected end of input
+expecting "end" or '|'
+
+cases (Two) a:
+1:15:
+  |
+1 | cases (Two) a:
+  |               ^
 unexpected end of input
 expecting "end" or '|'
 
@@ -1028,6 +1422,14 @@ cases (Two)
   |
 1 | cases (Two) 
   |             ^
+unexpected end of input
+expecting expression
+
+cases (Two)
+1:12:
+  |
+1 | cases (Two)
+  |            ^
 unexpected end of input
 expecting expression
 
@@ -1071,6 +1473,14 @@ cases
 unexpected end of input
 expecting '('
 
+cases
+1:6:
+  |
+1 | cases
+  |      ^
+unexpected end of input
+expecting '('
+
 case OK
 cas OK
 ca OK
@@ -1088,6 +1498,16 @@ example2 = {
   |
 4 | <empty line>
   | ^
+unexpected end of input
+expecting ',' or '}'
+
+example2 = {
+  make: lam(args): link(42,args) end,
+  make8: lam(a,b): [list: 8,a,b] end
+3:37:
+  |
+3 |   make8: lam(a,b): [list: 8,a,b] end
+  |                                     ^
 unexpected end of input
 expecting ',' or '}'
 
@@ -1120,6 +1540,16 @@ example2 = {
   |
 3 |   make8: lam(a,b): [list: 8,a,b] 
   |                                  ^
+unexpected end of input
+expecting "end"
+
+example2 = {
+  make: lam(args): link(42,args) end,
+  make8: lam(a,b): [list: 8,a,b]
+3:33:
+  |
+3 |   make8: lam(a,b): [list: 8,a,b]
+  |                                 ^
 unexpected end of input
 expecting "end"
 
@@ -1185,6 +1615,16 @@ expecting ']' or expression
 
 example2 = {
   make: lam(args): link(42,args) end,
+  make8: lam(a,b): [list:
+3:26:
+  |
+3 |   make8: lam(a,b): [list:
+  |                          ^
+unexpected end of input
+expecting ']' or expression
+
+example2 = {
+  make: lam(args): link(42,args) end,
   make8: lam(a,b): [list
 3:25:
   |
@@ -1240,6 +1680,16 @@ example2 = {
   |
 3 |   make8: lam(a,b): 
   |                    ^
+unexpected end of input
+expecting expression
+
+example2 = {
+  make: lam(args): link(42,args) end,
+  make8: lam(a,b):
+3:19:
+  |
+3 |   make8: lam(a,b):
+  |                   ^
 unexpected end of input
 expecting expression
 
@@ -1335,6 +1785,16 @@ expecting expression
 
 example2 = {
   make: lam(args): link(42,args) end,
+  make8:
+3:9:
+  |
+3 |   make8:
+  |         ^
+unexpected end of input
+expecting expression
+
+example2 = {
+  make: lam(args): link(42,args) end,
   make8
 3:8:
   |
@@ -1394,6 +1854,15 @@ unexpected end of input
 expecting '}' or identifier
 
 example2 = {
+  make: lam(args): link(42,args) end,
+2:38:
+  |
+2 |   make: lam(args): link(42,args) end,
+  |                                      ^
+unexpected end of input
+expecting '}' or identifier
+
+example2 = {
   make: lam(args): link(42,args) end
 2:37:
   |
@@ -1428,6 +1897,15 @@ example2 = {
   |
 2 |   make: lam(args): link(42,args) 
   |                                  ^
+unexpected end of input
+expecting "end"
+
+example2 = {
+  make: lam(args): link(42,args)
+2:33:
+  |
+2 |   make: lam(args): link(42,args)
+  |                                 ^
 unexpected end of input
 expecting "end"
 
@@ -1549,6 +2027,15 @@ unexpected end of input
 expecting expression
 
 example2 = {
+  make: lam(args):
+2:19:
+  |
+2 |   make: lam(args):
+  |                   ^
+unexpected end of input
+expecting expression
+
+example2 = {
   make: lam(args)
 2:18:
   |
@@ -1639,6 +2126,15 @@ unexpected end of input
 expecting expression
 
 example2 = {
+  make:
+2:8:
+  |
+2 |   make:
+  |        ^
+unexpected end of input
+expecting expression
+
+example2 = {
   make
 2:7:
   |
@@ -1683,6 +2179,14 @@ example2 = {
 unexpected end of input
 expecting '}' or expression
 
+example2 = {
+1:13:
+  |
+1 | example2 = {
+  |             ^
+unexpected end of input
+expecting '}' or expression
+
 example2 = 
 1:12:
   |
@@ -1691,7 +2195,16 @@ example2 =
 unexpected end of input
 expecting expression
 
+example2 =
+1:11:
+  |
+1 | example2 =
+  |           ^
+unexpected end of input
+expecting expression
+
 example2  OK
+example2 OK
 example OK
 exampl OK
 examp OK
@@ -1744,6 +2257,17 @@ expecting "end"
 fun apply-twice(f, x):
   f(f(x))
 where:
+  apply-twice(square, 3) is 81
+4:31:
+  |
+4 |   apply-twice(square, 3) is 81
+  |                               ^
+unexpected end of input
+expecting "end"
+
+fun apply-twice(f, x):
+  f(f(x))
+where:
   apply-twice(square, 3) is 8
 4:30:
   |
@@ -1760,6 +2284,17 @@ where:
   |
 4 |   apply-twice(square, 3) is 
   |                             ^
+unexpected end of input
+expecting expression
+
+fun apply-twice(f, x):
+  f(f(x))
+where:
+  apply-twice(square, 3) is
+4:28:
+  |
+4 |   apply-twice(square, 3) is
+  |                            ^
 unexpected end of input
 expecting expression
 
@@ -1788,6 +2323,17 @@ expecting "end"
 fun apply-twice(f, x):
   f(f(x))
 where:
+  apply-twice(square, 3)
+4:25:
+  |
+4 |   apply-twice(square, 3)
+  |                         ^
+unexpected end of input
+expecting "end"
+
+fun apply-twice(f, x):
+  f(f(x))
+where:
   apply-twice(square, 3
 4:24:
   |
@@ -1804,6 +2350,17 @@ where:
   |
 4 |   apply-twice(square, 
   |                       ^
+unexpected end of input
+expecting expression
+
+fun apply-twice(f, x):
+  f(f(x))
+where:
+  apply-twice(square,
+4:22:
+  |
+4 |   apply-twice(square,
+  |                      ^
 unexpected end of input
 expecting expression
 
@@ -2018,6 +2575,16 @@ expecting "end"
 
 fun apply-twice(f, x):
   f(f(x))
+where:
+3:7:
+  |
+3 | where:
+  |       ^
+unexpected end of input
+expecting "end"
+
+fun apply-twice(f, x):
+  f(f(x))
 where
 3:6:
   |
@@ -2073,6 +2640,15 @@ fun apply-twice(f, x):
   |
 3 | <empty line>
   | ^
+unexpected end of input
+expecting "end" or statement
+
+fun apply-twice(f, x):
+  f(f(x))
+2:10:
+  |
+2 |   f(f(x))
+  |          ^
 unexpected end of input
 expecting "end" or statement
 
@@ -2139,6 +2715,14 @@ fun apply-twice(f, x):
 unexpected end of input
 expecting statement
 
+fun apply-twice(f, x):
+1:23:
+  |
+1 | fun apply-twice(f, x):
+  |                       ^
+unexpected end of input
+expecting statement
+
 fun apply-twice(f, x)
 1:22:
   |
@@ -2160,6 +2744,14 @@ fun apply-twice(f,
   |
 1 | fun apply-twice(f, 
   |                    ^
+unexpected end of input
+expecting identifier
+
+fun apply-twice(f,
+1:19:
+  |
+1 | fun apply-twice(f,
+  |                   ^
 unexpected end of input
 expecting identifier
 
@@ -2275,6 +2867,14 @@ fun
 unexpected end of input
 expecting identifier
 
+fun
+1:4:
+  |
+1 | fun
+  |    ^
+unexpected end of input
+expecting identifier
+
 fu OK
 f OK
 
@@ -2316,6 +2916,17 @@ check "x":
   |
 5 | <empty line>
   | ^
+unexpected end of input
+expecting "end" or statement
+
+check "x":
+  f(1) is true
+  raise("hello") raises "hello"
+  raise(1) raises-satisfies is_one
+4:35:
+  |
+4 |   raise(1) raises-satisfies is_one
+  |                                   ^
 unexpected end of input
 expecting "end" or statement
 
@@ -2382,6 +2993,17 @@ check "x":
   |
 4 |   raise(1) raises-satisfies 
   |                             ^
+unexpected end of input
+expecting expression
+
+check "x":
+  f(1) is true
+  raise("hello") raises "hello"
+  raise(1) raises-satisfies
+4:28:
+  |
+4 |   raise(1) raises-satisfies
+  |                            ^
 unexpected end of input
 expecting expression
 
@@ -2564,6 +3186,17 @@ expecting "end" or statement
 check "x":
   f(1) is true
   raise("hello") raises "hello"
+  raise(1)
+4:11:
+  |
+4 |   raise(1)
+  |           ^
+unexpected end of input
+expecting "end" or statement
+
+check "x":
+  f(1) is true
+  raise("hello") raises "hello"
   raise(1
 4:10:
   |
@@ -2651,6 +3284,16 @@ expecting "end" or statement
 
 check "x":
   f(1) is true
+  raise("hello") raises "hello"
+3:32:
+  |
+3 |   raise("hello") raises "hello"
+  |                                ^
+unexpected end of input
+expecting "end" or statement
+
+check "x":
+  f(1) is true
   raise("hello") raises "hello
 3:31:
   |
@@ -2721,6 +3364,16 @@ expecting expression
 
 check "x":
   f(1) is true
+  raise("hello") raises
+3:24:
+  |
+3 |   raise("hello") raises
+  |                        ^
+unexpected end of input
+expecting expression
+
+check "x":
+  f(1) is true
   raise("hello") raise
 3:23:
   |
@@ -2776,6 +3429,16 @@ check "x":
   |
 3 |   raise("hello") 
   |                  ^
+unexpected end of input
+expecting "end" or statement
+
+check "x":
+  f(1) is true
+  raise("hello")
+3:17:
+  |
+3 |   raise("hello")
+  |                 ^
 unexpected end of input
 expecting "end" or statement
 
@@ -2920,6 +3583,15 @@ unexpected end of input
 expecting "end" or statement
 
 check "x":
+  f(1) is true
+2:15:
+  |
+2 |   f(1) is true
+  |               ^
+unexpected end of input
+expecting "end" or statement
+
+check "x":
   f(1) is tru
 2:14:
   |
@@ -2956,6 +3628,15 @@ unexpected end of input
 expecting expression
 
 check "x":
+  f(1) is
+2:10:
+  |
+2 |   f(1) is
+  |          ^
+unexpected end of input
+expecting expression
+
+check "x":
   f(1) i
 2:9:
   |
@@ -2970,6 +3651,15 @@ check "x":
   |
 2 |   f(1) 
   |        ^
+unexpected end of input
+expecting "end" or statement
+
+check "x":
+  f(1)
+2:7:
+  |
+2 |   f(1)
+  |       ^
 unexpected end of input
 expecting "end" or statement
 
@@ -3009,6 +3699,14 @@ check "x":
 unexpected end of input
 expecting "end" or statement
 
+check "x":
+1:11:
+  |
+1 | check "x":
+  |           ^
+unexpected end of input
+expecting "end" or statement
+
 check "x"
 1:10:
   |
@@ -3038,6 +3736,14 @@ check
   |
 1 | check 
   |       ^
+unexpected end of input
+expecting ':' or check block name
+
+check
+1:6:
+  |
+1 | check
+  |      ^
 unexpected end of input
 expecting ':' or check block name
 
@@ -3096,6 +3802,7 @@ expecting '}' or expression
 
 {a:1,b:2}
  OK
+{a:1,b:2} OK
 {a:1,b:2
 1:9:
   |
