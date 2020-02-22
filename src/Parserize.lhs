@@ -37,10 +37,10 @@ try to skip comments
 >                                    Right _ -> " OK\n"
 >                                    Left e -> "\n" ++ f e ++ "\n")
 >                          ++ doAnother (reverse $ drop 1 $ keepDroppingWhitespace $ reverse s)
->     in doAnother src
+>     in doAnother $ keepDroppingWhitespace src
 >   where
 >     keepDroppingWhitespace (x:xs) | isSpace x = keepDroppingWhitespace xs
->                                   | otherwise = xs
+>                                   | otherwise = (x:xs)
 >     keepDroppingWhitespace [] = []
 >     f s = if not (isInfixOf "unexpected end of input" s)
 >           then s ++ "\n^^^^^^^^^^^^^^^^^^^^^^^"
