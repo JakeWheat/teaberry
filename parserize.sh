@@ -22,7 +22,7 @@ END
 CONSTR=$(cat <<-END
 example2 = {
   make: lam(args): link(42,args) end,
-  make8: lam(a,b,c,d,e,f,g,h): [list: 8,a,b,c,d,e,f,g,h] end
+  make8: lam(a,b): [list: 8,a,b] end
 }
 END
 )
@@ -46,7 +46,13 @@ end
 END
 )
 
+CURLYTHINGS=$(cat <<-END
+{a:1,b:2}
+{a,b}
+END
+)
 
+# todo: add prelude statements
 
 
 
@@ -56,6 +62,7 @@ cabal run -v0 teaberry --disable-optimization -- --parserize-c "$CASES"
 cabal run -v0 teaberry --disable-optimization -- --parserize-c "$CONSTR"
 cabal run -v0 teaberry --disable-optimization -- --parserize-c "$FUNDECL"
 cabal run -v0 teaberry --disable-optimization -- --parserize-c "$CHECK"
+cabal run -v0 teaberry --disable-optimization -- --parserize-c "$CURLYTHINGS"
 
 
 
