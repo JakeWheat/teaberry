@@ -50,7 +50,7 @@ for things like expressions, patterns, terms, etc.
   expecting expression
 
 
-> {-# LANGUAGE TupleSections,ScopedTypeVariables, MultiWayIf #-}
+> {-# LANGUAGE TupleSections,ScopedTypeVariables, MultiWayIf, LambdaCase #-}
 > module Parse (parseExpr
 >              ,parseStmt
 >              ,parseProgram) where
@@ -305,7 +305,7 @@ and make sure it doesn't parse newlines when it shouldn't
 >             <?> "string literal"
 
 > appSuffix :: Parser (Expr -> Expr)
-> appSuffix = (flip App <$> parens (commaSep expr)) <?> ""
+> appSuffix = flip App <$> parens (commaSep expr)
 
 
 > expr :: Parser Expr
@@ -423,74 +423,60 @@ todo: remove the trys by implementing a proper lexer or a lexer style
 > construct = Construct <$> (symbol_ "[" *> (Iden <$> identifier) <* symbol_ ":")
 >             <*> (commaSep expr <* symbol_ "]")
 >
-> tupleOrRecord :: Parser Expr
-> tupleOrRecord = do
->     symbol_ "{"
->     choice [-- {} is an empty record, not an empty tuple
->             symbol_ "}" *> pure (Sel $ Record [])
->            ,eitherElement]
->   where
->     eitherElement = do
->         x <- expr
->         case x of
->             Iden i -> choice
->                 [do
->                  symbol_ ":"
->                  e <- expr
->                  moreRecord [(i,e)]
->                 ,moreTuple [x]]
->             _ -> moreTuple [x]
->     moreTuple ts = choice
->         [symbol_ "}" *> pure (Sel $ Tuple (reverse ts))
->         ,symbol ";" *> choice
->              [symbol_ "}" *> pure (Sel $ Tuple (reverse ts))
->              ,do
->               te <- expr
->               moreTuple (te:ts)]]
->     moreRecord fs = choice
->         [symbol_ "}" *> pure (Sel $ Record (reverse fs))
->         ,symbol "," *> choice
->              [symbol_ "}" *> pure (Sel $ Record (reverse fs))
->              ,do
->               f <- fld
->               moreRecord (f:fs)]]
->     fld = (,) <$> (identifier <* symbol_ ":") <*> expr
 
+> tupleOrRecord :: Parser Expr
+> tupleOrRecord = tupleOrRecord2 (Sel . Record)
+>                                (Sel . Tuple)
+>                                expr
+>                                (\case
+>                                      Iden i -> Just i
+>                                      _ -> Nothing)
 
 > tupleOrRecordP :: Parser EPExpr
-> tupleOrRecordP = do
+> tupleOrRecordP = tupleOrRecord2 (EPExpr . Sel . Record)
+>                                  (EPSel . EPTupleP)
+>                                  epExpr
+>                                  (\case
+>                                        EPExpr (Iden i) -> Just i
+>                                        _ -> Nothing)
+>                                
+
+> tupleOrRecord2 :: ([(String, Expr)] -> a)
+>                -> ([a] -> a)
+>                -> Parser a
+>                -> (a -> Maybe String)
+>                -> Parser a
+> tupleOrRecord2 mkRecSel mkTupSel pTupEl extractIden = do
 >     symbol_ "{"
 >     choice [-- {} is an empty record, not an empty tuple
->             symbol_ "}" *> pure (EPExpr $ Sel $ Record [])
+>             symbol_ "}" *> pure (mkRecSel [])
 >            ,eitherElement]
 >   where
 >     eitherElement = do
->         x <- epExpr
->         case x of
->             (EPExpr (Iden i)) -> choice
+>         x <- pTupEl
+>         if | Just i <- extractIden x -> choice
 >                 [do
 >                  symbol_ ":"
 >                  e <- expr
 >                  moreRecord [(i,e)]
 >                 ,moreTuple [x]]
->             _ -> moreTuple [x]
+>            | otherwise -> moreTuple [x]
 >     moreTuple ts = choice
->         [symbol_ "}" *> pure (EPSel $ EPTupleP (reverse ts))
+>         [symbol_ "}" *> pure (mkTupSel (reverse ts))
 >         ,symbol ";" *> choice
->              [symbol_ "}" *> pure (EPSel $ EPTupleP (reverse ts))
+>              [symbol_ "}" *> pure (mkTupSel (reverse ts))
 >              ,do
->               te <- epExpr
+>               te <- pTupEl
 >               moreTuple (te:ts)]]
 >     moreRecord fs = choice
->         [symbol_ "}" *> pure (EPExpr $ Sel $ Record (reverse fs))
+>         [symbol_ "}" *> pure (mkRecSel (reverse fs))
 >         ,symbol "," *> choice
->              [symbol_ "}" *> pure (EPExpr $ Sel $ Record (reverse fs))
+>              [symbol_ "}" *> pure (mkRecSel (reverse fs))
 >              ,do
 >               f <- fld
 >               moreRecord (f:fs)]]
 >     fld = (,) <$> (identifier <* symbol_ ":") <*> expr
-
-
+> 
 
 > dotSuffix :: Parser (Expr -> Expr)
 > dotSuffix = symbol_ "." *>
