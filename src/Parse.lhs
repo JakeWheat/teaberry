@@ -88,7 +88,7 @@ for things like expressions, patterns, terms, etc.
 >                             )
 
 > import Control.Applicative ((<**>))
-> import Control.Monad (guard, void)
+> import Control.Monad ({-guard-} when, void)
 
 > import Text.Megaparsec (satisfy, anySingle)
 
@@ -244,7 +244,9 @@ the can get rid of more trys
 > identifier :: Parser String
 > identifier = try $ do
 >     i <- identifierX
->     guard (i `notElem` reservedKeywords)
+>     when (i `elem` reservedKeywords)
+>         $ fail $ "unexpected keyword: " ++ i
+>     --guard (i `notElem` reservedKeywords)
 >     pure i
 
 

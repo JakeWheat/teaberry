@@ -30,6 +30,11 @@ swap a token in each place and parse again
 There's no lexer atm, so start with something that takes a text, then
 removes one char at a time from the end and reparses.
 
+Try to simulate what a user might do:
+leaving something out is common
+spelling something wrong is also common
+  -> replace lexical symbols with something similar but different
+
 To reduce the size of the output, group consecutive strings which all
 succeed or all have the same error message together?
 
