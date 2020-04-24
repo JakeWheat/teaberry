@@ -23,11 +23,12 @@ branches:
   - travis_stuff
 
 cabal-install:
-  - 3.0
+  - 3.2
 cabal:
-  - 3.0
+  - 3.2
 
 ghc:
+  - 8.10.1
   - 8.8.2
   - 8.6.5
   - 8.4.4
