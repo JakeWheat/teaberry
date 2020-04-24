@@ -36,7 +36,6 @@ common shared-properties
                        filepath >= 1.4 && < 1.5
 
   ghc-options:         -Wall
-  hs-source-dirs:      src
 
 library
   import:              shared-properties
@@ -48,36 +47,30 @@ library
                        Pretty
                        PrettyInterpreter
                        Engine
-                       Parserize
                        Paths_teaberry
   autogen-modules:     Paths_teaberry
+  hs-source-dirs:      src/lib
 
-common library-modules
-  ghc-options:         -threaded
-  other-modules:       Syntax
-                       Parse
-                       Desugar
-                       InterpreterSyntax
-                       Interpreter
-                       Pretty
-                       PrettyInterpreter
-                       Engine
-                       Parserize
-                       Paths_teaberry
-  autogen-modules:     Paths_teaberry
 
 executable teaberry
-  import:              shared-properties, library-modules
+  import:              shared-properties
   main-is:             Teaberry.lhs
+  build-depends:       teaberry
+  ghc-options:         -threaded
+  hs-source-dirs:      src/exe
+  other-modules:       Parserize
 
-              
+  
 Test-Suite RunTests
-  import:              shared-properties, library-modules
+  import:              shared-properties
   type:                exitcode-stdio-1.0
   main-is:             RunTests.lhs
   other-modules:       DesugarTests
                        InterpreterTests
                        TeaberryTests
                        ParseTests
-  build-depends:       tasty >= 1.1 && < 1.3,
+  build-depends:       teaberry,
+                       tasty >= 1.1 && < 1.3,
                        tasty-hunit >= 0.10 && < 0.11
+  ghc-options:         -threaded
+  hs-source-dirs:      src/tests
