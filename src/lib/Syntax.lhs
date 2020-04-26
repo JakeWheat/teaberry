@@ -10,6 +10,7 @@ The high level syntax which the parser produces
 >               ,Selector(..)
 >               ,VariantDecl(..)
 >               ,Pat(..)
+>               ,PatName(..)
 >               ,Program(..)
 >               ,PreludeItem(..)
 >               ,ProvideItem(..)
@@ -72,11 +73,15 @@ import * from <import-source>
 > data Binding = Binding Pat Expr
 >           deriving (Eq,Show,Data,Typeable,Generic) 
 
-> data Pat = IdenP Shadow String
->          | VariantP String [Pat]
+> data Pat = IdenP Shadow PatName
+>          | VariantP PatName [Pat]
 >          | TupleP [Pat]
 >          | AsP Pat Shadow String
 >           deriving (Eq,Show,Data,Typeable,Generic) 
+
+> data PatName = PatName String
+>              | QPatName String String
+>              deriving (Eq,Show,Data,Typeable,Generic) 
 
 > data Shadow = NoShadow | Shadow
 >           deriving (Eq,Show,Data,Typeable,Generic) 

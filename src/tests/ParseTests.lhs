@@ -10,7 +10,12 @@
 > import qualified Test.Tasty as T
 > import qualified Test.Tasty.HUnit as T
 
-> import Syntax (Stmt(..), Expr(..), Selector(..), VariantDecl(..), Pat(..)
+> import Syntax (Stmt(..)
+>               ,Expr(..)
+>               ,Selector(..)
+>               ,VariantDecl(..)
+>               ,Pat(..)
+>               ,PatName(..)
 >               ,Shadow(..)
 >               ,Binding(..)
 >               ,Ref(..)
@@ -66,34 +71,34 @@
 
 >     ,("(a)", Parens (Iden "a"))
 
->     ,("lam(x): x + 1 end", Lam [IdenP NoShadow "x"] (BinOp (Iden "x") "+" (num 1)))
+>     ,("lam(x): x + 1 end", Lam [idenPat "x"] (BinOp (Iden "x") "+" (num 1)))
 
 >     ,("lam(x, y): x - y end"
->      ,Lam [IdenP NoShadow "x",IdenP NoShadow "y"] (BinOp (Iden "x") "-" (Iden "y")))
+>      ,Lam [idenPat "x",idenPat "y"] (BinOp (Iden "x") "-" (Iden "y")))
 
 >     ,("lam(x, y): x - y end(1,2)"
->      ,App (Lam [IdenP NoShadow "x",IdenP NoShadow "y"] (BinOp (Iden "x") "-" (Iden "y")))
+>      ,App (Lam [idenPat "x",idenPat "y"] (BinOp (Iden "x") "-" (Iden "y")))
 >       [num 1, num 2])
 
 todo: review all the whitespace rules that are being ignored
 
 >     ,("let x=3,y=4: x + y end"
->      , Let [Binding (IdenP NoShadow "x") (num 3)
->            ,Binding (IdenP NoShadow "y") (num 4)]
+>      , Let [Binding (idenPat "x") (num 3)
+>            ,Binding (idenPat "y") (num 4)]
 >          (BinOp (Iden "x") "+" (Iden "y")))
 >     ,("let x=3: x + 4 end"
->      ,Let [Binding (IdenP NoShadow "x") (num 3)]
+>      ,Let [Binding (idenPat "x") (num 3)]
 >          (BinOp (Iden "x") "+" (num 4)))
 
 >     ,("let shadow x = 3: x end"
->      ,Let [Binding (IdenP Shadow "x") (num 3)] (Iden "x"))
+>      ,Let [Binding (idenPatShadow "x") (num 3)] (Iden "x"))
 
 >     ,("let shadow a = 5, shadow b = 6: a end"
->      ,Let [Binding (IdenP Shadow "a") (num 5)
->           ,Binding (IdenP Shadow "b") (num 6)] (Iden "a"))
+>      ,Let [Binding (idenPatShadow "a") (num 5)
+>           ,Binding (idenPatShadow "b") (num 6)] (Iden "a"))
 
 >     ,("letrec shadow a = 5: a end"
->      ,LetRec [Binding (IdenP Shadow "a") (num 5)] (Iden "a"))
+>      ,LetRec [Binding (idenPatShadow "a") (num 5)] (Iden "a"))
 
 >     ,("a.b.c"
 >      ,DotExpr (DotExpr (Iden "a") "b") "c")
@@ -113,13 +118,13 @@ todo: review all the whitespace rules that are being ignored
 
 
 >     ,("let x = f(): x end"
->      ,Let [Binding (IdenP NoShadow "x") (App (Iden "f") [])]
+>      ,Let [Binding (idenPat "x") (App (Iden "f") [])]
 >          (Iden "x"))
 
 >     ,("block:\n\
 >       \  fun f(a): a + 1 end\n\
 >       \end"
->      ,Block[FunDecl "f" [IdenP NoShadow "a"] (BinOp (Iden "a") "+" (num 1)) Nothing])
+>      ,Block[FunDecl "f" [idenPat "a"] (BinOp (Iden "a") "+" (num 1)) Nothing])
 
 
 >     ,("block:\n\
@@ -127,7 +132,7 @@ todo: review all the whitespace rules that are being ignored
 >       \  a = 1\n\
 >       \  a + 1\n\
 >       \end\n\
->       \end", Block[FunDecl "f" [IdenP NoShadow "a"] (Block [LetDecl (Binding (IdenP NoShadow "a") (num 1))
+>       \end", Block[FunDecl "f" [idenPat "a"] (Block [LetDecl (Binding (idenPat "a") (num 1))
 >                                             ,StExpr $ BinOp (Iden "a") "+" (num 1)]) Nothing])
 
 
@@ -162,7 +167,7 @@ todo: review all the whitespace rules that are being ignored
 >     ,("block:\n\
 >       \a = 5\n\
 >       \a + 3 end"
->      ,Block [LetDecl (Binding (IdenP NoShadow "a") (num 5.0))
+>      ,Block [LetDecl (Binding (idenPat "a") (num 5.0))
 >             ,StExpr (BinOp (Iden "a") "+" (num 3))])
 
 >     ,("lam() : 1 end", Lam [] (num 1))
@@ -177,8 +182,8 @@ todo: review all the whitespace rules that are being ignored
 >       \  fact(5)\n\
 >       \end"
 
->      ,Block [RecDecl (Binding (IdenP NoShadow "fact")
->             $ Lam [IdenP NoShadow "x"] $
+>      ,Block [RecDecl (Binding (idenPat "fact")
+>             $ Lam [idenPat "x"] $
 >                     If [(BinOp (Iden "x") "==" (num 0), num 1)]
 >                     (Just (BinOp (Iden "x") "*" (App (Iden "fact") [BinOp (Iden "x") "-" (num 1)]))))
 >             ,StExpr (App (Iden "fact") [num 5])])
@@ -219,8 +224,8 @@ todo: review all the whitespace rules that are being ignored
 >       \  | link(f, r) => \"link\"\n\
 >       \end"
 >      ,Cases "List" (Construct (Iden "list") [num 1, num 2, num 3])
->         [(IdenP NoShadow "empty", Sel $ Str "empty")
->         ,(VariantP "link" [IdenP NoShadow "f", IdenP NoShadow "r"], Sel $ Str "link")]
+>         [(idenPat "empty", Sel $ Str "empty")
+>         ,(VariantP (PatName "link") [idenPat "f", idenPat "r"], Sel $ Str "link")]
 >         Nothing)
 
 >     ,("cases(List) [list: 1,2,3]:\n\
@@ -228,7 +233,7 @@ todo: review all the whitespace rules that are being ignored
 >       \  | else => \"else\"\n\
 >       \end"
 >      ,Cases "List" (Construct (Iden "list") [num 1, num 2, num 3])
->         [(IdenP NoShadow "empty", Sel $ Str "empty")]
+>         [(idenPat "empty", Sel $ Str "empty")]
 >         (Just $ Sel $ Str "else"))
 
 >     ,("cases(List) [list: {\"a\"; 1}, {\"b\"; 2}, {\"c\"; 3}]:\n\
@@ -239,37 +244,52 @@ todo: review all the whitespace rules that are being ignored
 >      ,Cases "List" (Construct (Iden "list") [Sel $ Tuple [Sel $ Str "a", num 1]
 >                                             ,Sel $ Tuple [Sel $ Str "b", num 2]
 >                                             ,Sel $ Tuple [Sel $ Str "c", num 3]])
->         [(IdenP NoShadow "empty", Sel $ Str "empty")
->         ,(VariantP "link" [TupleP [IdenP NoShadow "x", IdenP NoShadow "y"], IdenP NoShadow "r"], Iden "x")]
+>         [(idenPat "empty", Sel $ Str "empty")
+>         ,(VariantP (PatName "link") [TupleP [idenPat "x", idenPat "y"], idenPat "r"], Iden "x")]
 >         (Just $ Sel $ Str "else"))
+
+>     ,("cases(z.List) [list: {\"a\"; 1}, {\"b\"; 2}, {\"c\"; 3}]:\n\
+>       \  | z.empty => \"empty\"\n\
+>       \  | z.link({x;y}, r) => x\n\
+>       \  | else => \"else\"\n\
+>       \end"
+>      ,Cases "z.List" (Construct (Iden "list") [Sel $ Tuple [Sel $ Str "a", num 1]
+>                                               ,Sel $ Tuple [Sel $ Str "b", num 2]
+>                                               ,Sel $ Tuple [Sel $ Str "c", num 3]])
+>         [(IdenP NoShadow (QPatName "z" "empty"), Sel $ Str "empty")
+>         ,(VariantP (QPatName "z" "link") [TupleP [idenPat "x", idenPat "y"], idenPat "r"], Iden "x")]
+>         (Just $ Sel $ Str "else"))
+
 
 
 >       ]
 >  where
->      num = Sel . Num
+>    num = Sel . Num
+>    idenPat = IdenP NoShadow . PatName
+>    idenPatShadow = IdenP Shadow . PatName
 
 > parseStmtExamples :: [(String, Stmt)]
 > parseStmtExamples =
 >     [("when x == 3: 4 end"
 >      ,When (BinOp (Iden "x") "==" (Sel $ Num 3)) (Sel $ Num 4))
->     ,("var a = 5", VarDecl (Binding (IdenP NoShadow "a") (num 5)))
+>     ,("var a = 5", VarDecl (Binding (idenPat "a") (num 5)))
 >     ,("a := 6", SetVar "a" (num 6))
 >     ,("{x; y} = {1; 2}"
->      ,LetDecl (Binding (TupleP [IdenP NoShadow "x", IdenP NoShadow "y"])
+>      ,LetDecl (Binding (TupleP [idenPat "x", idenPat "y"])
 >       (Sel $ Tuple [num 1, num 2])))
 
 >     ,("{{w; x}; {y; z}} = x154"
 >      ,LetDecl (Binding
->                (TupleP [TupleP [IdenP NoShadow "w", IdenP NoShadow "x"]
->                        ,TupleP [IdenP NoShadow "y", IdenP NoShadow "z"]])
+>                (TupleP [TupleP [idenPat "w", idenPat "x"]
+>                        ,TupleP [idenPat "y", idenPat "z"]])
 >                (Iden "x154")))
 >
 >     ,("{w; x} as wx = z"
->      ,LetDecl (Binding (AsP (TupleP [IdenP NoShadow "w", IdenP NoShadow "x"]) NoShadow "wx")
+>      ,LetDecl (Binding (AsP (TupleP [idenPat "w", idenPat "x"]) NoShadow "wx")
 >       (Iden "z")))
 
 >     ,("{w; x} as shadow wx = z"
->      ,LetDecl (Binding (AsP (TupleP [IdenP NoShadow "w", IdenP NoShadow "x"]) Shadow "wx")
+>      ,LetDecl (Binding (AsP (TupleP [idenPat "w", idenPat "x"]) Shadow "wx")
 >       (Iden "z")))
 
 
@@ -384,7 +404,7 @@ end
 >       \  is-Point(a-pt) is true\n\
 >       \end"
 >      ,DataDecl "Point" [VariantDecl "pt" [(Con, "x"), (Con, "y")]]
->       (Just [LetDecl (Binding (IdenP NoShadow "a-pt") (App (Iden "pt") [num 1, num 2]))
+>       (Just [LetDecl (Binding (idenPat "a-pt") (App (Iden "pt") [num 1, num 2]))
 >             ,StExpr $ BinOp (App (Iden "is-Point") [Iden "a-pt"]) "is" (Iden "true")]))
 >
 >     ,("fun double(n):\n\
@@ -393,25 +413,27 @@ end
 >       \  double(10) is 20\n\
 >       \  double(15) is 30\n\
 >       \end"
->      ,FunDecl "double" [IdenP NoShadow "n"] (BinOp (Iden "n") "+" (Iden "n"))
+>      ,FunDecl "double" [idenPat "n"] (BinOp (Iden "n") "+" (Iden "n"))
 >       (Just [StExpr $ BinOp (App (Iden "double") [num 10]) "is" (num 20)
 >            ,StExpr $ BinOp (App (Iden "double") [num 15]) "is" (num 30)]))
 
 >     ,("shadow a = 1"
->      ,LetDecl (Binding (IdenP Shadow "a") (num 1)))
+>      ,LetDecl (Binding (idenPatShadow "a") (num 1)))
 >     ,("rec shadow a = 1"
->      ,RecDecl (Binding (IdenP Shadow "a") (num 1)))
+>      ,RecDecl (Binding (idenPatShadow "a") (num 1)))
 
 >     ,("var shadow a = 1"
->      ,VarDecl (Binding (IdenP Shadow "a") (num 1)))
+>      ,VarDecl (Binding (idenPatShadow "a") (num 1)))
 
 >     ,("{shadow x12; shadow y12} = x"
->      ,LetDecl (Binding (TupleP [IdenP Shadow "x12", IdenP Shadow "y12"])
+>      ,LetDecl (Binding (TupleP [idenPatShadow "x12", idenPatShadow "y12"])
 >       (Iden "x")))
 
 >     ]
 >  where
->      num = Sel . Num
+>    num = Sel . Num
+>    idenPat = IdenP NoShadow . PatName
+>    idenPatShadow = IdenP Shadow . PatName
 
 > parseProgramExamples :: [(String,Program)]
 > parseProgramExamples =

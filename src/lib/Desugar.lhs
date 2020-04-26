@@ -461,7 +461,7 @@ n2 = X.n1
 >               [] -> throwError $ "internal error: no provides in desugared module"
 >               _ -> throwError $ "internal error: multiple provides in desugared module"
 >     let stmts' = is ++
->                  [S.LetDecl (S.Binding (S.IdenP S.NoShadow localModuleName)
+>                  [S.LetDecl (S.Binding (S.IdenP S.NoShadow (S.PatName localModuleName))
 >                              (S.Block (stmts ++ rv)))
 >                  ,S.StExpr $ S.Iden "nothing"]
 >     {-trace ("-----------------------\n" ++ P.prettyStmts stmts') $ -}
@@ -486,11 +486,11 @@ n2 = X.n1
 >     desugarImport :: S.PreludeItem -> DesugarStack (Either S.PreludeItem [S.Stmt])
 >     desugarImport (S.Import impsrc x) =
 >         case lookup impsrc moduleNameMap of
->              Just inm -> pure $ Right $ [S.LetDecl (S.Binding (S.IdenP S.NoShadow x)
+>              Just inm -> pure $ Right $ [S.LetDecl (S.Binding (S.IdenP S.NoShadow (S.PatName x))
 >                                                    (S.Iden inm))]
 >              Nothing -> throwError $ "module not found: " ++ show impsrc ++ "\n" ++ show moduleNameMap
 >     desugarImport (S.IncludeFrom nm pis) | Just x <- mapM (f nm) pis =
->         pure $ Right $ map (\(n,e) -> S.LetDecl (S.Binding (S.IdenP S.NoShadow n) e)) x
+>         pure $ Right $ map (\(n,e) -> S.LetDecl (S.Binding (S.IdenP S.NoShadow (S.PatName n)) e)) x
 >     desugarImport x = pure $ Left x
 >     f nm (S.ProvideAlias n m) = Just (m,S.DotExpr (S.Iden nm) n)
 >     f _ _ = Nothing
@@ -525,7 +525,7 @@ corresponding function value here too for creating variant values)
 > expandProvideAll (_ : xs) = expandProvideAll xs
 
 > getBindingNames :: S.Pat -> [String]
-> getBindingNames (S.IdenP _ s) = [s]
+> getBindingNames (S.IdenP _ (S.PatName s)) = [s]
 > getBindingNames (S.VariantP _ ps) = concatMap getBindingNames ps
 > getBindingNames (S.TupleP ps) = concatMap getBindingNames ps
 > getBindingNames (S.AsP p _ nm) = nm : getBindingNames p
@@ -559,7 +559,7 @@ when a fun or rec is seen, it will collect subsequent funs and recs
 >   where
 >     convRec (S.FunDecl nm as bdy whr) =
 >         Just (S.Binding
->               (S.IdenP S.NoShadow nm)
+>               (S.IdenP S.NoShadow (S.PatName nm))
 >               (S.Lam as bdy)
 >              ,fmap (nm,) whr)
 >     convRec (S.RecDecl b) = Just (b, Nothing)
@@ -569,7 +569,7 @@ when a fun or rec is seen, it will collect subsequent funs and recs
 >     -- if it's a variable, add to the env
 >     xs <- desugarStmt s
 >     ys <- case s of
->               S.VarDecl (S.Binding (S.IdenP _ n) _) -> do
+>               S.VarDecl (S.Binding (S.IdenP _ (S.PatName n)) _) -> do
 >                   local (addVariableName n) $ desugarStmts ss
 >               _ -> desugarStmts ss
 >     pure (xs ++ ys)
@@ -605,7 +605,7 @@ when a fun or rec is seen, it will collect subsequent funs and recs
 >     forM bs $ \(_,nm,e) -> I.LetDecl nm <$> desugarExpr' e
 
 > desugarStmt (S.FunDecl nm as bdy whr) = do
->     a <- desugarStmt (S.RecDecl (S.Binding (S.IdenP S.NoShadow nm) (S.Lam as bdy)))
+>     a <- desugarStmt (S.RecDecl (S.Binding (S.IdenP S.NoShadow (S.PatName nm)) (S.Lam as bdy)))
 >     case whr of
 >         Nothing -> pure a
 >         Just w -> (++) a <$> desugarStmt (S.Check (Just nm) w)
@@ -624,19 +624,19 @@ work without error on any value
 >         vnofx = S.App (S.Iden "safe-variant-name") [S.Iden "x"]
 >         eqVariants = map (\n -> S.App (S.Iden "==") [S.Iden "vn", S.Sel $ S.Str n]) variantNames
 >         
->         isT = S.LetDecl (S.Binding (S.IdenP S.NoShadow ("is-" ++ typenm))
->               $ S.Lam [S.IdenP S.Shadow "x"] (S.Let [S.Binding (S.IdenP S.Shadow "vn") vnofx]
+>         isT = S.LetDecl (S.Binding (S.IdenP S.NoShadow (S.PatName $ "is-" ++ typenm))
+>               $ S.Lam [S.IdenP S.Shadow (S.PatName "x")] (S.Let [S.Binding (S.IdenP S.Shadow (S.PatName "vn")) vnofx]
 >                        (foldr orEm (S.Iden "false") eqVariants)))
 >     -- variant selectors
 >         mkV :: String -> [(S.Ref,String)] -> S.Stmt
 >         -- 0 args
->         mkV ctnm [] = S.LetDecl (S.Binding (S.IdenP S.NoShadow ctnm)
+>         mkV ctnm [] = S.LetDecl (S.Binding (S.IdenP S.NoShadow (S.PatName ctnm))
 >                                  $ S.App
 >              (S.Iden "make-variant")
 >              [S.Sel (S.Str ctnm)
 >              ,mkListSel []])
->         mkV ctnm fs = S.LetDecl (S.Binding (S.IdenP S.NoShadow ctnm)
->                                  $ S.Lam (map (S.IdenP S.Shadow) $ map snd fs) $ S.App
+>         mkV ctnm fs = S.LetDecl (S.Binding (S.IdenP S.NoShadow (S.PatName ctnm))
+>                                  $ S.Lam (map (S.IdenP S.Shadow . S.PatName) $ map snd fs) $ S.App
 >              (S.Iden "make-variant")
 >              [S.Sel (S.Str ctnm)
 >              ,mkListSel $ map (\(m,a) -> S.Sel $ S.Tuple [case m of
@@ -645,8 +645,8 @@ work without error on any value
 >                                                          ,S.Sel $ S.Str a, S.Iden a]) fs])
 >         vnts = map (\(S.VariantDecl nm fs) -> mkV nm fs) vs
 >     -- is-variant fns
->         mkIsVnt ctnm = S.LetDecl (S.Binding (S.IdenP S.NoShadow ("is-" ++ ctnm))
->                                $ S.Lam [S.IdenP S.Shadow "x"] $ S.BinOp (S.App (S.Iden "safe-variant-name") [S.Iden "x"])
+>         mkIsVnt ctnm = S.LetDecl (S.Binding (S.IdenP S.NoShadow (S.PatName $ "is-" ++ ctnm))
+>                                $ S.Lam [S.IdenP S.Shadow (S.PatName "x")] $ S.BinOp (S.App (S.Iden "safe-variant-name") [S.Iden "x"])
 >                                "==" (S.Sel $ S.Str ctnm))
 >         isVnts = map (\(S.VariantDecl nm _) -> mkIsVnt nm) vs
 >     -- where block
@@ -678,14 +678,14 @@ pt = lam (x,y): I.App "make-variant" ["pt",[list: {"x",x},{"y",y}]]
 is-pt = lam(x): I.App "variant-name" [x] == "pt"
 
 
-> desugarStmt (S.VarDecl (S.Binding (S.IdenP _ n) e)) =
+> desugarStmt (S.VarDecl (S.Binding (S.IdenP _ (S.PatName n)) e)) =
 >     (:[]) <$> (I.LetDecl n . I.Box) <$> desugarExpr' e
 > desugarStmt (S.VarDecl (S.Binding p _)) = throwError $ "var binding must be name, got " ++ show p
 > desugarStmt (S.SetVar n e) = (:[]) <$> I.SetBox (I.Iden n) <$> desugarExpr' e
 
 > desugarStmt (S.SetRef e as) = do
 >     enm <- getUnique "setref"
->     bs <- desugarPatternBinding (S.Binding (S.IdenP S.NoShadow enm) e)
+>     bs <- desugarPatternBinding (S.Binding (S.IdenP S.NoShadow (S.PatName enm)) e)
 >     sts <- forM bs $ \(_,nm,e') -> I.LetDecl nm <$> desugarExpr' e'
 >     stsets <- forM as $ \(nm, bdy) -> do
 >         nm' <- desugarExpr' (S.DotExpr (S.Iden enm) nm)
@@ -772,7 +772,7 @@ this fails with 'a block cannot end with a binding'
 >     checkblockidnm <- getUnique "checkblockid"
 >     let blockNameVal = S.Sel $ S.Str nm'
 >         checkblockidval = S.Sel $ S.Num $ fromIntegral checkblockid
->         blk = [S.LetDecl (S.Binding (S.IdenP S.NoShadow checkblockidnm) checkblockidval)
+>         blk = [S.LetDecl (S.Binding (S.IdenP S.NoShadow (S.PatName checkblockidnm)) checkblockidval)
 >                 ,S.StExpr $ S.App (S.Iden "log-check-block") [S.Iden checkblockidnm
 >                                                              ,blockNameVal]
 >               ] ++ sts ++ [S.StExpr $ S.Sel S.NothingS]
@@ -810,13 +810,13 @@ end
 >     failmsg <- getUnique "isfailmsg"
 >     let mys = S.StExpr $ S.Block
 >                    [{-S.StExpr $ S.App (S.Iden "print") [S.Sel $ S.Str $ "Desugar test enter"]
->                    ,-}S.LetDecl (S.Binding (S.IdenP S.Shadow v0) e)
->                    ,S.LetDecl (S.Binding (S.IdenP S.Shadow v1) e1)
->                    ,S.LetDecl (S.Binding (S.IdenP S.Shadow nameit) $ S.Sel $ S.Str syn)
+>                    ,-}S.LetDecl (S.Binding (S.IdenP S.Shadow (S.PatName v0)) e)
+>                    ,S.LetDecl (S.Binding (S.IdenP S.Shadow (S.PatName v1)) e1)
+>                    ,S.LetDecl (S.Binding (S.IdenP S.Shadow (S.PatName nameit)) $ S.Sel $ S.Str syn)
 >                    ,S.StExpr $ S.If [(S.App (S.Iden "==") [S.Iden v0, S.Iden v1]
 >                                    ,S.App (S.Iden "log-test-pass") [checkBlockID, S.Iden nameit])]
 >                        (Just $ S.Block
->                         [S.LetDecl (S.Binding (S.IdenP S.Shadow failmsg)
+>                         [S.LetDecl (S.Binding (S.IdenP S.Shadow (S.PatName failmsg))
 >                                     (str "Values not equal:\n" `plus` app "torepr" [S.Iden v0]
 >                                               `plus` str "\n" `plus` app "torepr" [S.Iden v1]))
 >                         ,S.StExpr $ S.App (S.Iden "log-test-fail")
@@ -862,12 +862,12 @@ catch(
 >     let failMsg = "The test operation raises-satisfies failed for the test "
 >                   ++ P.prettyExpr e1
 >         arg0 = S.Block [S.StExpr e
->                        ,S.LetDecl (S.Binding (S.IdenP S.Shadow nameit) $ S.Sel $ S.Str syn)
+>                        ,S.LetDecl (S.Binding (S.IdenP S.Shadow (S.PatName nameit)) $ S.Sel $ S.Str syn)
 >                        ,S.StExpr $ app "log-test-fail"
 >                          [checkBlockID, S.Iden nameit, str "No exception raised"]]
->         arg1 = S.Lam [S.IdenP S.Shadow "a"]
->                $ S.Block [S.LetDecl (S.Binding (S.IdenP S.Shadow v1) e1)
->                          ,S.LetDecl (S.Binding (S.IdenP S.Shadow nameit) $ S.Sel $ S.Str syn)
+>         arg1 = S.Lam [S.IdenP S.Shadow (S.PatName "a")]
+>                $ S.Block [S.LetDecl (S.Binding (S.IdenP S.Shadow (S.PatName v1)) e1)
+>                          ,S.LetDecl (S.Binding (S.IdenP S.Shadow (S.PatName nameit)) $ S.Sel $ S.Str syn)
 >                          ,S.StExpr (S.If [(app v1 [S.Iden "a"]
 >                                           ,app "log-test-pass" [checkBlockID, S.Iden nameit])]
 >                                     $ Just $ app "log-test-fail"
@@ -949,8 +949,8 @@ it exists for testing and development of the language only
 > desugarExpr' (S.BinOp a op b) = desugarExpr' (S.App (S.Iden op) [a,b])
 
 > desugarExpr' (S.Lam [] bdy) = I.LamVoid <$> desugarExpr' bdy
-> desugarExpr' (S.Lam [S.IdenP _ x] bdy) = I.Lam x <$> desugarExpr' bdy
-> desugarExpr' (S.Lam (S.IdenP _ x:xs) bdy) = I.Lam x <$> desugarExpr' (S.Lam xs bdy)
+> desugarExpr' (S.Lam [S.IdenP _ (S.PatName x)] bdy) = I.Lam x <$> desugarExpr' bdy
+> desugarExpr' (S.Lam (S.IdenP _ (S.PatName x):xs) bdy) = I.Lam x <$> desugarExpr' (S.Lam xs bdy)
 
 > desugarExpr' (S.Let ps bdy) = do
 >     ps' <- concat <$> mapM desugarPatternBinding ps
@@ -1048,20 +1048,20 @@ Cases String Expr [(Pat, Expr)] (Maybe Expr)
 >     -- enm = e
 >     enm <- getUnique "cases-e"
 >     -- todo: assert typeof e is ty
->     let a0 = S.LetDecl (S.Binding (S.IdenP S.NoShadow enm) e)
+>     let a0 = S.LetDecl (S.Binding (S.IdenP S.NoShadow (S.PatName enm)) e)
 >     -- vnm = variant-name(e)
 >     vnm <- getUnique "cases-vnm"
->     let a1 = S.LetDecl (S.Binding (S.IdenP S.NoShadow vnm) $ S.App (S.Iden "variant-name") [S.Iden enm])
+>     let a1 = S.LetDecl (S.Binding (S.IdenP S.NoShadow (S.PatName vnm)) $ S.App (S.Iden "variant-name") [S.Iden enm])
 >         --a15 = S.StExpr $ S.App (S.Iden "print") [S.Iden vnm]
 >     -- fn to get the variant name from a pattern
->     let makeVB pat expr = (S.BinOp (S.Iden vnm) "==" (S.Sel $ S.Str $  patternVariantName pat)
+>     let makeVB pat expr = (S.BinOp (S.Iden vnm) "==" (S.Sel $ S.Str $ patternVariantName pat)
 >                           ,S.Let [S.Binding pat (S.Iden enm)]  expr)
 >         a2 = map (uncurry makeVB) branches
 >         aif = S.StExpr $ S.If a2 els
 >     desugarExpr' (S.Block [a0, a1, aif])
 >   where
->     patternVariantName (S.VariantP x _) = x
->     patternVariantName (S.IdenP _ x) = x
+>     patternVariantName (S.VariantP (S.PatName x) _) = x
+>     patternVariantName (S.IdenP _ (S.PatName x)) = x
 
 > desugarExpr' (S.Unbox e f) = do
 >     x <- desugarExpr' (S.DotExpr e f)
@@ -1089,12 +1089,12 @@ turn a list of expressions into a nested seq value
 desugar pattern binding
 
 > desugarPatternBinding :: S.Binding -> DesugarStack [(S.Shadow, String, S.Expr)]
-> desugarPatternBinding (S.Binding (S.IdenP s nm) e) = do
+> desugarPatternBinding (S.Binding (S.IdenP s (S.PatName nm)) e) = do
 >     -- check if nm is a variant name
 >     -- todo: see if we can use shadow to shadow a variant
 >     x <- getVariantNames
 >     if nm `elem` x
->     then desugarPatternBinding (S.Binding (S.VariantP nm []) e)
+>     then desugarPatternBinding (S.Binding (S.VariantP (S.PatName nm) []) e)
 >     else pure [(s,nm,e)]
 
 {x; y} = {1; 2}
@@ -1144,7 +1144,7 @@ _ = block:
       nothing
     end
 
-> desugarPatternBinding (S.Binding (S.AsP (S.VariantP cnm ps) s anm) e) = do
+> desugarPatternBinding (S.Binding (S.AsP (S.VariantP (S.PatName cnm) ps) s anm) e) = do
 >     let a0 = (s, anm, e)
 >     -- assert e.variantname == cnm
 >         msg = S.Sel (S.Str "desugarPatternBinding: pattern match failure in, expected ")
@@ -1275,18 +1275,18 @@ end
 > desugarRecs rs = do
 >     let
 >         recnms = flip mapMaybe rs $ \case
->                                         S.Binding (S.IdenP _ f) (S.Lam {}) -> Just f
+>                                         S.Binding (S.IdenP _ (S.PatName f)) (S.Lam {}) -> Just f
 >                                         _ -> Nothing
 >         recmap = zip recnms recnms
 >     recnms' <- mapM getUnique recnms
 >     let recmap' = zip recnms recnms'
 >         mkrec :: S.Binding -> DesugarStack (Maybe S.Binding, Maybe S.Binding)
->         mkrec (S.Binding (S.IdenP s f) (S.Lam as bdy)) = do
+>         mkrec (S.Binding (S.IdenP s (S.PatName f)) (S.Lam as bdy)) = do
 >             f' <- maybe (throwError $ "Desugarer: internal error, didn't find just generated matching unique id " ++ f)
 >                      pure $ lookup f recmap'
 >             let bdy' = patchCalls recmap recnms bdy
->             pure (Just (S.Binding (S.IdenP S.NoShadow f') (S.Lam (map (S.IdenP S.Shadow) recnms ++ as) bdy'))
->                  ,Just (S.Binding (S.IdenP s f) (S.Lam as (S.App (S.Iden f') (map S.Iden (recnms' ++ map (\(S.IdenP _ x) -> x) as))))))
+>             pure (Just (S.Binding (S.IdenP S.NoShadow (S.PatName f')) (S.Lam (map (S.IdenP S.Shadow . S.PatName) recnms ++ as) bdy'))
+>                  ,Just (S.Binding (S.IdenP s (S.PatName f)) (S.Lam as (S.App (S.Iden f') (map S.Iden (recnms' ++ map (\(S.IdenP _ (S.PatName x)) -> x) as))))))
 >         mkrec (S.Binding f e) = pure (Nothing
 >                                      ,Just (S.Binding f (patchCalls recmap' recnms' e)))
 >     (a,b) <- unzip <$> mapM mkrec rs

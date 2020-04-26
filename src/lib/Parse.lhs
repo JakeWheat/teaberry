@@ -101,6 +101,7 @@ for things like expressions, patterns, terms, etc.
 >               ,Shadow(..)
 >               ,Binding(..)
 >               ,Pat(..)
+>               ,PatName(..)
 >               ,Ref(..)
 >               ,Program(..)
 >               ,PreludeItem(..)
@@ -487,10 +488,17 @@ todo: remove the trys by implementing a proper lexer or a lexer style
 
 > cases :: Parser Expr
 > cases = do
->     ty <- keyword_ "cases" *> parens identifier
+>     ty <- keyword_ "cases" *> parens typeName
 >     t <- (expr <* symbol_ ":")
 >     nextCase ty t []
 >   where
+>     typeName = (do
+>         i <- identifier
+>         -- todo: don't allow whitespace?
+>         choice [do
+>                 j <- char '.' *> identifier
+>                 pure $ i ++ "." ++ j
+>                ,pure i]) <?> "type name"
 >     nextCase ty t cs =
 >         choice [do
 >                 x <- casePart
@@ -715,10 +723,10 @@ parsing code, which is worse, but either method is viable
 
 
 > epExprToPat :: EPExpr -> Maybe Pat
-> epExprToPat (EPExpr (Iden i)) = Just $ IdenP NoShadow i
+> epExprToPat (EPExpr (Iden i)) = Just $ IdenP NoShadow (PatName i)
 > epExprToPat (EPApp (Iden f) ps) = do
 >     ps' <- mapM epExprToPat ps
->     pure $ VariantP f ps'
+>     pure $ VariantP (PatName f) ps'
 > epExprToPat (EPSel (EPTupleP ps)) = do
 >     ps' <- mapM epExprToPat ps
 >     pure $ TupleP ps'
@@ -730,12 +738,12 @@ parsing code, which is worse, but either method is viable
 >     pure $ TupleP ps'
 > epExprToPat (EPExpr (App (Iden f) es)) = do
 >     ps' <- mapM (epExprToPat . EPExpr) es
->     pure $ VariantP f ps'
+>     pure $ VariantP (PatName f) ps'
 
 > epExprToPat (EPAsP p s i) = do
 >     p' <- epExprToPat p
 >     pure $ AsP p' s i
-> epExprToPat (EPShadowIden i) = Just $ IdenP Shadow i
+> epExprToPat (EPShadowIden i) = Just $ IdenP Shadow (PatName i)
 > epExprToPat _ = Nothing
 
 todo: when the flags are added to tell the parser whether to accept
@@ -771,9 +779,18 @@ should just say expression
 > pat :: Parser Pat
 > pat = bchoice
 >       [TupleP <$> ((symbol_ "{" <?> "") *> xSep ';' pat <* symbol_ "}")
->       ,(IdenP <$> boption NoShadow (Shadow <$ keyword_ "shadow")
->               <*> identifier) <**> boption id vntPSuffix]
->       <**> boption id asPatSuffix
+>       ,do
+>        s <- boption NoShadow (Shadow <$ keyword_ "shadow")
+>        i <- identifier
+>        i' <- choice [do
+>                      j <- char '.' *> identifier
+>                      pure $ QPatName i j
+>                     ,pure $ PatName i]
+>        choice [do
+>                as <- parens (commaSep pat)
+>                pure $ VariantP i' as
+>               ,pure $ IdenP s i']
+>       <**> boption id asPatSuffix]
 
 > asPatSuffix :: Parser (Pat -> Pat)
 > asPatSuffix = f <$> (keyword_ "as" *> boption NoShadow (Shadow <$ keyword_ "shadow"))
@@ -781,10 +798,10 @@ should just say expression
 >    where
 >      f a b c = AsP c a b
 
-> vntPSuffix :: Parser (Pat -> Pat)
+> {-vntPSuffix :: Parser (Pat -> Pat)
 > vntPSuffix = do
 >     x <- parens (commaSep pat)
->     pure (\(IdenP NoShadow y) -> VariantP y x)
+>     pure (\(IdenP NoShadow y) -> VariantP y x)-}
 
 > whenStmt :: Parser Stmt
 > whenStmt = When <$> (keyword_ "when" *> expr)
