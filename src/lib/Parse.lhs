@@ -20,14 +20,19 @@ this makes a lot of things which should work fail and is particularly bad
 
 doesn't require ws around binops
 
-doesn't quite support - in identifiers properly
+doesn't quite support - in identifiers properly (I think, maybe it
+does, it's a little hacky with the potential overlap with binary -
+operator atm because of the whitespace issue)
 
 doesn't parse binops properly at the moment. I think it's mostly the
 case that it's too permissive compared with pyret. It doesn't use a
-fixity parser either
+fixity parser either, so not using parens with multiple binops
+produces unexpected asts
 
 
 imroving the error messages:
+
+these are some rules determined by the parser error testing
 
 use 'eof <?> ""' to avoid '... or end of input' in error messages
 

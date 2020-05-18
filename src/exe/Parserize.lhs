@@ -55,8 +55,14 @@ process (techniques in addition to removing the evil 'try')
 
 TODO: write a lexer so can do this better
 add more syntax examples to the test - aim for coverage of all the
-  grammar
+  grammar -> use a code coverage tool for this
 
+do some example code showing the error messages improving following
+these rules
+
+this work should be depriorized as much as possible right now because
+it's polish that should come after many of the other things are
+much further along
 
 
 > parserize :: FilePath -> String -> String
