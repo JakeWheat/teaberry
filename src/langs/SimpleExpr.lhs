@@ -1,7 +1,7 @@
 
 Simple expression language example.
 
-It has two data types: ints and functions
+It has two data types: numbers, and functions
 
 It has closures
 
@@ -18,7 +18,7 @@ It has multi arg functions + lambdas, and multi bind lets.
 > 
 > import qualified Parse as P
 > import qualified Syntax as S
-> import Data.Scientific (floatingOrInteger)
+> import Data.Scientific (Scientific)
 
 > import Prelude hiding ((<>))
 > import Text.PrettyPrint (render, text, (<>), (<+>), parens,
@@ -33,7 +33,7 @@ It has multi arg functions + lambdas, and multi bind lets.
 syntax
 ------
 
-> data Expr = Num Int
+> data Expr = Num Scientific
 >           | Iden String
 >           | Plus Expr Expr
 >           | App Expr [Expr]
@@ -48,18 +48,18 @@ interpreter
 
 > type Env = [(String,Value)]
 
-> data Value = IntV Int
+> data Value = NumV Scientific
 >            | FunV [String] Expr Env
 >            deriving (Eq, Show)
 
 > interp :: Env -> Expr -> Either String Value
-> interp _ (Num n) = Right (IntV n)
+> interp _ (Num n) = Right (NumV n)
 > interp env (Iden i) = maybe (Left $ "Identifier not found: " ++ i) Right $ lookup i env
 > interp env (Plus a b) = do
 >     av <- interp env a
 >     bv <- interp env b
 >     case (av, bv) of
->         (IntV an, IntV bn) -> Right $ IntV $ an + bn
+>         (NumV an, NumV bn) -> Right $ NumV $ an + bn
 >         _ -> Left $ "bad args to  plus " ++ show (av, bv)
 
 function application:
@@ -100,12 +100,12 @@ a language like this is straightforward to convert to C
 simplified interp that uses 'error' to avoid monads/do
 
 > interpE :: Env -> Expr -> Value
-> interpE _ (Num n) = IntV n
+> interpE _ (Num n) = NumV n
 > interpE env (Iden i) =
 >     maybe (error $ "Identifier not found: " ++ i) id $ lookup i env
 > interpE env (Plus a b) =
 >     case (interpE env a, interpE env b) of
->         (IntV an, IntV bn) -> IntV $ an + bn
+>         (NumV an, NumV bn) -> NumV $ an + bn
 >         _ -> error $ "bad args to  plus " ++ show (a, b)
 > interpE env (App f es) =
 >     case (interpE env f, map (interpE env) es) of
@@ -132,7 +132,9 @@ for error messages, etc.
 > prettyExpr = render . expr
 
 > expr :: Expr -> Doc
-> expr (Num n) = text $ show n
+> expr (Num n) = text $ case S.extractInt n of
+>                              Just x -> show x
+>                              Nothing -> show n
 > expr (Iden i) = text i
 > expr (Plus e0 e1) = expr e0 <+> text "+" <+> expr e1
 > expr (App f es) = expr f <> parens (commaSep $ map expr es)
@@ -169,7 +171,7 @@ parser
 >       Left e -> Left e
 >
 > convExpr :: S.Expr -> Either String Expr
-> convExpr (S.Sel (S.Num x)) | Right n <- (floatingOrInteger x :: Either Double Int) = Right $ Num n
+> convExpr (S.Sel (S.Num x)) = Right $ Num x
 > convExpr (S.Iden s) = Right $ Iden s
 > convExpr (S.Parens e) = convExpr e
 > convExpr (S.App f es) = App <$> (convExpr f) <*> mapM convExpr es

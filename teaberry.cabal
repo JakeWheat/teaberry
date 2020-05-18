@@ -88,5 +88,6 @@ Test-Suite Langs
                        SimpleExprReader
                        SimpleExprDesugared
                        SimplestCheck
+                       SimpleExprFFI
   main-is:             Langs.lhs
 

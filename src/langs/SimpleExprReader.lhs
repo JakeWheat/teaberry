@@ -11,6 +11,8 @@
 > import Control.Monad.Trans.Except (Except, runExcept, throwE)
 > import Control.Monad.Trans.Reader (ReaderT, runReaderT, ask, local)
 
+> import Data.Scientific (Scientific)
+
 > import qualified Test.Tasty as T
 > import qualified Test.Tasty.HUnit as T
 
@@ -21,7 +23,7 @@ interpreter
 
 > type Env = [(String,Value)]
 
-> data Value = IntV Int
+> data Value = NumV Scientific
 >            | FunV [String] Expr Env
 >            deriving (Eq, Show)
 
@@ -31,7 +33,7 @@ interpreter
 > runInterp env expr = runExcept (runReaderT (interp expr) env)
 
 > interp :: Expr -> Interpreter Value
-> interp (Num n) = pure (IntV n)
+> interp (Num n) = pure (NumV n)
 > interp (Iden i) = do
 >     env <- ask
 >     maybe (lift $ throwE $ "Identifier not found: " ++ i) pure $ lookup i env
@@ -39,7 +41,7 @@ interpreter
 >     av <- interp a
 >     bv <- interp b
 >     case (av, bv) of
->         (IntV an, IntV bn) -> pure $ IntV $ an + bn
+>         (NumV an, NumV bn) -> pure $ NumV $ an + bn
 >         _ -> lift $ throwE $ "bad args to plus " ++ show (av, bv)
 > interp (App f es) = do
 >     fv <- interp f
