@@ -85,6 +85,32 @@ a language like this is straightforward to convert to C
 
 ------------------------------------------------------------------------------
 
+simplified interp that uses 'error' to avoid monads/do
+
+> interpE :: Env -> Expr -> Value
+> interpE _ (Num n) = IntV n
+> interpE env (Iden i) =
+>     maybe (error $ "Identifier not found: " ++ i) id $ lookup i env
+> interpE env (Plus a b) =
+>     case (interpE env a, interpE env b) of
+>         (IntV an, IntV bn) -> IntV $ an + bn
+>         _ -> error $ "bad args to  plus " ++ show (a, b)
+> interpE env (App f es) =
+>     case (interpE env f, map (interpE env) es) of
+>         (FunV ps bdy env', vs)
+>             | length vs == length ps ->
+>                   let env'' = zip ps vs ++ env'
+>                   in interpE env'' bdy
+>             | otherwise -> error $ "wrong number of args to function"
+>         _ -> error "non function value in app position"
+> interpE env (Lam ps e) = FunV ps e env
+> interpE env (Let bs e) =
+>     let newEnv en [] = en
+>         newEnv en ((b,ex):bs') = newEnv ((b,interpE en ex):en) bs'
+>     in interpE (newEnv env bs) e
+
+------------------------------------------------------------------------------
+
 parser
 ------
 
@@ -121,6 +147,12 @@ parser
 >     ast <- parse s
 >     interp [] ast
 
+> evaluateE :: String -> Value
+> evaluateE s =
+>     let ast = either error id $ parse s
+>     in interpE [] ast
+
+
 ------------------------------------------------------------------------------
 
 tests
@@ -135,7 +167,12 @@ tests
 >     ,("let f = lam(x,y): x + y end: f(1,2) end", "3")]
 
 > tests :: T.TestTree
-> tests = T.testGroup "simpleexpr" $ map (uncurry runTest) interpreterExamples
+> tests = T.testGroup "simpleexpr"
+>         [T.testGroup "simplexpr either"
+>          $ map (uncurry runTest) interpreterExamples
+>         ,T.testGroup "simplexpr error"
+>          $ map (uncurry runTestE) interpreterExamples
+>         ]
 
 > runTest :: String -> String -> T.TestTree
 > runTest s v = T.testCase s $ do
@@ -143,5 +180,12 @@ tests
 >         expected = either error id $ evaluate v
 >     T.assertEqual "" expected res
 
+> runTestE :: String -> String -> T.TestTree
+> runTestE s v = T.testCase s $ do
+>     let res = evaluateE s
+>         expected = evaluateE v
+>     T.assertEqual "" expected res
+
 > main :: IO ()
 > main = T.defaultMain tests
+
