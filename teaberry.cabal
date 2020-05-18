@@ -75,7 +75,7 @@ Test-Suite RunTests
   ghc-options:         -threaded
   hs-source-dirs:      src/tests
 
-Test-Suite SimpleExpr
+Test-Suite Langs
   import:              shared-properties
   type:                exitcode-stdio-1.0
   build-depends:       teaberry,
@@ -83,5 +83,7 @@ Test-Suite SimpleExpr
                        tasty-hunit >= 0.10 && < 0.11
   ghc-options:         -threaded
   hs-source-dirs:      src/langs
-  main-is:             SimpleExpr.lhs
+  other-modules:       SimpleExpr
+                       SimpleExprReader  
+  main-is:             Langs.lhs
 

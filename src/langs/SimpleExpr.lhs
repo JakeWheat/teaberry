@@ -9,6 +9,11 @@ It has multi arg functions + lambdas, and multi bind lets.
 
 > {-# LANGUAGE TupleSections #-}
 
+> module SimpleExpr (tests
+>                   ,Expr(..)
+>                   ,parse
+>                   ) where
+> 
 > import qualified Parse as P
 > import qualified Syntax as S
 > import Data.Scientific (floatingOrInteger)
@@ -185,7 +190,4 @@ tests
 >     let res = evaluateE s
 >         expected = evaluateE v
 >     T.assertEqual "" expected res
-
-> main :: IO ()
-> main = T.defaultMain tests
 
