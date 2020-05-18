@@ -12,11 +12,18 @@ It has multi arg functions + lambdas, and multi bind lets.
 > module SimpleExpr (tests
 >                   ,Expr(..)
 >                   ,parse
+>                   ,prettyExpr
+>                   ,convExpr
 >                   ) where
 > 
 > import qualified Parse as P
 > import qualified Syntax as S
 > import Data.Scientific (floatingOrInteger)
+
+> import Prelude hiding ((<>))
+> import Text.PrettyPrint (render, text, (<>), (<+>), parens,
+>                          nest, Doc, punctuate, comma, sep, vcat)
+
 
 > import qualified Test.Tasty as T
 > import qualified Test.Tasty.HUnit as T
@@ -116,6 +123,42 @@ simplified interp that uses 'error' to avoid monads/do
 
 ------------------------------------------------------------------------------
 
+pretty printer
+--------------
+
+for error messages, etc.
+
+> prettyExpr :: Expr -> String
+> prettyExpr = render . expr
+
+> expr :: Expr -> Doc
+> expr (Num n) = text $ show n
+> expr (Iden i) = text i
+> expr (Plus e0 e1) = expr e0 <+> text "+" <+> expr e1
+> expr (App f es) = expr f <> parens (commaSep $ map expr es)
+> expr (Lam ps e) = vcat
+>     [text "lam" <> parens (commaSep $ map text ps) <> text ":"
+>     ,nest 2 (expr e)
+>     ,text "end"]
+> expr (Let bs e) =
+>     vcat [text "let" <+> nest 2 bs' <> text ":"
+>          ,nest 2 (expr e)
+>          ,text "end"]
+>   where
+>     bs' | [b] <- bs = binding b
+>         | otherwise = vcommaSep $ map binding bs
+>     binding (n,be) =
+>         text n <+> text "=" <+> nest 2 (expr be)
+
+> commaSep :: [Doc] -> Doc
+> commaSep ds = sep $ punctuate comma ds
+
+> vcommaSep :: [Doc] -> Doc
+> vcommaSep ds = vcat $ punctuate comma ds
+
+
+------------------------------------------------------------------------------
+
 parser
 ------
 
@@ -124,28 +167,29 @@ parser
 >     case P.parseExpr "" src of
 >       Right e -> convExpr e
 >       Left e -> Left e
->   where
->     convExpr (S.Sel (S.Num x)) | Right n <- (floatingOrInteger x :: Either Double Int) = Right $ Num n
->     convExpr (S.Iden s) = Right $ Iden s
->     convExpr (S.Parens e) = convExpr e
->     convExpr (S.App f es) = App <$> (convExpr f) <*> mapM convExpr es
->     convExpr (S.BinOp e "+" e1) = Plus <$>     convExpr e <*>     convExpr e1
->     convExpr (S.Lam ps e) = do
+>
+> convExpr :: S.Expr -> Either String Expr
+> convExpr (S.Sel (S.Num x)) | Right n <- (floatingOrInteger x :: Either Double Int) = Right $ Num n
+> convExpr (S.Iden s) = Right $ Iden s
+> convExpr (S.Parens e) = convExpr e
+> convExpr (S.App f es) = App <$> (convExpr f) <*> mapM convExpr es
+> convExpr (S.BinOp e "+" e1) = Plus <$> convExpr e <*> convExpr e1
+> convExpr (S.Lam ps e) = do
 >         ps' <- mapM pf ps
 >         e' <- convExpr e
 >         Right $ Lam ps' e'
 >       where
 >         pf (S.IdenP _ (S.PatName x)) = Right x
 >         pf x = Left $ "unsupported pattern " ++ show x
->     convExpr (S.Let bs e) = do
+> convExpr (S.Let bs e) = do
 >         bs' <- mapM bf bs
 >         e' <- convExpr e
 >         Right $ Let bs' e'
 >       where
 >         bf (S.Binding (S.IdenP _ (S.PatName x)) ex) =
->             (x,) <$>     convExpr ex
+>             (x,) <$> convExpr ex
 >         bf x = Left $ "unsupported binding " ++ show x
->     convExpr x = Left $ "unsupported syntax " ++ show x
+> convExpr x = Left $ "unsupported syntax " ++ show x
 
 > evaluate :: String -> Either String Value
 > evaluate s =  do

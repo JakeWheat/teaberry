@@ -6,17 +6,34 @@ to demonstrate that technique enough to be interesting
 the goal is to build towards an industrial production language
   and to develop different techniques in simple environments instead
   of in a full codebase with legacy-like issues
+keep getting slowed down by building each new feature on top of a
+  messy codebase
+don't want to keep tidying it, don't know how to tidy it effectively
+  yet in many ways
+this approach means can keep developing new features in isolation
+the hope is that then combining these into a language using them all
+  will be relatively easily
+and that the little languages approach will be the best way to
+  develop new features: write them in a minimal language variant first
+  then incorporate them into the main code
+by separating the feature dev, from working with and integrating into
+  a big code base, the speed should be faster, and it should be easier
+  to do smaller steps and be productive
 
-basic architecture: try to use the same parser for as much as possible
-use the same old test framework
-
-create a single exe front end for all the little languages
-it can execute each one
-it can run the tests for each one
-it can parse for each one
-it can do type checking when that is an option
-it can load from command line or file
+todo: fix the exe front end
+it can run the tasty tests
+it can run a script for each of the little languages that you pass
+and it can run the inline tests for that script in language
+  for any script you pass (for all the languages that support check
+  blocks and stuff)
+give options to just parse, or just type check as well as run
 maybe a repl as well
+  don't like command line repls
+  something which is a multiline editor first, and a repl around this
+  is viable, multiline text on a traditional command line repl is
+  awful
+  the way e.g. shell works in emacs is pretty nice, keeps the kind
+  of command line thing, but has much better multiline, etc. ux
 
 --------------------------------------
 
@@ -131,6 +148,8 @@ improving the test framework
   exception handling
   import
   statements
+  agdt?
+  ffi?
 
 
 adding monads to the interpreter
@@ -139,7 +158,6 @@ adding monads to the desugarer
 purescript style letrec
 
 contracts and assertions
-
 
 is the above the core?
 

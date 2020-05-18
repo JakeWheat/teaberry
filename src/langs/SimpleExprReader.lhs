@@ -2,7 +2,9 @@
 
 > {-# LANGUAGE TupleSections #-}
 
-> module SimpleExprReader (tests) where
+> module SimpleExprReader (tests
+>                         ,runInterp
+>                         ) where
 
 > import SimpleExpr (Expr(..), parse)
 > import Control.Monad.Trans.Class (lift)

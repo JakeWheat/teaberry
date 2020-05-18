@@ -5,7 +5,7 @@ instead
 functions have 1 arg, lambda only has one param
 let is implemented as lambda
 
-> module SimpleExprDesugared where
+> module SimpleExprDesugared (tests) where
 
 > import qualified SimpleExpr as S (Expr(..), parse)
 > import Control.Monad.Trans.Class (lift)
