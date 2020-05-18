@@ -1,0 +1,267 @@
+
+langs:
+
+the idea in each case is to try to use the smallest language to build on,
+to demonstrate that technique enough to be interesting
+the goal is to build towards an industrial production language
+  and to develop different techniques in simple environments instead
+  of in a full codebase with legacy-like issues
+
+basic architecture: try to use the same parser for as much as possible
+use the same old test framework
+
+create a single exe front end for all the little languages
+it can execute each one
+it can run the tests for each one
+it can parse for each one
+it can do type checking when that is an option
+it can load from command line or file
+maybe a repl as well
+
+--------------------------------------
+
+tutorial notes:
+
+turn it into a tutorial?
+
+can just write a few more commments?
+
+do a dependency list for each language
+it shows each language that feeds into this one as a tree
+and then as a linear list that you could work through
+so if you click on subject x, and there's too much new stuff
+  you can look at the build up to it easily
+  you aren't forced to go through everything linearly in order to not
+    get out of your depth
+at the end of each language, give links to every language that builds
+  on this one, do it choose your own adventure style
+
+------------------------------------
+
+
+
+simplest expressions
+  variations:
+     moresimple: 1 arg fns, single let, single lam
+       using desugaring with new types
+     without closures
+     without functions as values? how different is this from with
+       functions as values but not closures?
+       this might be different with other versions below
+     using the reader monad transformer
+  is it worth doing an example using error to get rid of monads
+    completely?
+    yes, can write a few lines in the same file: interpE
+
+simplest testing framework, definitely next
+  this is check + simple is with trivial parsing and execution
+
+add a range of data types
+  which of the above should be reproduced with these?
+    maybe one without closures?
+    see how different it is
+  use the reader monad transformer only
+  no desugaring at this stage
+  
+
+hypotheses:
+
+the version of a language with functions as values but not closures
+  (aka 'function pointers') is not different enough from the one
+  without function pointers to write both
+having closures and not having closures makes a real difference in the
+  implementation with defunctionalization
+  otherwise, it's pretty trivial.
+
+add regimented haskell ffi for functions
+add haskell ffi for opaque data types
+  -> this gives us extensbility/flexibility to improvise
+  and bootstrap the language more easily
+do a complete and nicely done ffi
+  then work backwards to create some steps towards it
+  this will create a new base language
+    start with maybe a proper ffi interface for expressions only?
+      then add one for statements too later
+
+algebraic data types, cases
+
+statements, scripts
+
+better testing framework
+  what are the options/stages here?
+  later, in language testing framework
+  then as a plain module with ffi
+
+import, modules -> do one before agdt
+  and another one after
+  use the renaming approach
+  can do stages, first stage is just to make a module
+    available under it's name
+  second stage is to do export and import lists
+  2.1 + sugar for import and export
+  third stage is to be able to do unqualified, rename module name
+
+type path:
+  explicitly typed simple expressions
+  then type inference for these
+  then start to work towards the extra type features that want
+  typing (try to do each one on it's own)
+    letrec variants
+    complete script
+    ffi
+    basic agdt
+      is recursive an additional?
+    imports
+    parametric polymorpism
+    extensible records?
+    
+    
+  don't know anything about this
+    want to learn asap
+
+
+stuff to do on demand when needed above:
+
+separate interpreter with desugarer
+
+letrec, letrec*
+
+improving the test framework
+  what does the most complete example need?
+  exception handling
+  import
+  statements
+
+
+adding monads to the interpreter
+adding monads to the desugarer
+
+purescript style letrec
+
+contracts and assertions
+
+
+is the above the core?
+
+------------------------------------------------------------------------------
+
+interpreter/compiler path:
+  a defunctionalization implementation
+    this is probably a series of steps?
+  a more complete bytecode
+    work backwards from what llvm would look like
+    so the bytecode is do most of what you would do for llvm
+    but then still interpret it in a haskell interpreter
+    should benchmark this to understand it
+  use llvm
+  garbage collection
+
+--------------------------------------
+
+system ux path
+
+repl
+command line interface
+
+
+--------------------------------------
+
+enchanced ffi
+
+c
+python
+
+
+--------------------------------------
+
+parsing path:
+writing the basic parser from scratch
+  try to get parsing specific stuff sidelined
+  there are no real interesting parts of parsing, it's all just necessary
+  tediousness (except maybe the parse error messages and the later
+    source location message support - one you get into multiple ranges
+    per syntax node/message)
+
+extending the parser to make it more interesting
+  try to have as many examples use the most trivial parsers properly
+  because this path adds a lot of complexity in the parser
+  and one source positions are there, a lot in the syntax too
+  lots of angles
+  I think this is pretty orthogonal, wait until late
+
+syntax path:
+  complete basics
+  handling the tricky parts of the syntax
+  doing source locations
+  working on parse error messages
+  I think this is pretty orthogonal, wait until late
+  can decide what to do with error message
+  adding a lot of nice syntax sugar
+
+--------------------------------------
+
+the interpreter/language packaging path
+
+split haskell source files into multiple modules: when does this
+  happen? when it becomes unweidly? I think this is as soon as
+  can reuse the parser and syntax
+  make it a separate step to show how it's done
+  tutorial only
+
+turn into a cabal package: when does this happen, make it into a
+  separate step
+  want to do this before it starts using external packages?
+  not really possible
+  can just have the cabal files there
+  and then one step shows the cabal file progression
+  this can happen separately?
+
+--------------------------------------
+
+error handling:
+  part of parsing also:
+    work on parse error quality
+    adding source positions for later diagnostics
+  type errors
+  runtime errors
+  test as much as possible in the language
+
+--------------------------------------
+
+optimisation path
+  overlaps with interpreter/compiler path
+  a big part is doing performance regression tests, and doing profiling
+  
+--------------------------------------
+
+relational dbms path
+
+extensible records
+
+  single thread in memory transactions
+  single thread durable transactions
+  concurrent in memory transactions
+    this needs concurrency in the language
+  concurrent durable transactions
+  client server (not strictly needed, but I want it)
+  optimisation?
+  relational algebra
+  expression planning?
+    -> this might turn into a more generic idea
+
+it must be abstract: you should have a plugable layer for storage
+representation, and relation values in flight representation
+-> can build a simple dynamically typed version with serialization
+   can build with sqlite as the persistence layer (for bootstrap purposes)
+   can build a direct statically typed version
+   can build 'the ultimate row based', or something traditional and/or modern
+   can build a columnar engine
+   all of these should be switchable - you use the same syntax to create vars, do queries, etc.
+     and you can convert data between the representations
+       in storage
+       and as part of an expression plan
+
+what more is needed to replace sqlite?
+
+where could this go next? too many options
+
