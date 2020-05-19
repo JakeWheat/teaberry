@@ -55,7 +55,27 @@ interpreter
 >            deriving (Eq, Show)
 
 
-> type Env = [(String,Value)]
+> data Env = Env
+>     {envEnv :: [(String,Value)]
+>     ,envForeignFunctions :: [(String, [Value] -> Interpreter Value)]}
+
+> emptyEnv :: Env
+> emptyEnv = Env
+>     {envEnv = []
+>     ,envForeignFunctions = []}
+
+> extendEnv :: [(String,Value)] -> Env -> Env
+> extendEnv bs env = env {envEnv = bs ++ envEnv env}
+>
+> envLookup :: String -> Env -> Interpreter Value
+> envLookup nm env =
+>     maybe (lift $ throwE $ "Identifier not found " ++ nm) pure
+>     $ lookup nm (envEnv env)
+
+> lookupForeignFunction :: String -> Env -> Interpreter ([Value] -> Interpreter Value)
+> lookupForeignFunction nm env =
+>     maybe (lift $ throwE $ "ffi function not found: " ++ nm)
+>       pure $ lookup nm $ envForeignFunctions env
 
 ------------------------------------------------------------------------------
 
@@ -65,7 +85,13 @@ interpreter
 >            | StringV String
 >            | FunV [String] Expr Env
 >            | HaskellFunV String
->            deriving (Eq, Show)
+
+> instance Show Value where
+>   show (NumV n) = "NumV " ++ show n
+
+> instance Eq Value where
+>     NumV a == NumV b = a == b
+
 
 > type Interpreter = ReaderT Env (Except String)
 
@@ -76,18 +102,18 @@ interpreter
 > interp (Num n) = pure (NumV n)
 > interp (Iden i) = do
 >     env <- ask
->     maybe (lift $ throwE $ "Identifier not found: " ++ i) pure $ lookup i env
+>     envLookup i env
 > interp (App f es) = do
 >     fv <- interp f
 >     vs <- mapM interp es
 >     case fv of
 >         FunV ps bdy env' -> do
 >             as <- safeZip ps vs
->             let env'' = as ++ env'
+>             let env'' = extendEnv as env'
 >             local (const env'') $ interp bdy
 >         HaskellFunV nm -> do
->             hf <- maybe (lift $ throwE $ "ffi function not found: " ++ nm)
->                         pure $ lookup nm haskellFunctions
+>             env <- ask
+>             hf <- lookupForeignFunction nm env
 >             hf vs
 >         _ -> lift $ throwE "non function value in app position"
 >   where
@@ -100,26 +126,56 @@ interpreter
 >     let newEnv [] = interp e
 >         newEnv ((b,ex):bs') = do
 >             v <- interp ex
->             local ((b,v):) $ newEnv bs'
+>             local (extendEnv [(b,v)]) $ newEnv bs'
 >     newEnv bs
 
 ------------------------------------------------------------------------------
 
 function ffi: call haskell functions from in language
 
-> testEnvironment :: Env
-> testEnvironment = [("+", HaskellFunV "+")]
+creating the standard set of functions:
 
-> haskellFunctions :: [(String, [Value] -> Interpreter Value)]
-> haskellFunctions =
->     [("+"
->      ,\case
->           [NumV a, NumV b] -> pure $ NumV $ plus a b
->           as -> lift $ throwE $ "bad args to + " ++ show as
->      )]
+> testEnv :: Env
+> testEnv = either error id $ addHaskellFn "+"
+>               (ternAOp unwrapNum wrapNum plus)
+>               emptyEnv
 
 > plus :: Scientific -> Scientific -> Scientific
 > plus = (+)
+
+
+boilerplate
+
+> --plusx :: [Value] -> Interpreter Value
+> --plusx = ternAOp unwrapNum wrapNum plus
+
+
+> addHaskellFn :: String -> ([Value] -> Interpreter Value) -> Env -> Either String Env
+> addHaskellFn nm f env =
+>     pure ((extendEnv [(nm, HaskellFunV nm)] env)
+>          {envForeignFunctions = (nm, f) : envForeignFunctions env})
+
+> unwrapNum :: Value -> Interpreter Scientific
+> unwrapNum (NumV n) = pure n
+> unwrapNum x = lift $ throwE $ "expected num got " ++ show x
+>
+> wrapNum :: Scientific -> Interpreter Value
+> wrapNum n = pure $ NumV n
+
+> ternAOp :: (Value -> Interpreter a)
+>         -> (a -> Interpreter Value)
+>         -> (a -> a -> a)
+>         -> ([Value] -> Interpreter Value)
+> ternAOp unwrap wrap f =
+>     (\as -> do
+>             case as of
+>                 [a,b] -> do
+>                     ax <- unwrap a
+>                     bx <- unwrap b
+>                     wrap (f ax bx)
+>                 _ -> lift $ throwE $ "wrong number of args to function, expected 2, got " ++ show (length as))
+
+
 
 TODO:
 
@@ -190,7 +246,7 @@ too, to insulate at API level from implementation changes.
 > evaluate :: String -> Either String Value
 > evaluate s =  do
 >     ast <- parse s
->     runInterp testEnvironment ast
+>     runInterp testEnv ast
 
 ------------------------------------------------------------------------------
 
