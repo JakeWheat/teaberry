@@ -7,15 +7,19 @@ let is implemented as lambda
 
 > module SimpleExprDesugared (tests) where
 
-> import qualified SimpleExpr as S (Expr(..), parse, simpleInterpreterExamples)
+> import qualified SimpleExpr as S
+>     (Expr(..)
+>     ,parse
+>     ,simpleInterpreterExamples
+>     ,TestTree
+>     ,makeSimpleTests
+>     )
+
 > import Control.Monad.Trans.Class (lift)
 > import Control.Monad.Trans.Except (Except, runExcept, throwE)
 > import Control.Monad.Trans.Reader (ReaderT, runReaderT, ask, local)
 
 > import Data.Scientific (Scientific)
-
-> import qualified Test.Tasty as T
-> import qualified Test.Tasty.HUnit as T
 
 
 ------------------------------------------------------------------------------
@@ -118,20 +122,13 @@ let to lambda
 >     vv <- interp v
 >     local ((n,vv):) $ interp e-}
 
-------------------------------------------------------------------------------
-
 > evaluate :: String -> Either String Value
 > evaluate s =  do
 >     ast <- S.parse s
 >     iast <- desugar ast
 >     runInterp [] iast
 
-> tests :: T.TestTree
-> tests = T.testGroup "simplexprdesugared"
->         $ map (uncurry runTest) S.simpleInterpreterExamples
+------------------------------------------------------------------------------
 
-> runTest :: String -> String -> T.TestTree
-> runTest s v = T.testCase s $ do
->     let res = either error id $ evaluate s
->         expected = either error id $ evaluate v
->     T.assertEqual "" expected res
+> tests :: S.TestTree
+> tests = S.makeSimpleTests "simplexprdesugared" S.simpleInterpreterExamples evaluate

@@ -38,17 +38,23 @@ interpreter
 
 > data Status = Pass | Fail
 
-> evaluateScript :: Script -> Either String [(Status, String)]
+> interp :: Script -> Either String [(Status, String)]
 
-> evaluateScript (Script []) = pure []
-> evaluateScript (Script ((e, expected):ts)) = do
+> interp (Script []) = pure []
+> interp (Script ((e, expected):ts)) = do
 >     ev <- SE.runInterp [] e
 >     expectedv <- SE.runInterp [] expected
 >     let res = (if ev == expectedv
 >              then Pass
 >              else Fail
 >             ,SE.prettyExpr e ++ " is " ++ SE.prettyExpr expected)
->     (res:) <$> evaluateScript (Script ts)
+>     (res:) <$> interp (Script ts)
+
+> evaluate :: String -> Either String [(Status, String)]
+> evaluate src = do
+>     ast <- parse src
+>     interp ast
+
 
 ------------------------------------------------------------------------------
 
@@ -76,8 +82,8 @@ tests
 
 it's just an in language script now
 
-> testScript :: String
-> testScript = [r|
+> simpleTestScript :: String
+> simpleTestScript = [r|
 \begin{code} 
 
 check:
@@ -105,11 +111,12 @@ end
 
 \end{code}
 >    |]
+
+
+      
 > tests :: T.TestTree
 > tests =
->     let ts = either error id $ do
->                ast <- parse testScript
->                evaluateScript ast
+>     let ts = either error id $ evaluate simpleTestScript
 >     -- todo: if executing the script itself fails
 >     -- create a failing test for this
 >     -- otherwise, do the actual tests

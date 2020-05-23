@@ -32,7 +32,10 @@ foreign types
 
 > import qualified Parse as P
 > import qualified Syntax as S
-> import SimpleExpr (simpleInterpreterExamples)
+> import SimpleExpr (simpleInterpreterExamples
+>                   ,TestTree
+>                   ,makeSimpleTests
+>                   )
 
 > --import qualified SimpleExpr (Expr(..), parse)
 > import Control.Monad.Trans.Class (lift)
@@ -40,9 +43,6 @@ foreign types
 > import Control.Monad.Trans.Reader (ReaderT, runReaderT, ask, local)
 > import Data.Scientific (Scientific)
 > import Data.List (intercalate)
-
-> import qualified Test.Tasty as T
-> import qualified Test.Tasty.HUnit as T
 
 ------------------------------------------------------------------------------
 
@@ -89,6 +89,8 @@ interpreter
 
 ------------------------------------------------------------------------------
 
+values
+
 
 > data Value = NumV Scientific
 >            | BoolV Bool
@@ -115,6 +117,11 @@ interpreter
 >     TextV a == TextV b = a == b
 >     BoolV a == BoolV b = a == b
 >     _ == _ = False
+
+
+------------------------------------------------------------------------------
+
+interpreter
 
 > type Interpreter = ReaderT Env (Except String)
 
@@ -154,11 +161,14 @@ interpreter
 >             local (extendEnv [(b,v)]) $ newEnv bs'
 >     newEnv bs
 
+> evaluate :: String -> Either String Value
+> evaluate s =  do
+>     ast <- parse s
+>     runInterp testEnv ast
+
 ------------------------------------------------------------------------------
 
-function ffi: call haskell functions from in language
-
-creating the standard set of functions:
+ffi catalog
 
 > testEnv :: Env
 > testEnv = either error id $ addForeignFuns'
@@ -235,6 +245,9 @@ haskell code anywhere else
 
 boilerplate
 
+I don't think it's perfect, but I think it's maintainable enough.
+Maybe good do better with some clever code or generics or something.
+
 >
 > addForeignFun' :: String -> ([String], ([Value] -> Interpreter Value)) -> Env -> Either String Env
 > addForeignFun' nm (tys, f) env = addForeignFun nm tys f env
@@ -282,35 +295,26 @@ boilerplate
 
 TODO:
 
-haskellFunctions is hardcoded in the interpreter
-want to pass it as a value
-
-want to write something like:
-add function "+", plus
-there's tons of boilerplate
 want to make it easy to give much better errors
-is there a way to automatically create the unwrapping?
 
 what does it look like to use 'dynamic type classes'
-so you create + as a typeclass function
-then you can add a + for some particular types independently
 
-eventually want a standard set of functions
-
-with the ability to add your own haskell functions when running
-something
-
-and the ability to have a minimal built in set, or none at all
+eventually want a standard set of functions with the ability to add
+your own haskell functions when running something, and the ability to
+have a minimal built in set instead of the usual full one, or no built
+ins at all
 
 the next step after that is to implement haskell data types ffi
 so you can pass haskell values around in language opaquely
 and then add something that allows you to use them as conveniently as
 in language values
 
-it would be nice to make the Value type abstract for users of the code
+it would be nice to make the Value type abstract for users of this code
 too, to insulate at API level from implementation changes.
 
 ------------------------------------------------------------------------------
+
+parser
 
 > parse :: String -> Either String Expr
 > parse src =
@@ -347,13 +351,6 @@ too, to insulate at API level from implementation changes.
 
 ------------------------------------------------------------------------------
 
-> evaluate :: String -> Either String Value
-> evaluate s =  do
->     ast <- parse s
->     runInterp testEnv ast
-
-------------------------------------------------------------------------------
-
 tests
 -----
 
@@ -364,12 +361,5 @@ tests
 >     ,("'three' + 'four'", "'threefour'")
 >     ]
 
-> runTest :: String -> String -> T.TestTree
-> runTest s v = T.testCase s $ do
->     let res = either error id $ evaluate s
->         expected = either error id $ evaluate v
->     T.assertEqual "" expected res
-
-> tests :: T.TestTree
-> tests = T.testGroup "simpleexprreader"
->            $ map (uncurry runTest) interpreterExamples
+> tests :: TestTree
+> tests = makeSimpleTests "simpleexprffi" interpreterExamples evaluate

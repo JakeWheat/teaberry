@@ -15,6 +15,8 @@ It has multi arg functions + lambdas, and multi bind lets.
 >                   ,prettyExpr
 >                   ,convExpr
 >                   ,simpleInterpreterExamples
+>                   ,makeSimpleTests
+>                   ,T.TestTree
 >                   ) where
 > 
 > import qualified Parse as P
@@ -197,14 +199,18 @@ tests
 >       \  g(3)\n\
 >       \  end","5")]
 
-
 > tests :: T.TestTree
-> tests = T.testGroup "simplexpr"
->          $ map (uncurry runTest) simpleInterpreterExamples
+> tests = makeSimpleTests "simplexpr" simpleInterpreterExamples evaluate
 
-> runTest :: String -> String -> T.TestTree
-> runTest s v = T.testCase s $ do
->     let res = either error id $ evaluate s
->         expected = either error id $ evaluate v
+
+
+> makeSimpleTests :: (Eq a, Show a) => String -> [(String,String)] -> (String -> a) -> T.TestTree
+> makeSimpleTests nm ts eval =
+>     T.testGroup nm $ map (uncurry (runTest eval)) ts
+
+> runTest :: (Eq a, Show a) => (String -> a) -> String -> String -> T.TestTree
+> runTest eval s v = T.testCase s $ do
+>     let res = eval s
+>         expected = eval v
 >     T.assertEqual "" expected res
 

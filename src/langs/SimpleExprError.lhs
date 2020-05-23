@@ -7,12 +7,13 @@ monads/do notation.
 
 > module SimpleExprError (tests) where
 >
-> import SimpleExpr (Expr(..), parse, simpleInterpreterExamples)
+> import SimpleExpr (Expr(..)
+>                   ,parse
+>                   ,simpleInterpreterExamples
+>                   ,TestTree
+>                   ,makeSimpleTests)
 
 > import Data.Scientific (Scientific)
-
-> import qualified Test.Tasty as T
-> import qualified Test.Tasty.HUnit as T
 
 ------------------------------------------------------------------------------
 
@@ -59,13 +60,6 @@ interpreter
 tests
 -----
 
-> tests :: T.TestTree
-> tests = T.testGroup "simplexprerror"
->          $ map (uncurry runTest) simpleInterpreterExamples
-
-> runTest :: String -> String -> T.TestTree
-> runTest s v = T.testCase s $ do
->     let res = evaluate s
->         expected = evaluate v
->     T.assertEqual "" expected res
+> tests :: TestTree
+> tests = makeSimpleTests "simpleexprerror" simpleInterpreterExamples evaluate
 
