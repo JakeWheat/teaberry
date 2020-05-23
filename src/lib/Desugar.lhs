@@ -938,13 +938,10 @@ it exists for testing and development of the language only
 "short circuiting" and and or
 
 > desugarExpr' (S.BinOp a "and" b) =
->     desugarExpr' (S.If [(S.App (S.Iden "==") [a, S.Iden "true"], b)]
->                   (Just $ S.Iden "false"))
+>     desugarExpr' (S.If [(a, b)] (Just $ S.Iden "false"))
 
 > desugarExpr' (S.BinOp a "or" b) =
->     desugarExpr' (S.If [(S.App (S.Iden "==") [a, S.Iden "true"], S.Iden "true")]
->                      (Just b))
-
+>     desugarExpr' (S.If [(a, S.Iden "true")] (Just b))
 
 > desugarExpr' (S.BinOp a op b) = desugarExpr' (S.App (S.Iden op) [a,b])
 

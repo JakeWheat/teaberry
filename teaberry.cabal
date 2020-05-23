@@ -91,5 +91,6 @@ Test-Suite Langs
                        SimplestCheck
                        SimpleExprFFI
                        SimpleExprIf
+                       SimpleExprIfAndOr
   main-is:             Langs.lhs
 
