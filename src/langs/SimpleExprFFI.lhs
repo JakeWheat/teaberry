@@ -1,28 +1,17 @@
 
-First pass on a proper range of data types. It's a bit trivial, but
-the base for some other things.
+Showing a function ffi for implementing functions in haskell
 
-update: this is daft, it doesn't do anything, what's the motivation
+TODO:
 
-bools: if, ask?
-text: ?
-binops
-start by doing an ffi immediately
-copy the existing one
-then try to refactor it
+is this too much:
+create the first pass file separately
+then show the boilerplate remove
+then show the overloading hack
+then do one with the full range of functions from the current main code?
 
+start by doing later experiments that need the ffi, and then refactor
+backwards
 
-
-start with
-numbers
-booleans
-text
-functions
-
-todo later:
-variants
-boxes
-foreign types
 
 
 > {-# LANGUAGE TupleSections #-}
@@ -172,8 +161,8 @@ ffi catalog
 
 > testEnv :: Env
 > testEnv = either error id $ addForeignFuns'
->    [("+", ternAOp unwrapNum wrapNum plusNum)
->    ,("+", ternAOp unwrapText wrapText plusText)]
+>    [("+", binaryAOp unwrapNum wrapNum plusNum)
+>    ,("+", binaryAOp unwrapText wrapText plusText)]
 >    emptyEnv
 
 > plusNum :: Scientific -> Scientific -> Scientific
@@ -264,7 +253,7 @@ Maybe good do better with some clever code or generics or something.
 > unwrapNum = ("number", \case
 >                           NumV n -> pure n
 >                           x -> lift $ throwE $ "type: expected number, got " ++ show x)
->
+
 > wrapNum :: Scientific -> Interpreter Value
 > wrapNum n = pure $ NumV n
 
@@ -272,16 +261,16 @@ Maybe good do better with some clever code or generics or something.
 > unwrapText = ("text", \case
 >                           TextV n -> pure n
 >                           x -> lift $ throwE $ "type: expected text, got " ++ show x)
->
+
 > wrapText :: String -> Interpreter Value
 > wrapText n = pure $ TextV n
 
 
-> ternAOp :: (String, Value -> Interpreter a)
+> binaryAOp :: (String, Value -> Interpreter a)
 >         -> (a -> Interpreter Value)
 >         -> (a -> a -> a)
 >         -> ([String], ([Value] -> Interpreter Value))
-> ternAOp unwrap wrap f =
+> binaryAOp unwrap wrap f =
 >     ([fst unwrap, fst unwrap]
 >     ,\as -> do
 >             case as of
