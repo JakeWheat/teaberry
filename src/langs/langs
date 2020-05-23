@@ -43,6 +43,8 @@ turn it into a tutorial?
 
 can just write a few more commments?
 
+to make it really work it would be nice to have transclusions
+
 do a dependency list for each language
 it shows each language that feeds into this one as a tree
 and then as a linear list that you could work through
@@ -189,6 +191,7 @@ enchanced ffi
 c
 python
 
+running executables and pipelines?
 
 --------------------------------------
 
@@ -246,10 +249,28 @@ error handling:
 
 --------------------------------------
 
+extended patterns path
+
+--------------------------------------
+
 optimisation path
   overlaps with interpreter/compiler path
   a big part is doing performance regression tests, and doing profiling
-  
+
+--------------------------------------
+
+basic concurrency path
+show running threads or something
+list the primitives for inter thread communication
+threads don't share memory, more like processes
+what about read only closures?
+queues
+unsafe shared mem
+safe shared vars is exactly the relational path, the transactions part
+what other kinds of shared vars are possible? or needed as part of an
+implementation
+what about threads and ffi?
+
 --------------------------------------
 
 relational dbms path

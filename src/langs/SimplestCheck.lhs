@@ -96,6 +96,11 @@ check:
     f(1,2)
   end is 3
 
+  let f = lam(x): lam(y): x + y end end,
+      g = f(2):
+      g(3)
+  end is 5
+
 end
 
 \end{code}

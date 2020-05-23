@@ -85,6 +85,13 @@ a language like this is straightforward to convert to C
 >                                in interp env'' bdy
 >                          | otherwise -> Left $ "wrong number of args to function"
 >         _ -> Left "non function value in app position"
+
+A function value:
+the list of parameter names
+the body of the function
+the closure of the function: the environment when the function value
+  is created
+
 > interp env (Lam ps e) = Right $ FunV ps e env
 > interp env (Let bs e) = do
 >     -- each let binding can see the previous binding
@@ -215,7 +222,12 @@ tests
 >     ,("1 + 2", "3")
 >     ,("let x = 3: x end", "3")
 >     ,("lam(x,y): x + y end(1,2)", "3")
->     ,("let f = lam(x,y): x + y end: f(1,2) end", "3")]
+>     ,("let f = lam(x,y): x + y end: f(1,2) end", "3")
+>     ,("let f = lam(x): lam(y): x + y end end,\n\
+>       \    g = f(2):\n\
+>       \  g(3)\n\
+>       \  end","5")]
+
 
 > tests :: T.TestTree
 > tests = T.testGroup "simpleexpr"
