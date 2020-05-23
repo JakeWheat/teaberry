@@ -6,15 +6,17 @@
 >                         ,runInterp
 >                         ) where
 
-> import SimpleExpr (Expr(..), parse, simpleInterpreterExamples)
+> import SimpleExpr (Expr(..)
+>                   ,parse
+>                   ,simpleInterpreterExamples
+>                   ,TestTree
+>                   ,makeSimpleTests)
 > import Control.Monad.Trans.Class (lift)
 > import Control.Monad.Trans.Except (Except, runExcept, throwE)
 > import Control.Monad.Trans.Reader (ReaderT, runReaderT, ask, local)
 
 > import Data.Scientific (Scientific)
 
-> import qualified Test.Tasty as T
-> import qualified Test.Tasty.HUnit as T
 
 ------------------------------------------------------------------------------
 
@@ -77,12 +79,5 @@ interpreter
 tests
 -----
 
-> runTest :: String -> String -> T.TestTree
-> runTest s v = T.testCase s $ do
->     let res = either error id $ evaluate s
->         expected = either error id $ evaluate v
->     T.assertEqual "" expected res
-
-> tests :: T.TestTree
-> tests = T.testGroup "simpleexprreader"
->            $ map (uncurry runTest) simpleInterpreterExamples
+> tests :: TestTree
+> tests = makeSimpleTests "simpleexprreader" simpleInterpreterExamples evaluate
