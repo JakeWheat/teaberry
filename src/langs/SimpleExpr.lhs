@@ -14,6 +14,7 @@ It has multi arg functions + lambdas, and multi bind lets.
 >                   ,parse
 >                   ,prettyExpr
 >                   ,convExpr
+>                   ,simpleInterpreterExamples
 >                   ) where
 > 
 > import qualified Parse as P
@@ -216,8 +217,8 @@ parser
 tests
 -----
 
-> interpreterExamples :: [(String, String)]
-> interpreterExamples =
+> simpleInterpreterExamples :: [(String, String)]
+> simpleInterpreterExamples =
 >     [("1", "1")
 >     ,("1 + 2", "3")
 >     ,("let x = 3: x end", "3")
@@ -232,9 +233,9 @@ tests
 > tests :: T.TestTree
 > tests = T.testGroup "simpleexpr"
 >         [T.testGroup "simplexpr either"
->          $ map (uncurry runTest) interpreterExamples
+>          $ map (uncurry runTest) simpleInterpreterExamples
 >         ,T.testGroup "simplexpr error"
->          $ map (uncurry runTestE) interpreterExamples
+>          $ map (uncurry runTestE) simpleInterpreterExamples
 >         ]
 
 > runTest :: String -> String -> T.TestTree

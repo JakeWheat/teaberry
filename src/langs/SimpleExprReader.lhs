@@ -6,7 +6,7 @@
 >                         ,runInterp
 >                         ) where
 
-> import SimpleExpr (Expr(..), parse)
+> import SimpleExpr (Expr(..), parse, simpleInterpreterExamples)
 > import Control.Monad.Trans.Class (lift)
 > import Control.Monad.Trans.Except (Except, runExcept, throwE)
 > import Control.Monad.Trans.Reader (ReaderT, runReaderT, ask, local)
@@ -77,14 +77,6 @@ interpreter
 tests
 -----
 
-> interpreterExamples :: [(String, String)]
-> interpreterExamples =
->     [("1", "1")
->     ,("1 + 2", "3")
->     ,("let x = 3: x end", "3")
->     ,("lam(x,y): x + y end(1,2)", "3")
->     ,("let f = lam(x,y): x + y end: f(1,2) end", "3")]
-
 > runTest :: String -> String -> T.TestTree
 > runTest s v = T.testCase s $ do
 >     let res = either error id $ evaluate s
@@ -93,4 +85,4 @@ tests
 
 > tests :: T.TestTree
 > tests = T.testGroup "simpleexprreader"
->            $ map (uncurry runTest) interpreterExamples
+>            $ map (uncurry runTest) simpleInterpreterExamples

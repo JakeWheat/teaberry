@@ -32,6 +32,7 @@ foreign types
 
 > import qualified Parse as P
 > import qualified Syntax as S
+> import SimpleExpr (simpleInterpreterExamples)
 
 > --import qualified SimpleExpr (Expr(..), parse)
 > import Control.Monad.Trans.Class (lift)
@@ -358,12 +359,8 @@ tests
 
 > interpreterExamples :: [(String, String)]
 > interpreterExamples =
->     [("1", "1")
->     ,("1 + 2", "3")
->     ,("let x = 3: x end", "3")
->     ,("lam(x,y): x + y end(1,2)", "3")
->     ,("let f = lam(x,y): x + y end: f(1,2) end", "3")
->     ,("'three'", "'three'")
+>     simpleInterpreterExamples ++
+>     [("'three'", "'three'")
 >     ,("'three' + 'four'", "'threefour'")
 >     ]
 
