@@ -103,31 +103,10 @@ the closure of the function: the environment when the function value
 >     env' <- newEnv env bs
 >     interp env' e
 
-------------------------------------------------------------------------------
-
-simplified interp that uses 'error' to avoid monads/do
-
-> interpE :: Env -> Expr -> Value
-> interpE _ (Num n) = NumV n
-> interpE env (Iden i) =
->     maybe (error $ "Identifier not found: " ++ i) id $ lookup i env
-> interpE env (Plus a b) =
->     case (interpE env a, interpE env b) of
->         (NumV an, NumV bn) -> NumV $ an + bn
->         _ -> error $ "bad args to  plus " ++ show (a, b)
-> interpE env (App f es) =
->     case (interpE env f, map (interpE env) es) of
->         (FunV ps bdy env', vs)
->             | length vs == length ps ->
->                   let env'' = zip ps vs ++ env'
->                   in interpE env'' bdy
->             | otherwise -> error $ "wrong number of args to function"
->         _ -> error "non function value in app position"
-> interpE env (Lam ps e) = FunV ps e env
-> interpE env (Let bs e) =
->     let newEnv en [] = en
->         newEnv en ((b,ex):bs') = newEnv ((b,interpE en ex):en) bs'
->     in interpE (newEnv env bs) e
+> evaluate :: String -> Either String Value
+> evaluate s =  do
+>     ast <- parse s
+>     interp [] ast
 
 ------------------------------------------------------------------------------
 
@@ -201,17 +180,6 @@ parser
 >         bf x = Left $ "unsupported binding " ++ show x
 > convExpr x = Left $ "unsupported syntax " ++ show x
 
-> evaluate :: String -> Either String Value
-> evaluate s =  do
->     ast <- parse s
->     interp [] ast
-
-> evaluateE :: String -> Value
-> evaluateE s =
->     let ast = either error id $ parse s
->     in interpE [] ast
-
-
 ------------------------------------------------------------------------------
 
 tests
@@ -231,22 +199,12 @@ tests
 
 
 > tests :: T.TestTree
-> tests = T.testGroup "simpleexpr"
->         [T.testGroup "simplexpr either"
+> tests = T.testGroup "simplexpr"
 >          $ map (uncurry runTest) simpleInterpreterExamples
->         ,T.testGroup "simplexpr error"
->          $ map (uncurry runTestE) simpleInterpreterExamples
->         ]
 
 > runTest :: String -> String -> T.TestTree
 > runTest s v = T.testCase s $ do
 >     let res = either error id $ evaluate s
 >         expected = either error id $ evaluate v
->     T.assertEqual "" expected res
-
-> runTestE :: String -> String -> T.TestTree
-> runTestE s v = T.testCase s $ do
->     let res = evaluateE s
->         expected = evaluateE v
 >     T.assertEqual "" expected res
 

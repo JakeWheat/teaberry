@@ -85,6 +85,7 @@ Test-Suite Langs
   ghc-options:         -threaded
   hs-source-dirs:      src/langs
   other-modules:       SimpleExpr
+                       SimpleExprError
                        SimpleExprReader
                        SimpleExprDesugared
                        SimplestCheck
