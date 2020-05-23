@@ -6,6 +6,7 @@
 > import qualified SimpleExprDesugared
 > import qualified SimplestCheck
 > import qualified SimpleExprFFI
+> import qualified SimpleExprIf
 
 > import qualified Test.Tasty as T
 
@@ -17,4 +18,5 @@
 >        ,SimpleExprDesugared.tests
 >        ,SimplestCheck.tests
 >        ,SimpleExprFFI.tests
+>        ,SimpleExprIf.tests
 >        ]

@@ -35,6 +35,12 @@ maybe a repl as well
   the way e.g. shell works in emacs is pretty nice, keeps the kind
   of command line thing, but has much better multiline, etc. ux
 
+
+keep thinking about the complexity of the code
+but the first goal right now is to learn how to write the engine
+not to create documentation/tutorials/guides for users
+
+
 --------------------------------------
 
 tutorial notes:
@@ -44,6 +50,14 @@ turn it into a tutorial?
 can just write a few more commments?
 
 to make it really work it would be nice to have transclusions
+
+the examples are evolving to not be a step by step from stage 1,
+but to demonstrate each feature repeatedly refactored to make it
+simpler and more maintainable
+
+this is less good for learning as a beginner, it's focused on the
+final product. it's still good for someone who already knows the
+basics well
 
 do a dependency list for each language
 it shows each language that feeds into this one as a tree
@@ -57,7 +71,18 @@ at the end of each language, give links to every language that builds
 
 ------------------------------------
 
+maybe most things should be duplicated:
+  version one is to get correct things right
+  version two adds full anomaly testing
 
+   - adding anomaly handling first into already complex examples is
+      against the motivation of this process
+     it may or may not be worth doing examples without anomaly handling
+       first, before adding it, to keep the steps smaller, and to make
+       it easier to rewrite things for discovery/invention purposes
+      
+  could even a third somerthing partial for things like performance
+  and stability
 
 simplest expressions
   variations:

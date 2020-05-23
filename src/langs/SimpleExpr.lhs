@@ -195,9 +195,15 @@ tests
 >     ,("lam(x,y): x + y end(1,2)", "3")
 >     ,("let f = lam(x,y): x + y end: f(1,2) end", "3")
 >     ,("let f = lam(x): lam(y): x + y end end,\n\
->       \    g = f(2):\n\
+>       \    g = f(2),\n\
+>       \    h = f(3):\n\
 >       \  g(3)\n\
->       \  end","5")]
+>       \  end","5")
+>     ,("let f = lam(x): lam(y): x + y end end,\n\
+>       \    g = f(2),\n\
+>       \    h = f(3):\n\
+>       \  h(3)\n\
+>       \  end","6")]
 
 > tests :: T.TestTree
 > tests = makeSimpleTests "simplexpr" simpleInterpreterExamples evaluate

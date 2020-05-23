@@ -655,6 +655,8 @@ and try to put all these functions in pyret files
 > tostring (StrV v) = StrV v
 > tostring x = torepr x
 
+tostring equals is used in implementing raises with raises-satisfies
+
 > tostringEquals :: [Value] -> Interpreter Value
 > tostringEquals [e0, e1] = do
 >     let x = tostring e1

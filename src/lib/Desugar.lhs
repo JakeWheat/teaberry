@@ -581,7 +581,7 @@ when a fun or rec is seen, it will collect subsequent funs and recs
 
 > desugarStmt (S.StExpr x@(S.BinOp e0 "is" e1)) = do
 >   let p = P.prettyExpr x
->   y <- desugarIs p e0 e1
+>   y <- desugarIs p e0 e1 
 >   desugarStmt y
 
 

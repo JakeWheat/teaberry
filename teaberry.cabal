@@ -90,5 +90,6 @@ Test-Suite Langs
                        SimpleExprDesugared
                        SimplestCheck
                        SimpleExprFFI
+                       SimpleExprIf
   main-is:             Langs.lhs
 
