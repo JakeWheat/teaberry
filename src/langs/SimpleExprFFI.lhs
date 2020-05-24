@@ -277,7 +277,7 @@ boilerplate
 I don't think it's perfect, but I think it's maintainable enough.
 Maybe good do better with some clever code or generics or something.
 
->
+
 > addForeignFun' :: String -> ([String], ([Value] -> Interpreter Value)) -> Env -> Either String Env
 > addForeignFun' nm (tys, f) env = addForeignFun nm tys f env
 

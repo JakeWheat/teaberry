@@ -93,5 +93,6 @@ Test-Suite Langs
                        SimpleExprIf
                        SimpleExprIfAndOr
                        SimpleExprTupleHack
+                       SimpleStatements
   main-is:             Langs.lhs
 

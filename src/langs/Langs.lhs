@@ -9,6 +9,7 @@
 > import qualified SimpleExprIf
 > import qualified SimpleExprIfAndOr
 > import qualified SimpleExprTupleHack
+> import qualified SimpleStatements
 
 > import qualified Test.Tasty as T
 
@@ -23,4 +24,5 @@
 >        ,SimpleExprIf.tests
 >        ,SimpleExprIfAndOr.tests
 >        ,SimpleExprTupleHack.tests
+>        ,SimpleStatements.tests
 >        ]
