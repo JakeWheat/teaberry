@@ -47,7 +47,7 @@ interpreter
 >     let res = (if ev == expectedv
 >              then Pass
 >              else Fail
->             ,SE.prettyExpr e ++ " is " ++ SE.prettyExpr expected)
+>             ,SE.pretty e ++ " is " ++ SE.pretty expected)
 >     (res:) <$> interp (Script ts)
 
 > evaluate :: String -> Either String [(Status, String)]

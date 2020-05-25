@@ -12,7 +12,7 @@ It has multi arg functions + lambdas, and multi bind lets.
 > module SimpleExpr (tests
 >                   ,Expr(..)
 >                   ,parse
->                   ,prettyExpr
+>                   ,pretty
 >                   ,convExpr
 >                   ,simpleInterpreterExamples
 >                   ,makeSimpleTests
@@ -21,12 +21,8 @@ It has multi arg functions + lambdas, and multi bind lets.
 > 
 > import qualified Parse as P
 > import qualified Syntax as S
+> import qualified Pretty as Pr
 > import Data.Scientific (Scientific)
-
-> import Prelude hiding ((<>))
-> import Text.PrettyPrint (render, text, (<>), (<+>), parens,
->                          nest, Doc, punctuate, comma, sep, vcat)
-
 
 > import qualified Test.Tasty as T
 > import qualified Test.Tasty.HUnit as T
@@ -117,35 +113,24 @@ pretty printer
 
 for error messages, etc.
 
-> prettyExpr :: Expr -> String
-> prettyExpr = render . expr
+> pretty :: Expr -> String
+> pretty x = Pr.prettyExpr $ unconv x
 
-> expr :: Expr -> Doc
-> expr (Num n) = text $ case S.extractInt n of
->                              Just x -> show x
->                              Nothing -> show n
-> expr (Iden i) = text i
-> expr (Plus e0 e1) = expr e0 <+> text "+" <+> expr e1
-> expr (App f es) = expr f <> parens (commaSep $ map expr es)
-> expr (Lam ps e) = vcat
->     [text "lam" <> parens (commaSep $ map text ps) <> text ":"
->     ,nest 2 (expr e)
->     ,text "end"]
-> expr (Let bs e) =
->     vcat [text "let" <+> nest 2 bs' <> text ":"
->          ,nest 2 (expr e)
->          ,text "end"]
->   where
->     bs' | [b] <- bs = binding b
->         | otherwise = vcommaSep $ map binding bs
->     binding (n,be) =
->         text n <+> text "=" <+> nest 2 (expr be)
+> unconv :: Expr -> S.Expr
+> unconv (Num n) = S.Sel (S.Num n)
+> unconv (Iden s) = S.Iden s
+>
+> unconv (Plus a b) = S.BinOp (unconv a) "+" (unconv b)
+ 
+> unconv (App e fs) = S.App (unconv e) $ map unconv fs
+> unconv (Lam ns e) = S.Lam (map unconvPattern ns) $ unconv e
+> unconv (Let bs e) = S.Let (map (uncurry unconvBinding) bs) (unconv e)
 
-> commaSep :: [Doc] -> Doc
-> commaSep ds = sep $ punctuate comma ds
+> unconvBinding :: String -> Expr -> S.Binding
+> unconvBinding n v = S.Binding (unconvPattern n) (unconv v)
 
-> vcommaSep :: [Doc] -> Doc
-> vcommaSep ds = vcat $ punctuate comma ds
+> unconvPattern ::String -> S.Pat
+> unconvPattern n = S.IdenP S.NoShadow (S.PatName n)
 
 
 ------------------------------------------------------------------------------
