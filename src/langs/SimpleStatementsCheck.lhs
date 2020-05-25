@@ -2,19 +2,11 @@
 Simplest version of the code which supports script with check blocks
 and closures. This allows writing fairly natural code and tests.
 
-tasks:
+This code expanded massively. Is it touching lots of code or not?
 
-hook up the log check results stuff
-do the convertor which creates the check results
-create the api
-hook it up to the testing framework
-print out the results also in a hack
+Can you show a small language without these tests, and then a change
+ that adds them, which is small and relatively self contained?
 
-
-TODO:
-
-once it's working, copy the code and try to simplify it to create a
-minimal example
 
 
 implementation sketch:
@@ -77,21 +69,6 @@ or everything in this dir, this package
 or all tests for all code that is used
 
 
-
-
-elements need:
-let statement
-unique id generator (this is a desugarer features
-blocks
-nothing? value, can hack it if needed like the tuples
-  if it's only needed for checking if code is correct, can skip it
-  until later?
-if expressions - simple ones only
-function app, lambdas, ==, torepr, + on text
-
-later, to do raises, can use a catch function. 
-
-
 ------------------------------------------------------------------------------
 
 
@@ -116,8 +93,6 @@ later, to do raises, can use a catch function.
 
 > import Control.Monad.Trans.Class (lift)
 > import Control.Monad.Trans.Except (Except, runExcept, throwE)
-> --import qualified Control.Monad.Trans.Reader as R (ReaderT, runReaderT, ask, local)
-> --import Control.Monad.Trans.State (StateT, evalStateT, get, put)
 > import Control.Monad.Trans.RWS (RWST, evalRWST, ask, local, get, put)
 
 > import Control.Monad (when)
@@ -155,11 +130,7 @@ syntax
 desugar
 -------
 
-on top of the block and statement desugaring, the desugarer
-
-now has to handle generating sort-of-unique ids (only sort of, because
-it's not good enough for production, but it's good enough for these
-tests)
+> type Desugarer = RWST () () DesugarState (Except String)
 
 > data DesugarState = DesugarState {uniqueCtr :: Int
 >                                  ,nextUnusedCheckBlockID :: Int
@@ -168,6 +139,18 @@ tests)
 
 > startingDesugarState :: DesugarState
 > startingDesugarState = DesugarState 0 0 0 Nothing
+
+> makeUniqueVar :: String -> Desugarer String
+> makeUniqueVar pref = do
+>     s <- get
+>     let suff = uniqueCtr s
+>     put $ s {uniqueCtr = suff + 1}
+>     pure $ pref ++ "-" ++ show suff
+
+
+--------------------------------------
+
+testing support in the desugarer monad
 
 > enterNewCheckBlock :: Desugarer (String,Expr)
 > enterNewCheckBlock = do
@@ -191,17 +174,12 @@ tests)
 >     put $ s {nextAnonymousBlockNumber = blockNo + 1}
 >     pure $ "check-block-" ++ show blockNo
 
-> makeUniqueVar :: String -> Desugarer String
-> makeUniqueVar pref = do
->     s <- get
->     let suff = uniqueCtr s
->     put $ s {uniqueCtr = suff + 1}
->     pure $ pref ++ "-" ++ show suff
+--------------------------------------
 
-> type Desugarer = RWST () [()] DesugarState (Except String)
+desugaring code
 
 > runDesugar :: Expr -> Either String Expr
-> runDesugar expr = --runExcept (evalStateT (desugar expr) startingDesugarState)
+> runDesugar expr =
 >     fst <$> runExcept (evalRWST (desugar expr) () startingDesugarState)
 
 > desugar :: Expr -> Desugarer Expr
@@ -217,6 +195,16 @@ tests)
 >     Seq <$> desugar e <*> desugar (Block es)
 
 
+--------------------------------------
+
+test desugaring
+it's a bunch of code, but mostly boilerplate
+see if can make it smaller
+  try to do all the monad stuff first
+then construct the generated code top down
+with as little splits as possible
+write generation helper functions instead
+
 check:
   stmt1
   ..
@@ -231,17 +219,6 @@ internal-tests.add-tests(lam():
   ...
   nothing
 end
-
-how can more be put in haskell with the purpose of shrinking the
-overall amount of code without adding new in language features?
-the key issue is that the check blocks need to do closure capture
-could remove the checkblock id for now
-this can be passed as literals to all the functions that need it in
-the syntax easily
-I don't think much can be done to shrink it realistically
-have to go over this code and try to refactor it within the current
-design to make it more succinct and maintainable
-
 
 > desugar (Block (Check nm bdy : es)) = do
 >     (uniqueCheckBlockIDVarName,uniqueCheckBlockID) <- enterNewCheckBlock
@@ -313,6 +290,9 @@ end
 >   where
 >     plus c d = App (Iden "+") [c, d]
 
+--------------------------------------
+
+the rest of the desugaring
 
 > desugar (Num i) = pure $ Num i
 > desugar (Text i) = pure $ Text i
@@ -331,8 +311,6 @@ shouldn't be hit
 
 > desugar (If c t e) =
 >     If <$> desugar c <*> desugar t <*> desugar e
-
-> -- desugar x = error $ show x
 
 ------------------------------------------------------------------------------
 
@@ -384,9 +362,7 @@ values
 > emptyInterpreterState :: InterpreterState
 > emptyInterpreterState = InterpreterState [] []
 
-> --type Interpreter = ReaderT Env (StateT InterpreterState (Except String))
->
-> type Interpreter = RWST Env [()] InterpreterState (Except String)
+> type Interpreter = RWST Env () InterpreterState (Except String)
 
 > runInterp :: Env -> Expr -> Either String [CheckResult]
 > runInterp env expr = --runExcept (evalStateT (runReaderT scriptWithTestStuff env) InterpreterState)
@@ -406,21 +382,7 @@ values
 > interp (App f es) = do
 >     fv <- interp f
 >     vs <- mapM interp es
->     app fv vs {-
->     case fv of
->         FunV ps bdy env' -> do
->             as <- safeZip ps vs
->             let env'' = extendEnv as env'
->             local (const env'') $ interp bdy
->         ForeignFunV nm -> do
->             let tys = map valueTypeName vs
->             env <- ask
->             hf <- lookupForeignFun nm tys env
->             hf vs
->         _ -> lift $ throwE "non function value in app position"
->   where
->     safeZip ps vs | length vs == length ps = pure $ zip ps vs
->                   | otherwise = lift $ throwE $ "wrong number of args to function"-}
+>     app fv vs
 > interp (Lam ps e) = do
 >     env <- ask
 >     pure $ FunV ps e env
@@ -470,15 +432,14 @@ values
 haskell side testing infrastructure
 -----------------------------------
 
-
 checkresult:
+
+this is the user api. Is this as simple and direct as possible?
 
 todo: will extend the name with the package and module as well
 want to be able to do a filter on which tests to run
 maybe the filter is just a predicate on the package, module and check
 block name
-
-this is the user api. Is this as simple and direct as possible?
 
 > data CheckResult = CheckResult String -- the test block name
 >                               [(String, Maybe String)]
@@ -486,19 +447,26 @@ this is the user api. Is this as simple and direct as possible?
 > -- the second is Nothing if it's a pass
 > -- if it is Just, it's a fail, and contains the failure message
 
+--------------------------------------
+
+ffi functions used by the desugared test code
+
+TODO: use/write helpers for working with state monad, etc.
+create a wrapper to convert an Interpreter () into NothingV
+
+> data TestResultLog = TestPass Scientific String -- check block id, test source
+>                    | TestFail Scientific String String -- check block id, test source, failure message
+>                    | TestBlock Scientific String
 
 add-tests(fn)
 takes a function value
+these functions are run at the end of the script to do the testing
 
 > addTests :: Value -> Interpreter Value
 > addTests v = do
 >     s <- get
 >     put $ s {addedTests = v : addedTests s}
 >     pure NothingV
-
-> data TestResultLog = TestPass Scientific String -- check block id, test source
->                    | TestFail Scientific String String -- check block id, test source, failure message
->                    | TestBlock Scientific String
 
 log-check-block(unique-block-id, name)
 says there is a new test block with a unique id and it's name
@@ -525,6 +493,10 @@ log-test-fail(block,id, text of test, fail message)
 >     put $ s {testResultLog = TestFail n msg failmsg : testResultLog s}
 >     pure NothingV
 
+--------------------------------------
+
+this is run at the end of the script to run all the saved tests
+
 > runAddedTests :: Interpreter [CheckResult]
 > runAddedTests = do
 >     s <- get
@@ -533,10 +505,8 @@ log-test-fail(block,id, text of test, fail message)
 >     let testLog = reverse $ testResultLog s'
 >     either (lift . throwE) pure $ testLogToCheckResults testLog
 
-
- data TestResultLog = TestPass Scientific String -- check block id, test source
-                    | TestFail Scientific String String -- check block id, test source, failure message
-                    | TestBlock Scientific String
+this is run after that, to convert the log of test events, into a
+organised data structure to view the results
 
 > testLogToCheckResults :: [TestResultLog] -> Either String [CheckResult]
 > testLogToCheckResults trls = do
@@ -573,6 +543,9 @@ log-test-fail(block,id, text of test, fail message)
 >   where
 >     reverseResults (CheckResult nm ts) = CheckResult nm $ reverse ts
 
+function to convert the check result data structure into a nicely
+formatted string
+
 > renderCheckResults :: [CheckResult] -> String
 > renderCheckResults cs =
 >     let bs = map renderCheck cs
@@ -604,11 +577,6 @@ log-test-fail(block,id, text of test, fail message)
 >     indent' ('\n':y@(_:_)) = "\n  " ++ indent' y
 >     indent' (x:y) = x : indent' y
 
-
- data CheckResult = CheckResult String -- the test block name
-                               [(String, Maybe String)]
-
-
 ------------------------------------------------------------------------------
 
 ffi catalog
@@ -633,8 +601,6 @@ ffi catalog
 >     )
 
 >    emptyEnv
-
-todo: write this properl;y
 
 > torepr :: Value -> Interpreter Value
 > torepr x = pure $ TextV $ torepr' x
@@ -902,43 +868,10 @@ pretty
 > unconvPattern ::String -> S.Pat
 > unconvPattern n = S.IdenP S.NoShadow (S.PatName n)
 
-
-StExpr Expr
-           | LetDecl String Expr
-           deriving (Eq, Show)
-
- data Expr = Num Scientific
-           | Text String
-           | TupleSel [Expr]
-           | Iden String
-           | App Expr [Expr]
-           | Lam [String] Expr
-           | Let [(String,Expr)] Expr
-           | Block [Stmt]
-           | Seq Expr Expr
-
 ------------------------------------------------------------------------------
 
 tests
 -----
-
-todo:
-
-figure out how doing the simplest check thing will work here
-maybe extend the simplest check concept
-and sketch out the tests for this code
-then work backwards from it
-not sure if it can be used without doing a basic desugaring of check
-and tests
-want to do a stripped down proper check implementation
-this will form the basis of most examples, the only ones
-  are the ones building the bits which need this?
-  or does it still add a lot of complexity to avoid in experiments?
-
-
-
-check basics
-check that the block scoping works by shadowing a variable
 
 > simpleTestScript :: String
 > simpleTestScript = [r|
@@ -946,7 +879,7 @@ check that the block scoping works by shadowing a variable
 
 check "basic tests":
   1 is 1
-  1 + 2 is 5
+  1 + 2 is 3
 
   let x = 3:
     x
@@ -1024,21 +957,15 @@ end
 
 
       
-> tests :: T.TestTree
-> tests = T.testCase "simplestatementscheck" $ do
->     let x = either error id $ evaluateWithChecks simpleTestScript
->     putStrLn $ renderCheckResults x
->     
-
->      {-
->     let ts = either error id $ evaluate simpleTestScript
->     -- todo: if executing the script itself fails
->     -- create a failing test for this
->     -- otherwise, do the actual tests
->     in T.testGroup "simplest check" $ map f ts
->   where
->     f (st, msg) = T.testCase msg $ do
->         case st of
->             Pass -> T.assertBool "" True
->             Fail -> T.assertFailure ""-}
->     
+> tests :: IO T.TestTree
+> tests = do
+>     let crs = either error id $ evaluateWithChecks simpleTestScript
+>     putStrLn $ renderCheckResults crs
+>     let f (CheckResult nm res) =
+>             T.testGroup nm $ map g res
+>         g (nm, fm) = T.testCase nm $
+>             case fm of
+>                 Nothing -> T.assertBool "" True
+>                 Just fmx -> T.assertFailure fmx
+>     pure $ T.testGroup "simplestatementscheck"
+>          $ map f crs
