@@ -1,50 +1,39 @@
 
-simple expressions, extended with statements
+simple statements variation
 
-two kinds of statements: let decl, and expression
-it has blocks which can contain 1 or more statements
-blocks cannot end with a let decl
+sequences of statements are desugared to seq
+letdecl is desugared to let expressions
+seq takes two expressions
 
-todo:
-fix this version to not desugar let decls
-then do another version which desugars them to let expressions
-then reconcile with the seq version and fix that one up
-what if seq took two statements instead of expressions?
+here's an idea: what if there's seqStatement, first arg is a
+ statement, second is an expression,
+and regular seq, both args are expressions
+both seqs are expressions
 
-what are the future kinds of statements which aren't expressions in
- disguise?
-set var, set ref
+doesn't solve empty blocks, or ending a block with a statement (should
+this be allowed?)
+
+these are some regular statements that can easily be expressions:
+when
+recdecl, fundecl
+vardecl?
+test predicates
+check blocks
+
+these are some which can't easily:
+set var
+set ref
 data decl
-types, etc.
+type decl
+contracts?
 
-
-
-
-a question:
-what is the top level?
-is it an expression?
-do you have to write block explicitly first if you want more than just
-a single expression?
-is the top level a list of statements
-if so, does it add the block implicitly or not?
-later might want to distinguish, since the top level
-  might become a special letrec
-  but non top level blocks are not letrec
-
-what's the easiest thing to do?
-parse a list of statements
-add the block in the ast automatically to wrap them
-this keeps syntax compatibility with the check version
-
-what's the ultimate thing to do? maybe come back to this after doing
-programs and imports and stuff
 
 
 > {-# LANGUAGE TupleSections #-}
 > {-# LANGUAGE LambdaCase #-}
 
-> module SimpleStatements (tests
->                         ) where
+> module SimpleStatementsSeq (tests
+>                            ) where
 
 > import SimpleExpr (TestTree
 >                   ,makeSimpleTests
@@ -78,6 +67,7 @@ syntax
 >           | Lam [String] Expr
 >           | Let [(String,Expr)] Expr
 >           | Block [Stmt]
+>           | Seq Expr Expr
 >           deriving (Eq, Show)
 
 ------------------------------------------------------------------------------
@@ -101,10 +91,9 @@ what are the pros and cons of desugaring to the same ast?
 >     v' <- desugar v
 >     Let [(n,v')] <$> desugar (Block es)
 
-> desugar (Block (StExpr e : es)) = do
->     e' <- desugar e
->     es' <- desugar (Block es)
->     pure $ Block [StExpr e', StExpr es']
+
+> desugar (Block (StExpr e : es)) =
+>     Seq <$> desugar e <*> desugar (Block es)
 
 > desugar (Num i) = pure $ Num i
 > desugar (Text i) = pure $ Text i
@@ -115,6 +104,12 @@ what are the pros and cons of desugaring to the same ast?
 > desugar (Let bs e) = do
 >     let f (n,v) = (n,) <$> desugar v
 >     Let <$> mapM f bs <*> desugar e
+
+shouldn't be hit
+
+> desugar (Seq a b) =
+>     Seq <$> desugar a <*> desugar b
+
 
 ------------------------------------------------------------------------------
 
@@ -192,10 +187,8 @@ values
 >             local (extendEnv [(b,v)]) $ newEnv bs'
 >     newEnv bs
 
-> interp (Block []) = lift $ throwE "empty block"
-> interp (Block (LetDecl {}: _)) = lift $ throwE "non desugared letdecl"
-> interp (Block [StExpr e]) = interp e
-> interp (Block (StExpr e:es)) = interp e *> interp (Block es)
+> interp (Block {}) = lift $ throwE $ "undesugared block passed to interpreter"
+> interp (Seq a b) = interp a *> interp b
 
 
 
@@ -376,24 +369,6 @@ parse
 
 tests
 -----
-
-todo:
-
-figure out how doing the simplest check thing will work here
-maybe extend the simplest check concept
-and sketch out the tests for this code
-then work backwards from it
-not sure if it can be used without doing a basic desugaring of check
-and tests
-want to do a stripped down proper check implementation
-this will form the basis of most examples, the only ones
-  are the ones building the bits which need this?
-  or does it still add a lot of complexity to avoid in experiments?
-
-
-
-check basics
-check that the block scoping works by shadowing a variable
 
 the tests are cheating slightly, because testing the code properly is
 deferred until more features are added. not sure if this is legit, an

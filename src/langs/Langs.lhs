@@ -10,6 +10,7 @@
 > import qualified SimpleExprIfAndOr
 > import qualified SimpleExprTupleHack
 > import qualified SimpleStatements
+> import qualified SimpleStatementsSeq
 > import qualified SimpleStatementsWithoutCheck
 > import qualified SimpleStatementsCheck
 
@@ -29,5 +30,6 @@
 >        ,SimpleExprIfAndOr.tests
 >        ,SimpleExprTupleHack.tests
 >        ,SimpleStatements.tests
+>        ,SimpleStatementsSeq.tests
 >        ,SimpleStatementsWithoutCheck.tests
 >        ] ++ iots

@@ -93,7 +93,7 @@ or all tests for all code that is used
 
 > import Control.Monad.Trans.Class (lift)
 > import Control.Monad.Trans.Except (Except, runExcept, throwE)
-> import Control.Monad.Trans.RWS (RWST, evalRWST, ask, local, get, put)
+> import Control.Monad.Trans.RWS (RWST, evalRWST, ask, local, get, gets, state, put, modify)
 
 > import Control.Monad (when)
 > import Data.Maybe (isJust, isNothing)
@@ -141,11 +141,10 @@ desugar
 > startingDesugarState = DesugarState 0 0 0 Nothing
 
 > makeUniqueVar :: String -> Desugarer String
-> makeUniqueVar pref = do
->     s <- get
+> makeUniqueVar pref = state $ \s ->
 >     let suff = uniqueCtr s
->     put $ s {uniqueCtr = suff + 1}
->     pure $ pref ++ "-" ++ show suff
+>     in (pref ++ "-" ++ show suff
+>        ,s {uniqueCtr = suff + 1})
 
 
 --------------------------------------
@@ -163,16 +162,13 @@ testing support in the desugarer monad
 >     pure (nm,Num $ fromIntegral $ newID)
 
 > exitCheckBlock :: Desugarer ()
-> exitCheckBlock = do
->     s <- get
->     put $ s {currentCheckBlockIDName = Nothing}
+> exitCheckBlock = modify $ \s -> s {currentCheckBlockIDName = Nothing}
 
 > getAnonBlockName :: Desugarer String
-> getAnonBlockName = do
->     s <- get
+> getAnonBlockName = state $ \s ->
 >     let blockNo = nextAnonymousBlockNumber s
->     put $ s {nextAnonymousBlockNumber = blockNo + 1}
->     pure $ "check-block-" ++ show blockNo
+>     in ("check-block-" ++ show blockNo
+>        ,s {nextAnonymousBlockNumber = blockNo + 1})
 
 --------------------------------------
 
@@ -223,21 +219,20 @@ end
 > desugar (Block (Check nm bdy : es)) = do
 >     (uniqueCheckBlockIDVarName,uniqueCheckBlockID) <- enterNewCheckBlock
 >     blockName <- maybe getAnonBlockName pure nm
->     let lamBdyPrefix =
->             [LetDecl uniqueCheckBlockIDVarName uniqueCheckBlockID
->             ,StExpr $ App (Iden "log-check-block")
->                           [Iden uniqueCheckBlockIDVarName
->                           ,Text blockName]]
->     sts <- desugar (Block (lamBdyPrefix ++ bdy))
->     let lam = Lam [] sts
->         top = App (Iden "add-tests") [lam]
->     x <- desugar top
+>     desugaredCheck <- desugar $
+>         appI "add-tests"
+>         [Lam [] (Block $
+>                  [LetDecl uniqueCheckBlockIDVarName uniqueCheckBlockID
+>                  ,StExpr $ appI "log-check-block"
+>                              [Iden uniqueCheckBlockIDVarName
+>                              ,Text blockName]]
+>                  ++ bdy)]
 >     exitCheckBlock
 >     case es of
->         [] -> pure x
->         _ -> do
->              xs <- desugar (Block es)
->              pure (Seq x xs)
+>         [] -> pure desugaredCheck
+>         _ -> Seq desugaredCheck <$> desugar (Block es)
+>   where
+>     appI i as = App (Iden i) as
 
 aexpr is bexpr
 
@@ -259,34 +254,28 @@ end
 >     uniqueV0 <- makeUniqueVar "is-v0"
 >     uniqueV1 <- makeUniqueVar "is-v1"
 >     uniqueName <- makeUniqueVar "testname"
->     x <- get
 >     checkBlockIDName <- (maybe (lift $ throwE "'is' test outside check block") pure)
->                         (currentCheckBlockIDName x)
->     
->     a' <- desugar a
->     b' <- desugar b
->     let -- make sure to use the original syntax to display the expressions
->         -- it might be even better to display the original source
->         uniqueNameVal = Text $ pretty a ++ " is " ++ pretty b
->         assigns = [LetDecl uniqueV0 a'
->                   ,LetDecl uniqueV1 b'
->                   ,LetDecl uniqueName uniqueNameVal]
->         cond = App (Iden "==") [Iden uniqueV0, Iden uniqueV1]
->         -- should get the name of the test block id?
->         -- it knows the value from the state, but maybe the name is
->         -- cleaner?
->         thn = App (Iden "log-test-pass")
->                   [Iden checkBlockIDName, Iden uniqueName]
->         els = App (Iden "log-test-fail")
->                          [Iden checkBlockIDName
->                          ,Iden uniqueName
->                          ,Text "Values not equal:\n"
->                           `plus` App (Iden "torepr") [Iden uniqueV0]
->                           `plus` Text "\n"
->                           `plus` App (Iden "torepr") [Iden uniqueV1]]
->     pure $ Block (assigns ++ [StExpr $ If cond thn els])
+>                         =<< (gets currentCheckBlockIDName)
+>     -- desugars things more than once?
+>     desugar $ Block
+>               [LetDecl uniqueV0 a
+>               ,LetDecl uniqueV1 b
+>               ,LetDecl uniqueName (Text $ pretty a ++ " is " ++ pretty b)
+>               ,StExpr $
+>                If (eqIdens uniqueV0 uniqueV1)
+>                   (appI "log-test-pass" [Iden checkBlockIDName
+>                                         ,Iden uniqueName])
+>                   (appI "log-test-fail"
+>                    [Iden checkBlockIDName
+>                    ,Iden uniqueName
+>                    ,Text "Values not equal:\n"
+>                        `plus` appI "torepr" [Iden uniqueV0]
+>                        `plus` Text "\n"
+>                        `plus` appI "torepr" [Iden uniqueV1]])]
 >   where
->     plus c d = App (Iden "+") [c, d]
+>     plus c d = appI "+" [c, d]
+>     eqIdens c d = appI "==" [Iden c, Iden d]
+>     appI i es = App (Iden i) es
 
 --------------------------------------
 
@@ -461,35 +450,29 @@ takes a function value
 these functions are run at the end of the script to do the testing
 
 > addTests :: Value -> Interpreter Value
-> addTests v = do
->     s <- get
->     put $ s {addedTests = v : addedTests s}
->     pure NothingV
+> addTests v = nothingWrapper $ \s -> s {addedTests = v : addedTests s}
 
 log-check-block(unique-block-id, name)
 says there is a new test block with a unique id and it's name
 
 > logCheckBlock :: Scientific -> String -> Interpreter Value
-> logCheckBlock n nm = do
->     s <- get
->     put $ s {testResultLog = TestBlock n nm : testResultLog s}
->     pure NothingV
+> logCheckBlock n nm =
+>     nothingWrapper $ \s -> s {testResultLog = TestBlock n nm : testResultLog s}
 
 log-test-pass(blockid, text of test)
 
 > logTestPass :: Scientific -> String -> Interpreter Value
-> logTestPass n msg = do
->     s <- get
->     put $ s {testResultLog = TestPass n msg : testResultLog s}
->     pure NothingV
+> logTestPass n msg =
+>     nothingWrapper $ \s -> s {testResultLog = TestPass n msg : testResultLog s}
 
 log-test-fail(block,id, text of test, fail message)
 
 > logTestFail :: Scientific -> String -> String -> Interpreter Value
-> logTestFail n msg failmsg = do
->     s <- get
->     put $ s {testResultLog = TestFail n msg failmsg : testResultLog s}
->     pure NothingV
+> logTestFail n msg failmsg = nothingWrapper $ \s ->
+>     s {testResultLog = TestFail n msg failmsg : testResultLog s}
+
+> nothingWrapper :: (InterpreterState -> InterpreterState) -> Interpreter Value
+> nothingWrapper f = modify f *> pure NothingV
 
 --------------------------------------
 
@@ -497,10 +480,9 @@ this is run at the end of the script to run all the saved tests
 
 > runAddedTests :: Interpreter [CheckResult]
 > runAddedTests = do
->     s <- get
->     mapM_ (\v -> app v []) (reverse $ addedTests s)
->     s' <- get
->     let testLog = reverse $ testResultLog s'
+>     ts <- reverse <$> gets addedTests
+>     mapM_ (\v -> app v []) ts
+>     testLog <- reverse <$> gets testResultLog
 >     either (lift . throwE) pure $ testLogToCheckResults testLog
 
 this is run after that, to convert the log of test events, into a
