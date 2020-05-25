@@ -404,21 +404,33 @@ figure out how doing the simplest check thing will work here
 maybe extend the simplest check concept
 and sketch out the tests for this code
 then work backwards from it
-
-how will the first stage of check desugaring work?
+not sure if it can be used without doing a basic desugaring of check
+and tests
+want to do a stripped down proper check implementation
+this will form the basis of most examples, the only ones
+  are the ones building the bits which need this?
+  or does it still add a lot of complexity to avoid in experiments?
 
 
 
 check basics
 check that the block scoping works by shadowing a variable
 
+the tests are cheating slightly, because testing the code properly is
+deferred until more features are added. not sure if this is legit, an
+issue, good or bad for maintenance or for tutorial purposes
+
 > additionalTests :: [(String,String)]
 > additionalTests = [("x = 3\n\
 >                     \x", "3")
 >                   ,("3 + 4\n\
 >                     \4 + 6", "10")
+>                   ,("x = block:\n\
+>                     \      3 + 4\n\
+>                     \      4 + 6\n\
+>                     \    end\n\
+>                     \x + 2", "12")
 >                   ]
-
 
 > tests :: TestTree
 > tests = makeSimpleTests "simplestatements" (simpleInterpreterExamples ++ additionalTests) evaluate
