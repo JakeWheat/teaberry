@@ -222,9 +222,7 @@ end
 
 > desugar (Block (Check nm bdy : es)) = do
 >     (uniqueCheckBlockIDVarName,uniqueCheckBlockID) <- enterNewCheckBlock
->     -- uniqueCheckBlockID <- (Num . fromIntegral) <$> enterNewCheckBlock
 >     blockName <- maybe getAnonBlockName pure nm
->     -- uniqueCheckBlockIDVarName <- makeUniqueVar "check-block-id"
 >     let lamBdyPrefix =
 >             [LetDecl uniqueCheckBlockIDVarName uniqueCheckBlockID
 >             ,StExpr $ App (Iden "log-check-block")
@@ -365,7 +363,7 @@ values
 > type Interpreter = RWST Env () InterpreterState (Except String)
 
 > runInterp :: Env -> Expr -> Either String [CheckResult]
-> runInterp env expr = --runExcept (evalStateT (runReaderT scriptWithTestStuff env) InterpreterState)
+> runInterp env expr =
 >     fst <$> runExcept (evalRWST scriptWithTestStuff env emptyInterpreterState)
 >   where
 >     scriptWithTestStuff = do
