@@ -16,6 +16,7 @@
 > import qualified SimpleStatementsCheck
 > import qualified SimpleStatementsCheckDesugarRefactor
 > import qualified SimpleVar
+> import qualified Lists1
 
 > import qualified Test.Tasty as T
 
@@ -38,4 +39,5 @@
 >        ,SimpleStatementsCheck.tests
 >        ,SimpleStatementsCheckDesugarRefactor.tests
 >        ,SimpleVar.tests
+>        ,Lists1.tests
 >        ]

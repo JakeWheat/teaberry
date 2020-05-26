@@ -100,5 +100,6 @@ Test-Suite Langs
                        SimpleStatementsCheck
                        SimpleStatementsCheckDesugarRefactor
                        SimpleVar
+                       Lists1
   main-is:             Langs.lhs
 
