@@ -5,31 +5,13 @@ two kinds of statements: let decl, and expression
 it has blocks which can contain 1 or more statements
 blocks cannot end with a let decl
 
-a question:
-what is the top level?
-is it an expression?
-do you have to write block explicitly first if you want more than just
-a single expression?
-is the top level a list of statements
-if so, does it add the block implicitly or not?
-later might want to distinguish, since the top level
-  might become a special letrec
-  but non top level blocks are not letrec
-
-what's the easiest thing to do?
-parse a list of statements
-add the block in the ast automatically to wrap them
-this keeps syntax compatibility with the check version
-
-what's the ultimate thing to do? maybe come back to this after doing
-programs and imports and stuff
-
+desugars let decls to let expressions
 
 > {-# LANGUAGE TupleSections #-}
 > {-# LANGUAGE LambdaCase #-}
 
-> module SimpleStatements (tests
->                         ) where
+> module SimpleStatementsDesugarLetDecl (tests
+>                                       ) where
 
 > import SimpleExpr (TestTree
 >                   ,makeSimpleTests
@@ -79,10 +61,22 @@ what are the pros and cons of desugaring to the same ast?
 
 > desugar :: Expr -> Either String Expr
 
-> desugar (Block sts) = Block <$> mapM desugarSt sts
+
+> desugar (Block sts) = do
+>     xs <- desugarLetDecl sts
+>     Block <$> mapM desugarSt xs
 >   where
->     desugarSt (LetDecl n e) = LetDecl n <$> desugar e
+>     desugarSt :: Stmt -> Either String Stmt
 >     desugarSt (StExpr e) = StExpr <$> desugar e
+>     desugarSt (LetDecl {}) = Left $ "internal error: didn't remove letdecl"
+>     desugarLetDecl :: [Stmt] -> Either String [Stmt]
+>     desugarLetDecl [] = pure []
+>     desugarLetDecl (LetDecl n v : xs) = desugarHaveLet [(n,v)] xs
+>     desugarLetDecl (x@(StExpr {}):xs) = (x :) <$> desugarLetDecl xs
+>     desugarHaveLet :: [(String,Expr)] -> [Stmt] -> Either String [Stmt]
+>     desugarHaveLet bs (LetDecl n v : xs) = desugarHaveLet ((n,v):bs) xs
+>     desugarHaveLet bs (StExpr e : xs) = (StExpr (Let (reverse bs) e) :) <$> desugarLetDecl xs
+>     desugarHaveLet _ [] = Left $ "block ends with letdecl"
 
 > desugar (Num i) = pure $ Num i
 > desugar (Text i) = pure $ Text i
@@ -170,22 +164,11 @@ values
 >             local (extendEnv [(b,v)]) $ newEnv bs'
 >     newEnv bs
 
-A bunch of tedious special cases. Using seq moves these to the
-desugarer. The special cases could be eliminated in the desugarer so
-you would never see them in the interpreter. I think this is what seq
-mainly brings - representing that these have been eliminated in the
-ast types. How do you put statements that don't desugar to expressions
-back into this system?
-
 > interp (Block []) = lift $ throwE "empty block"
-
-> interp (Block [LetDecl {}]) = lift $ throwE "blocks ends with letdecl"
-> interp (Block (LetDecl n e : es)) = do
->     v <- interp e
->     local (extendEnv [(n,v)]) $ interp (Block es)
+> interp (Block (LetDecl {}: _)) = lift $ throwE "non desugared letdecl"
 
 > interp (Block [StExpr e]) = interp e
-> interp (Block (StExpr e : es)) = interp e *> interp (Block es)
+> interp (Block (StExpr e:es)) = interp e *> interp (Block es)
 
 
 

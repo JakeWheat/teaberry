@@ -26,13 +26,13 @@ and how I use the command line interface:
 
 cabal run -v0 teaberry --disable-optimization -- -g examples/tests/fulltests/tour.tea
 
-(disabling the optimsation doesn't seem to make anything slower at
-this stage, and makes ghc compile it much faster)
+(disabling the optimsation doesn't seem to make anything slower for
+this code, and makes ghc compile it much faster)
 
 # About Pyret
 
 Pyret is a really nice functional language with an optional type
-checker primarily aimed at teaching programming at the moment.
+checker designed for teaching programming.
 
 Homepage:
 https://www.pyret.org/
@@ -57,17 +57,17 @@ mostly pyret syntax to start with
 strict/eager
 basic functional programming: functions as values + closures
 algebraic data types + pattern binding
-typed only, with inference (will remain untyped for a while yet)
+typed only, with inference
 parametric polymorphism
 type classes
-non whitespace significant (except maybe copying some of pyret, but
-  not indentation significant)
-no purity tracking in the type system
-  (to be reviewed)
+non indentation significant
+some whitespace significance from pyret (requiring whitespace/newline
+  or the opposite between two tokens in some places)
+no effects tracking in the type system (to be reviewed)
 exceptions (to be reviewed)
 garbage collection
 resource management
-control flow: break, continue, goto ?
+control flow: break, continue, goto (to be reviewed)
 no implicit casting
 no pragmas, javadoc in comment syntax
 good error messages
@@ -98,12 +98,9 @@ construct expressions
 
 check, where
 
-shadow (syntax only, shadowing not detected)
+shadow (syntax only, no enforcement of shadowing/not shadowing)
 
 usable subset of import, provide, include
-  doesn't check for import cycles yet, will probably hang if you do
-  this
-    
 
 ## planned
 

@@ -102,6 +102,8 @@ or all tests for all code that is used
 
 > import Data.Scientific (Scientific, floatingOrInteger)
 > import Data.List (intercalate, partition)
+>
+> import Debug.Trace (trace)
 
 ------------------------------------------------------------------------------
 
@@ -179,17 +181,6 @@ desugaring code
 >     fst <$> runExcept (evalRWST (desugar expr) () startingDesugarState)
 
 > desugar :: Expr -> Desugarer Expr
-> desugar (Block []) = lift $ throwE $ "empty block"
-> desugar (Block [StExpr e]) = desugar e
-> desugar (Block [LetDecl {}]) = lift $ throwE $ "block ends with let"
-
-> desugar (Block (LetDecl n v : es)) = do
->     v' <- desugar v
->     Let [(n,v')] <$> desugar (Block es)
-
-> desugar (Block (StExpr e : es)) =
->     Seq <$> desugar e <*> desugar (Block es)
-
 
 --------------------------------------
 
@@ -256,7 +247,6 @@ end
 >     uniqueName <- makeUniqueVar "testname"
 >     checkBlockIDName <- (maybe (lift $ throwE "'is' test outside check block") pure)
 >                         =<< (gets currentCheckBlockIDName)
->     -- desugars things more than once?
 >     desugar $ Block
 >               [LetDecl uniqueV0 a
 >               ,LetDecl uniqueV1 b
@@ -281,6 +271,18 @@ end
 
 the rest of the desugaring
 
+> desugar (Block []) = lift $ throwE $ "empty block"
+> desugar (Block [StExpr e]) = desugar e
+> desugar (Block [LetDecl {}]) = lift $ throwE $ "block ends with let"
+
+> desugar (Block (LetDecl n v : es)) = do
+>     v' <- desugar v
+>     Let [(n,v')] <$> desugar (Block es)
+
+> desugar (Block (StExpr e : es)) =
+>     Seq <$> desugar e <*> desugar (Block es)
+
+
 > desugar (Num i) = pure $ Num i
 > desugar (Text i) = pure $ Text i
 > desugar (TupleSel fs) = TupleSel <$> mapM desugar fs
@@ -291,7 +293,7 @@ the rest of the desugaring
 >     let f (n,v) = (n,) <$> desugar v
 >     Let <$> mapM f bs <*> desugar e
 
-shouldn't be hit
+shouldn't be hit?
 
 > desugar (Seq a b) =
 >     Seq <$> desugar a <*> desugar b
@@ -546,7 +548,7 @@ formatted string
 >            ++ "\n  " ++ show (length ps) ++ "/" ++ show (length ts) ++ " tests passed in check block: " ++ nm
 >            )
 >     renderTest (a,b) =
->         a ++ ": "
+>         "test (" ++ a ++ "): "
 >         ++ case b of
 >                Nothing -> "OK"
 >                Just msg -> "failed, reason:\n" ++ indent msg
@@ -937,15 +939,14 @@ end
 
 
       
-> tests :: IO T.TestTree
-> tests = do
+> tests :: T.TestTree
+> tests =
 >     let crs = either error id $ evaluateWithChecks simpleTestScript
->     putStrLn $ renderCheckResults crs
->     let f (CheckResult nm res) =
+>         f (CheckResult nm res) =
 >             T.testGroup nm $ map g res
 >         g (nm, fm) = T.testCase nm $
 >             case fm of
 >                 Nothing -> T.assertBool "" True
 >                 Just fmx -> T.assertFailure fmx
->     pure $ T.testGroup "simplestatementscheck"
->          $ map f crs
+>     in trace (renderCheckResults crs)
+>        $ T.testGroup "simplestatementscheck" $ map f crs

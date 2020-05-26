@@ -10,6 +10,7 @@
 > import qualified SimpleExprIfAndOr
 > import qualified SimpleExprTupleHack
 > import qualified SimpleStatements
+> import qualified SimpleStatementsDesugarLetDecl
 > import qualified SimpleStatementsSeq
 > import qualified SimpleStatementsWithoutCheck
 > import qualified SimpleStatementsCheck
@@ -17,8 +18,7 @@
 > import qualified Test.Tasty as T
 
 > main :: IO ()
-> main = do
->     iots <- sequence [SimpleStatementsCheck.tests]
+> main =
 >     T.defaultMain $ T.testGroup "all" $ 
 >        [SimpleExpr.tests
 >        ,SimpleExprError.tests
@@ -30,6 +30,8 @@
 >        ,SimpleExprIfAndOr.tests
 >        ,SimpleExprTupleHack.tests
 >        ,SimpleStatements.tests
+>        ,SimpleStatementsDesugarLetDecl.tests
 >        ,SimpleStatementsSeq.tests
 >        ,SimpleStatementsWithoutCheck.tests
->        ] ++ iots
+>        ,SimpleStatementsCheck.tests
+>        ]

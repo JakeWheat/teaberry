@@ -94,6 +94,7 @@ Test-Suite Langs
                        SimpleExprIfAndOr
                        SimpleExprTupleHack
                        SimpleStatements
+                       SimpleStatementsDesugarLetDecl
                        SimpleStatementsSeq
                        SimpleStatementsWithoutCheck
                        SimpleStatementsCheck
