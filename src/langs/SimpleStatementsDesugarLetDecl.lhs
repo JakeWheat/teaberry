@@ -67,6 +67,9 @@ what are the pros and cons of desugaring to the same ast?
 >     (Block . map StExpr) <$> mapM (desugar) xs
 >   where
 
+>     -- todo: is there a way to simplify this more
+>     -- to not accumulate the lets, but turn each one into
+>     -- a let as it's seen and avoid the reverse too
 >     desugarLetDecl [] = pure []
 >     desugarLetDecl (LetDecl n v : xs) = desugarHaveLet [(n,v)] xs
 >     desugarLetDecl (StExpr x : xs) = (x :) <$> desugarLetDecl xs
