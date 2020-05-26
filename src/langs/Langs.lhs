@@ -14,6 +14,7 @@
 > import qualified SimpleStatementsSeq
 > import qualified SimpleStatementsWithoutCheck
 > import qualified SimpleStatementsCheck
+> import qualified SimpleStatementsCheckDesugarRefactor
 
 > import qualified Test.Tasty as T
 
@@ -34,4 +35,5 @@
 >        ,SimpleStatementsSeq.tests
 >        ,SimpleStatementsWithoutCheck.tests
 >        ,SimpleStatementsCheck.tests
+>        ,SimpleStatementsCheckDesugarRefactor.tests
 >        ]

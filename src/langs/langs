@@ -40,6 +40,92 @@ keep thinking about the complexity of the code
 but the first goal right now is to learn how to write the engine
 not to create documentation/tutorials/guides for users
 
+--------------------------------------
+
+lessons learned:
+
+is it possible to go back over the code and cover stuff that takes
+some people a long time to get their heads round (and some that took
+me a long time to get my head round and now it's become second
+nature)?
+
+
+(TODO: some of these are dogma, list them separately, didn't really
+learn them, just believed them already and didn't have that belief
+shaken, which isn't a question that got the answer to, and it isn't
+something that didn't think about before but now know about and know a
+good answer, still worth listing the dogma that hasn't been shaken)
+
+desugaring n-way let, lambda and app to 'curry' them is probably a
+waste of time
+
+some questions have been raised about desugaring and and or to
+functions, instead of implementing the 'laziness' in the interpreter
+
+with simple let, desugaring to seq instead of keeping blocks is much
+better. not sure how this will change with rec, fun, and other kinds
+of statements, currently expect it to not change
+
+using a separate interpreter syntax makes it much easier to do the
+desugaring and not repeat passes
+
+reader is really nice to use
+
+bootstrapping with fake features that work well enough until they can
+be implemented properly is super valid
+  adding ghetto tuples works for this
+  suspect that something similar is true for side effects
+    -> some hack ability to measure side effects to check language
+       features before there is enough language to do it in a
+       direct proper way
+
+confirmed: moving the testing to being as in language as possible as
+soon as possible is a big win
+
+having the parser (and pretty printer) already makes everything super
+easy: maybe try to have parsing sprints, separate to anything else
+
+writing code a second time in a different code base works well
+
+refactoring to make much nicer code is much easier in the little
+languages
+
+confirmed: reducing the code size by good refactoring makes a massive
+difference
+
+hypothesis seems to be true: keeping the many language versions around
+and live is a good decision (will validate it more once start doing
+the checkpoints, and especially when have the full language again, but
+continue to develop new features by doing in a little language first,
+then porting to the main branch)
+
+adding foreign functions can be made nice, clear and succinct with the
+additional of a whole bunch of boilerplate helper functions
+
+some choices (e.g. desugaring letrec, assuming not desugaring to seq),
+don't become clear from the first set of experiments
+
+disciplined code gen using helper functions and trying very hard to
+follow the total code being generated top down works pretty well and
+might be enough to not need qq really badly. still not sure about that
+though. qq is super nice for generated code
+
+reusing code (and maybe even presenting it) for lots of little
+languages really needs a source code cut and paste system
+
+
+
+
+mistakes in previous implementation
+-----------------------------------
+
+haskellapp was syntax
+ffi functions can be a value instead, I think it works much better
+
+
+
+
+
 
 --------------------------------------
 
