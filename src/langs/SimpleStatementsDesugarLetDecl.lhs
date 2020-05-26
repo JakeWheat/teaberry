@@ -64,18 +64,15 @@ what are the pros and cons of desugaring to the same ast?
 
 > desugar (Block sts) = do
 >     xs <- desugarLetDecl sts
->     Block <$> mapM desugarSt xs
+>     (Block . map StExpr) <$> mapM (desugar) xs
 >   where
->     desugarSt :: Stmt -> Either String Stmt
->     desugarSt (StExpr e) = StExpr <$> desugar e
->     desugarSt (LetDecl {}) = Left $ "internal error: didn't remove letdecl"
->     desugarLetDecl :: [Stmt] -> Either String [Stmt]
+
 >     desugarLetDecl [] = pure []
 >     desugarLetDecl (LetDecl n v : xs) = desugarHaveLet [(n,v)] xs
->     desugarLetDecl (x@(StExpr {}):xs) = (x :) <$> desugarLetDecl xs
->     desugarHaveLet :: [(String,Expr)] -> [Stmt] -> Either String [Stmt]
+>     desugarLetDecl (StExpr x : xs) = (x :) <$> desugarLetDecl xs
+
 >     desugarHaveLet bs (LetDecl n v : xs) = desugarHaveLet ((n,v):bs) xs
->     desugarHaveLet bs (StExpr e : xs) = (StExpr (Let (reverse bs) e) :) <$> desugarLetDecl xs
+>     desugarHaveLet bs (StExpr e : xs) = ((Let (reverse bs) e) :) <$> desugarLetDecl xs
 >     desugarHaveLet _ [] = Left $ "block ends with letdecl"
 
 > desugar (Num i) = pure $ Num i
@@ -349,28 +346,6 @@ parse
 
 tests
 -----
-
-todo:
-
-figure out how doing the simplest check thing will work here
-maybe extend the simplest check concept
-and sketch out the tests for this code
-then work backwards from it
-not sure if it can be used without doing a basic desugaring of check
-and tests
-want to do a stripped down proper check implementation
-this will form the basis of most examples, the only ones
-  are the ones building the bits which need this?
-  or does it still add a lot of complexity to avoid in experiments?
-
-
-
-check basics
-check that the block scoping works by shadowing a variable
-
-the tests are cheating slightly, because testing the code properly is
-deferred until more features are added. not sure if this is legit, an
-issue, good or bad for maintenance or for tutorial purposes
 
 > additionalTests :: [(String,String)]
 > additionalTests = [("x = 3\n\

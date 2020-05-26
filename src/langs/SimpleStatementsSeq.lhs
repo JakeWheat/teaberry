@@ -370,10 +370,6 @@ parse
 tests
 -----
 
-the tests are cheating slightly, because testing the code properly is
-deferred until more features are added. not sure if this is legit, an
-issue, good or bad for maintenance or for tutorial purposes
-
 > additionalTests :: [(String,String)]
 > additionalTests = [("x = 3\n\
 >                     \x", "3")

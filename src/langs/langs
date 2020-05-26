@@ -170,6 +170,10 @@ separate interpreter with desugarer
 
 letrec, letrec*
 
+shadow: two parts
+  1. give an error when shadowing occurs without shadow keyword
+  2. implement shadowing using renamer
+
 improving the test framework
   what does the most complete example need?
   exception handling
