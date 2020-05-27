@@ -91,6 +91,7 @@ Test-Suite Langs
                        SimplestCheck
                        SimpleExprFFI
                        SimpleExprIf
+                       SimpleExprNWayIf
                        SimpleExprIfAndOr
                        SimpleExprTupleHack
                        SimpleStatements

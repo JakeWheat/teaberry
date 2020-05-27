@@ -7,6 +7,7 @@
 > import qualified SimplestCheck
 > import qualified SimpleExprFFI
 > import qualified SimpleExprIf
+> import qualified SimpleExprNWayIf
 > import qualified SimpleExprIfAndOr
 > import qualified SimpleExprTupleHack
 > import qualified SimpleStatements
@@ -31,6 +32,7 @@
 >        ,SimplestCheck.tests
 >        ,SimpleExprFFI.tests
 >        ,SimpleExprIf.tests
+>        ,SimpleExprNWayIf.tests
 >        ,SimpleExprIfAndOr.tests
 >        ,SimpleExprTupleHack.tests
 >        ,SimpleStatements.tests
