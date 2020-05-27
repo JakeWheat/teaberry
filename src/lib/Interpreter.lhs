@@ -716,7 +716,6 @@ todo: can do this in the desugaring once there is a type checker
 >         | otherwise -> throwM $ InternalException $ "construct make called on non list: " ++ torepr' args
 >     [_,_] -> throwM $ UserException "The left side was not a defined convenience constructor."
 >     x -> throwM $ InternalException $ "construct make called on " ++ show (length x) ++ " args"
->         
 
 
 > makeVariant :: [Value] -> Interpreter Value
