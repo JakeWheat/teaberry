@@ -64,9 +64,12 @@ syntax
 > data VariantDecl = VariantDecl String [String]
 >                  deriving (Eq,Show) 
   
-> data Expr = Num Scientific
+> data Expr = -- selectors
+>             Num Scientific
 >           | Text String
 >           | TupleSel [Expr]
+>           | ListSel [Expr]
+>             -- other things
 >           | Iden String
 >           | App Expr [Expr]
 >           | Lam [String] Expr
@@ -74,7 +77,6 @@ syntax
 >           | Block [Stmt]
 >           | Seq Expr Expr
 >           | If Expr Expr Expr
->           | Construct Expr [Expr]
 >           | DotExpr Expr String
 >           deriving (Eq, Show)
 
@@ -181,23 +183,11 @@ desugaring code
 
 > desugar (If c t e) =
 >     If <$> desugar c <*> desugar t <*> desugar e
-
-
-  
-hardcoded implementation for lists, here because it desugars general
-construct to construct using lists
-
-> desugar (Construct (Iden "list") vs) =
->     desugar $ f vs
->   where
->     f [] = Iden "empty"
->     f (v:vs') = App (Iden "link") [v,f vs']
-
-> desugar x@(Construct {}) = lift $ throwE $ "parse: only list construct supported: " ++ show x
-
   
 > desugar (DotExpr e f) = do
 >     desugar (App (Iden "variant-field-get") [Text f, e])
+
+> desugar (ListSel vs) = ListSel <$> mapM desugar vs
 
 
 > desugarStmts :: [Stmt] -> Desugarer Expr
@@ -253,7 +243,7 @@ construct to construct using lists
 pt = lam (x,y): I.App "make-variant" ["pt",[list: {"x";x},{"y";y}]]
 
 >    makeVarnt (VariantDecl vnm fs) =
->        let fields = Construct (Iden "list") $ flip map fs $ \f -> TupleSel [Text f, Iden f]
+>        let fields = ListSel $ flip map fs $ \f -> TupleSel [Text f, Iden f]
 >        in pure $ LetDecl vnm
 >                  (Lam fs $ appI "make-variant" [Text vnm, fields])
                                     
@@ -261,12 +251,6 @@ pt = lam (x,y): I.App "make-variant" ["pt",[list: {"x";x},{"y";y}]]
 >    appI i as = App (Iden i) as
 >    equals a b = App (Iden "==") [a,b]
 >    orf a b = App (Iden "or") [a,b]
-
-           | DataDecl String [VariantDecl]
-
- data VariantDecl = VariantDecl String [String]
-                  deriving (Eq,Show) 
-
 
 ------------------------------------------------------------------------------
 
@@ -277,6 +261,7 @@ values
 >            | BoolV Bool
 >            | TextV String
 >            | TupleV [Value]
+>            | ListV [Value]
 >            | NothingV
 >            | VariantV String -- variant name
 >                       [(String,Value)] -- fields
@@ -288,6 +273,7 @@ values
 > valueTypeName (TextV {}) = "text"
 > valueTypeName (BoolV {}) = "boolean"
 > valueTypeName (TupleV {}) = "tuple"
+> valueTypeName (ListV {}) = "list"
 > valueTypeName (VariantV {}) = "variant" -- or should it be the variant's type name?
 > valueTypeName (FunV {}) = "function"
 > valueTypeName (NothingV) = "nothing"
@@ -298,6 +284,7 @@ values
 >   show (TextV n) = "TextV " ++ show n
 >   show (BoolV n) = "BoolV " ++ show n
 >   show (TupleV fs) = "TupleV [" ++ intercalate "," (map show fs) ++ "]"
+>   show (ListV fs) = "[list: " ++ intercalate "," (map show fs) ++ "]"
 >   show (VariantV nm fs) = nm ++ "(" ++ intercalate "," (map show fs) ++ ")"
 >   show NothingV = "NothingV"
 >   show (FunV {}) = "FunV stuff"
@@ -337,6 +324,7 @@ values
 > interp (Num n) = pure (NumV n)
 > interp (Text t) = pure (TextV t)
 > interp (TupleSel es) = TupleV <$> mapM interp es
+> interp (ListSel es) = ListV <$> mapM interp es
 > interp (Iden i) = do
 >     env <- ask
 >     envLookup i env
@@ -364,6 +352,9 @@ values
 >         BoolV False -> interp e
 >         _ -> lift $ throwE $ "expected bool in if test, got " ++ show c'
 
+> interp e@(DotExpr {}) = lift $ throwE $ "interp: undesugared dotexpr " ++ show e
+
+  
 > app :: Value -> [Value] -> Interpreter Value
 > app fv vs = do
 >     case fv of
@@ -548,17 +539,10 @@ ffi catalog
 >    ,("log-test-pass", binaryOp unwrapNum unwrapText id logTestPass)
 >    ,("log-test-fail", ternaryOp unwrapNum unwrapText unwrapText id logTestFail)
 
-anyIn in == and torepr for instance, are standins for typeclasses
-in link, it's parametric polymorphism, these are two completely different things
-
->    ,("link", binaryOp anyIn anyIn pure link)
->    ,("is-empty", unaryOp variantIn wrapBool isEmpty)
->    ,("is-link", unaryOp variantIn wrapBool isLink)
->    ,("is-List", unaryOp variantIn wrapBool isList)
-
 >    ,("variant-field-get", binaryOp unwrapText variantIn id variantFieldGet)
 >    ,("safe-variant-name", unaryOp variantIn pure safeVariantName)
->    ,("safe-variant-name", unaryOp anyIn pure (const $ BoolV False))
+>    -- hack to make it work for any data type     
+>    ,("safe-variant-name", unaryOp anyIn pure (const $ NothingV))
 >    ,("make-variant", binaryOp unwrapText unwrapList id makeVariant)
 
 >    ,("torepr", unaryOp anyIn id torepr)
@@ -584,6 +568,8 @@ in link, it's parametric polymorphism, these are two completely different things
 >     "{" ++ intercalate ";" (map torepr' fs) ++ "}"
 > torepr' (VariantV nm fs) =
 >     nm ++ "(" ++ intercalate "," (map (torepr' . snd) fs) ++ ")"
+> torepr' (ListV fs) =
+>     "[list: " ++ intercalate "," (map torepr' fs) ++ "]"
 
  
 > torepr' NothingV = "nothing"
@@ -607,7 +593,6 @@ in link, it's parametric polymorphism, these are two completely different things
 
 > makeVariant :: String -> [Value] -> Interpreter Value
 > makeVariant vnt listargs = do
->     --vs <- listToHaskList listargs
 >     cd <- mapM unpackTuple listargs
 >     pure $ VariantV vnt cd
 >   where
@@ -615,29 +600,7 @@ in link, it's parametric polymorphism, these are two completely different things
 >         pure (nm,v)
 >     unpackTuple (VariantV "tuple" x) = lift $ throwE $ "value in list in make-variant, expected tuple of is-ref, name and val, got " ++ show (map (\(_,b) -> torepr' b) x)
 >     unpackTuple x = lift $ throwE $ "expected tuple in make-variant, got " ++ torepr' x
-> makeVariant _ x = lift $ throwE $ "make-variant called on " ++ show (length x) ++ " args, should be 2"
 
- > listToHaskList :: Value -> Interpreter [Value]
- > listToHaskList (VariantV "empty" []) = pure []
- > listToHaskList (VariantV "link" [("first",v),("rest",x)]) = (v:) <$> listToHaskList x
- > listToHaskList x = lift $ throwE $ "interpreter: listToHaskList: " ++ torepr' x
-
-  
-> link :: Value -> Value -> Value
-> link a b = VariantV "link" [("first", a), ("rest", b)]
-
-> isEmpty :: Value -> Bool
-> isEmpty (VariantV "empty" _) = True
-> isEmpty _ = False
-
-> isLink :: Value -> Bool
-> isLink (VariantV "link" _) = True
-> isLink _ = False
-
-> isList :: Value -> Bool
-> isList x = isEmpty x || isLink x
-
-  
 ------------------------------------------------------------------------------
 
 env, ffi boilerplate
@@ -684,8 +647,8 @@ env, ffi boilerplate
 >     addForeignFuns' xs env'
 >     
 
-> unwrapTuple :: (String, Value -> Interpreter [Value])
-> unwrapTuple = ("tuple", \case
+> _unwrapTuple :: (String, Value -> Interpreter [Value])
+> _unwrapTuple = ("tuple", \case
 >                           TupleV fs -> pure fs
 >                           x -> lift $ throwE $ "type: expected tuple, got " ++ show x)
 
@@ -724,14 +687,9 @@ env, ffi boilerplate
 
 > unwrapList :: (String, Value -> Interpreter [Value])
 > unwrapList =
->     ("variant"
->     ,let f = \case
->                  VariantV "empty" [] -> pure []
->                  VariantV "link" [("first",v),("rest",x)] -> (v:) <$> f x
->                  x -> lift $ throwE $ "interpreter: listToHaskList: " ++ torepr' x
->      in f)
-
-
+>     ("list", \case
+>                  ListV vs -> pure vs
+>                  x -> lift $ throwE $ "type: expected list, got: " ++ torepr' x)
   
 > anyIn :: (String, Value -> Interpreter Value)
 > anyIn = ("any", pure)
@@ -850,9 +808,6 @@ like a desugaring process.
 > convExpr (S.DotExpr e f) =
 >     flip DotExpr f <$> (convExpr e)
 
-> convExpr (S.Construct e as) =
->     Construct <$> convExpr e <*> mapM convExpr as
-  
 > convExpr x = Left $ "parse: unsupported expression " ++ show x
 
 > convSt :: S.Stmt -> Either String Stmt
@@ -880,6 +835,7 @@ pretty
 > unconv (Num n) = S.Sel (S.Num n)
 > unconv (Text n) = S.Sel (S.Str n)
 > unconv (TupleSel fs) = S.Sel (S.Tuple $ map unconv fs)
+> unconv (ListSel fs) = S.Construct (S.Iden "list") (map unconv fs)
 > unconv (Iden s) = S.Iden s
 >
 > unconv (App (Iden e) [a,b]) | isOp e = S.BinOp (unconv a) e (unconv b)
@@ -891,7 +847,6 @@ pretty
 > unconv (Block sts) = S.Block $ map unconvStmt sts
 > unconv (Seq a b) = S.Block $ map unconvStmt [StExpr a, StExpr b]
 > unconv (If c t e) = S.If [(unconv c, unconv t)] (Just $ unconv e)
-> unconv (Construct e as) = S.Construct (unconv e) (map unconv as)
 > unconv (DotExpr e f) = S.DotExpr (unconv e) f  
 > --unconv x = error $ "unconv: " ++ show x
   
@@ -899,6 +854,10 @@ pretty
 > unconvStmt (LetDecl n e) = S.LetDecl (unconvBinding n e)
 > unconvStmt (StExpr e) = S.StExpr (unconv e)
 > unconvStmt (Check nm bs) = S.Check nm $ map unconvStmt bs
+> unconvStmt (DataDecl nm vs) =
+>      S.DataDecl nm (map f vs) Nothing
+>    where
+>      f (VariantDecl vnm fs) = S.VariantDecl vnm $ map (S.Con,) fs
 
 > unconvBinding :: String -> Expr -> S.Binding
 > unconvBinding n v = S.Binding (unconvPattern n) (unconv v)
@@ -989,48 +948,6 @@ check "simple block stuff":
   end is {1;4}
 
 end
-
-
-check:
-  empty is [list:]
-  link(1, empty) is [list: 1]
-  link(1, link(2, empty)) is [list: 1,2]
-end
-
-check:
-  l1 = [list: 1]
-  mt = empty
-  is-empty(mt) is true
-  is-empty(l1) is false
-  is-link(mt) is false
-  is-link(l1) is true
-
-  is-List(l1) is true
-  is-List(mt) is true
-end
-
-check:
-  l1 = [list: 1,2,3]
-  l1.first is 1
-  l1.rest is [list: 2,3]
-end
-
-check:
-  list1 = [list: 2,3]
-  list2 = link(1, list1)
-  list2 is [list: 1,2,3]
-
-  [list: 1,2,3].first is 1
-  [list: 1,2,3].rest  is [list: 2,3]
-end
-
-check:
-  empty is [list:]
-  link(1, empty) is [list: 1]
-  link(1, link(2, empty)) is [list: 1,2]
-  link(empty, link(empty, [list: ])) is [list: [list:],[list:]]
-end
-
 
 data Point:
   | pt(x, y)
