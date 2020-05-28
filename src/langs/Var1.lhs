@@ -25,7 +25,7 @@ TODO: make this work without using knowledge that an iden refers to a
 
 > import Control.Monad.Trans.Class (lift)
 > import Control.Monad.Trans.Except (Except, runExcept, throwE)
-> import Control.Monad.Trans.RWS (RWST, evalRWST, ask, asks, local, get, gets, state, put, modify)
+> import Control.Monad.Trans.RWS (RWST, evalRWST, ask, {-asks,-} local, get, gets, state, put, modify)
 
 > import Control.Monad (when)
 > import Data.Maybe (isJust, isNothing)
@@ -61,7 +61,6 @@ syntax
 >           | If Expr Expr Expr
 >           | Box Expr
 >           | SetBox Expr Expr
->           | Unbox Expr
 >           deriving (Eq, Show)
 
 ------------------------------------------------------------------------------
@@ -69,7 +68,7 @@ syntax
 desugar
 -------
 
-> type Desugarer = RWST DesugarEnv () DesugarState (Except String)
+> type Desugarer = RWST () () DesugarState (Except String)
 
 > data DesugarState = DesugarState {uniqueCtr :: Int
 >                                  ,nextUnusedCheckBlockID :: Int
@@ -85,14 +84,6 @@ desugar
 >     let suff = uniqueCtr s
 >     in (pref ++ "-" ++ show suff
 >        ,s {uniqueCtr = suff + 1})
-
-this tracks what names in scope are variables
-so the desugar can convert accessing them to explicit unboxing
-
-> data DesugarEnv = DesugarEnv {variablesEnv :: [String]}
-
-> emptyDesugarEnv :: DesugarEnv
-> emptyDesugarEnv = DesugarEnv []
 
 --------------------------------------
 
@@ -117,30 +108,13 @@ testing support in the desugarer monad
 >     in ("check-block-" ++ show blockNo
 >        ,s {nextAnonymousBlockNumber = blockNo + 1})
 
-
---------------------------------------
-
-var handling
-
-used in desugaring vardecl
-
-> addVariableName :: String -> DesugarEnv -> DesugarEnv
-> addVariableName v e = e {variablesEnv = v : variablesEnv e}
-
-> isVar :: String -> Desugarer Bool
-> isVar i = do
->     vs <- asks variablesEnv
->     pure $ i `elem` vs
-
-used in desugaring iden
-
 --------------------------------------
 
 desugaring code
 
 > runDesugar :: [Stmt] -> Either String Expr
 > runDesugar stmts =
->     fst <$> runExcept (evalRWST (desugarStmts stmts) emptyDesugarEnv startingDesugarState)
+>     fst <$> runExcept (evalRWST (desugarStmts stmts) () startingDesugarState)
 
 > desugar :: Expr -> Desugarer Expr
 
@@ -150,12 +124,7 @@ desugaring code
 > desugar (Text i) = pure $ Text i
 > desugar (TupleSel fs) = TupleSel <$> mapM desugar fs
 
-> desugar (Iden i) = do
->     x <- isVar i
->     if x
->       then pure $ Unbox $ Iden i
->       else pure $ Iden i
-
+> desugar (Iden i) = pure $ Iden i
 
 > desugar (App (Iden "is") [a,b]) = do
 >     uniqueV0 <- makeUniqueVar "is-v0"
@@ -202,8 +171,8 @@ no idea if this is good or not
 > desugar (SetBox i@(Iden {}) v) = SetBox i <$> desugar v
 > desugar (SetBox b v) = SetBox <$> desugar b <*> desugar v
 
-> desugar (Unbox i@(Iden {})) = pure $ Unbox i
-> desugar (Unbox e) = Unbox <$> desugar e
+> --desugar (Unbox i@(Iden {})) = pure $ Unbox i
+> --desugar (Unbox e) = Unbox <$> desugar e
 
 
   
@@ -238,7 +207,7 @@ no idea if this is good or not
 
 > desugarStmts (VarDecl n v : es) = do
 >     v' <- Box <$> desugar v
->     Let [(n,v')] <$> local (addVariableName n) (desugarStmts es)
+>     Let [(n,v')] <$> desugarStmts es
   
 > desugarStmts (StExpr e : es) =
 >     Seq <$> desugar e <*> desugarStmts es
@@ -344,9 +313,15 @@ holds the values of variables
 > interp (Num n) = pure (NumV n)
 > interp (Text t) = pure (TextV t)
 > interp (TupleSel es) = TupleV <$> mapM interp es
-> interp (Iden i) = do
+> interp (Iden a) = do
 >     env <- ask
->     envLookup i env
+>     x <- envLookup a env
+>     case x of
+>         BoxV i -> do
+>                   st <- get
+>                   fetchStore i (isStore st)
+>         _ -> pure x
+  
 > interp (App f es) = do
 >     fv <- interp f
 >     vs <- mapM interp es
@@ -373,14 +348,6 @@ holds the values of variables
 
 ----------------------
 
-> interp (Unbox e) =
->     interp e >>= \case
->         BoxV i -> do
->                   st <- get
->                   fetchStore i (isStore st)
->         v -> lift $ throwE $ "Unbox on non box: " ++ torepr' v
-
-
 > interp (Box e) = do
 >     v <- interp e
 >     i <- state $ \s ->
@@ -388,8 +355,9 @@ holds the values of variables
 >          in (i, updateISStore (extendStore i v) s)
 >     pure $ BoxV i
 
-> interp (SetBox b v) = do
->     b' <- interp b
+> interp (SetBox (Iden b) v) = do
+>     env <- ask
+>     b' <- envLookup b env
 >     v' <- interp v
 >     i <- case b' of
 >              BoxV i -> pure i
@@ -397,6 +365,9 @@ holds the values of variables
 >     modify $ \s -> (updateISStore (extendStore i v') s)
 >     pure v'
 
+> interp (SetBox b _) = lift $ throwE $ "attemped to setbox non identifier: " ++ pretty b
+
+  
 -----------------------
 
 > app :: Value -> [Value] -> Interpreter Value
@@ -849,7 +820,6 @@ pretty
 > unconv (Seq a b) = S.Block $ map unconvStmt [StExpr a, StExpr b]
 > unconv (If c t e) = S.If [(unconv c, unconv t)] (Just $ unconv e)
 > unconv (Box {}) = error "unsupported internal box syntax in pretty"
-> unconv (Unbox {}) = error "unsupported internal unbox syntax in pretty"
 > unconv (SetBox {}) = error "unsupported internal setbox syntax in pretty"
 
 > unconvStmt :: Stmt -> S.Stmt
