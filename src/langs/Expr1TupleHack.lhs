@@ -12,7 +12,7 @@ language, also trivial)
 
 > {-# LANGUAGE TupleSections #-}
 
-> module SimpleExprTupleHack (tests
+> module Expr1TupleHack (tests
 >                            ,runInterp
 >                            ) where
 
@@ -153,4 +153,4 @@ tests
 
 
 > tests :: TestTree
-> tests = makeSimpleTests "simpleexprtuplehack" examples evaluate
+> tests = makeSimpleTests "expr1tuplehack" examples evaluate

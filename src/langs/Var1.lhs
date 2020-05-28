@@ -9,7 +9,7 @@ TODO: make this work without using knowledge that an iden refers to a
 > {-# LANGUAGE QuasiQuotes #-}
 > {-# LANGUAGE ScopedTypeVariables #-}
 
-> module SimpleVar (tests
+> module Var1 (tests
 >                  ) where
 
 > import Text.RawString.QQ

@@ -1,135 +1,101 @@
 
-simple expressions, extended with statements
+simple exprs extended to add if
 
-two kinds of statements: let decl, and expression
-it has blocks which can contain 1 or more statements
-blocks cannot end with a let decl
-
-a question:
-what is the top level?
-is it an expression?
-do you have to write block explicitly first if you want more than just
-a single expression?
-is the top level a list of statements
-if so, does it add the block implicitly or not?
-later might want to distinguish, since the top level
-  might become a special letrec
-  but non top level blocks are not letrec
-
-what's the easiest thing to do?
-parse a list of statements
-add the block in the ast automatically to wrap them
-this keeps syntax compatibility with the check version
-
-what's the ultimate thing to do? maybe come back to this after doing
-programs and imports and stuff
-
+boolean literals use constants in the env, not a separate syntax type
 
 > {-# LANGUAGE TupleSections #-}
 > {-# LANGUAGE LambdaCase #-}
 
-> module SimpleStatements (tests
->                         ) where
-
-> import SimpleExpr (TestTree
->                   ,makeSimpleTests
->                   ,simpleInterpreterExamples)
+> module Expr1If (tests) where
 
 > import qualified Parse as P
 > import qualified Syntax as S
+> import SimpleExpr (simpleInterpreterExamples
+>                   ,TestTree
+>                   ,makeSimpleTests
+>                   )
 
-
+> --import qualified SimpleExpr (Expr(..), parse)
 > import Control.Monad.Trans.Class (lift)
 > import Control.Monad.Trans.Except (Except, runExcept, throwE)
 > import Control.Monad.Trans.Reader (ReaderT, runReaderT, ask, local)
-
 > import Data.Scientific (Scientific)
 > import Data.List (intercalate)
 
 ------------------------------------------------------------------------------
 
-syntax
-------
-
-> data Stmt = StExpr Expr
->           | LetDecl String Expr
->           deriving (Eq, Show)
+interpreter
+-----------
 
 > data Expr = Num Scientific
->           | Text String
->           | TupleSel [Expr]
 >           | Iden String
 >           | App Expr [Expr]
 >           | Lam [String] Expr
 >           | Let [(String,Expr)] Expr
->           | Block [Stmt]
->           deriving (Eq, Show)
+>           | If Expr Expr Expr
+>            deriving (Eq, Show)
 
-------------------------------------------------------------------------------
+todo: import this from the ffi example
 
-desugar
--------
+> data Env = Env
+>     {envEnv :: [(String,Value)]
+>     ,envForeignFuns :: [((String,[String]), [Value] -> Interpreter Value)]}
 
-lists of statements are desugared to Seq
-block is removed completely
-so the desugaring removes statement completely, and blocks
-  and adds seq which does one expression then another
+> emptyEnv :: Env
+> emptyEnv = Env
+>     {envEnv = [("true", BoolV True)
+>               ,("false", BoolV False)]
+>     ,envForeignFuns = []}
 
-what are the pros and cons of desugaring to the same ast?
+> extendEnv :: [(String,Value)] -> Env -> Env
+> extendEnv bs env = env {envEnv = bs ++ envEnv env}
+>
+> envLookup :: String -> Env -> Interpreter Value
+> envLookup nm env =
+>     maybe (lift $ throwE $ "Identifier not found " ++ nm) pure
+>     $ lookup nm (envEnv env)
 
-> desugar :: Expr -> Either String Expr
+> addForeignFun :: String -> [String] -> ([Value] -> Interpreter Value) -> Env -> Either String Env
+> addForeignFun nm tys f env =
+>     pure ((extendEnv [(nm, ForeignFunV nm)] env)
+>          {envForeignFuns = ((nm,tys), f) : envForeignFuns env})
 
-> desugar (Block sts) = Block <$> mapM desugarSt sts
->   where
->     desugarSt (LetDecl n e) = LetDecl n <$> desugar e
->     desugarSt (StExpr e) = StExpr <$> desugar e
-
-> desugar (Num i) = pure $ Num i
-> desugar (Text i) = pure $ Text i
-> desugar (TupleSel fs) = TupleSel <$> mapM desugar fs
-> desugar (Iden i) = pure $ Iden i
-> desugar (App f as) = App <$> desugar f <*> mapM desugar as
-> desugar (Lam ns e) = Lam ns <$> desugar e
-> desugar (Let bs e) = do
->     let f (n,v) = (n,) <$> desugar v
->     Let <$> mapM f bs <*> desugar e
+> lookupForeignFun :: String -> [String] -> Env -> Interpreter ([Value] -> Interpreter Value)
+> lookupForeignFun nm tys env =
+>     maybe (lift $ throwE $ "ffi function not found: " ++ nm ++ "(" ++ intercalate "," tys ++")")
+>       pure $ lookup (nm,tys) $ envForeignFuns env
 
 ------------------------------------------------------------------------------
 
 values
-------
+
 
 > data Value = NumV Scientific
 >            | BoolV Bool
->            | TextV String
->            | TupleV [Value]
 >            | FunV [String] Expr Env
 >            | ForeignFunV String
 
 > valueTypeName :: Value -> String
 > valueTypeName (NumV {}) = "number"
-> valueTypeName (TextV {}) = "text"
 > valueTypeName (BoolV {}) = "boolean"
-> valueTypeName (TupleV {}) = "tuple"
 > valueTypeName (FunV {}) = "function"
 > valueTypeName (ForeignFunV {}) = "foreign-function"
 
 > instance Show Value where
 >   show (NumV n) = "NumV " ++ show n
->   show (TextV n) = "TextV " ++ show n
 >   show (BoolV n) = "BoolV " ++ show n
->   show (TupleV fs) = "TupleV [" ++ intercalate "," (map show fs) ++ "]"
 >   show (FunV {}) = "FunV stuff"
 >   show (ForeignFunV n) = "ForeignFunV " ++ show n
 
 > instance Eq Value where
 >     NumV a == NumV b = a == b
->     TextV a == TextV b = a == b
 >     BoolV a == BoolV b = a == b
->     TupleV fs == TupleV gs = fs == gs
 >     _ == _ = False
 
+
 ------------------------------------------------------------------------------
+
+interpreter
 
 > type Interpreter = ReaderT Env (Except String)
 
@@ -138,8 +104,6 @@ values
 
 > interp :: Expr -> Interpreter Value
 > interp (Num n) = pure (NumV n)
-> interp (Text t) = pure (TextV t)
-> interp (TupleSel es) = TupleV <$> mapM interp es
 > interp (Iden i) = do
 >     env <- ask
 >     envLookup i env
@@ -170,78 +134,44 @@ values
 >             local (extendEnv [(b,v)]) $ newEnv bs'
 >     newEnv bs
 
-A bunch of tedious special cases. Using seq moves these to the
-desugarer. The special cases could be eliminated in the desugarer so
-you would never see them in the interpreter. I think this is what seq
-mainly brings - representing that these have been eliminated in the
-ast types. How do you put statements that don't desugar to expressions
-back into this system?
+'if' becomes the primary place to implement "functions" which don't
+always evaluate all their arguements. e.g. we use this to implement
+short circuiting 'and' and 'or'.
 
-> interp (Block []) = lift $ throwE "empty block"
-
-> interp (Block [LetDecl {}]) = lift $ throwE "blocks ends with letdecl"
-> interp (Block (LetDecl n e : es)) = do
->     v <- interp e
->     local (extendEnv [(n,v)]) $ interp (Block es)
-
-> interp (Block [StExpr e]) = interp e
-> interp (Block (StExpr e : es)) = interp e *> interp (Block es)
-
-
+> interp (If c t e) = do
+>     c' <- interp c
+>     case c' of
+>         BoolV True -> interp t
+>         BoolV False -> interp e
+>         _ -> lift $ throwE $ "expected bool in if test, got " ++ show c'
 
 > evaluate :: String -> Either String Value
 > evaluate s =  do
 >     ast <- parse s
->     ast' <- desugar ast
->     runInterp testEnv ast'
+>     runInterp testEnv ast
 
 ------------------------------------------------------------------------------
 
 ffi catalog
 
-
 > testEnv :: Env
 > testEnv = either error id $ addForeignFuns'
 >    [("+", binaryOp unwrapNum unwrapNum wrapNum (+))
->    ,("not", unaryOp unwrapBool wrapBool not)
 >    ,("==", binaryOp unwrapNum unwrapNum wrapBool (==))
 >    ]
 >    emptyEnv
 
-------------------------------------------------------------------------------
+> {-plusNum :: Scientific -> Scientific -> Scientific
+> plusNum = (+)
 
-env, ffi boilerplate
---------------------
+> equalsNum :: Scientific -> Scientific -> Bool
+> equalsNum = (==)-}
 
-> data Env = Env
->     {envEnv :: [(String,Value)]
->     ,envForeignFuns :: [((String,[String]), [Value] -> Interpreter Value)]}
+--------------------------------------
 
-> emptyEnv :: Env
-> emptyEnv = Env
->     {envEnv = [("true", BoolV True)
->               ,("false", BoolV False)]
->     ,envForeignFuns = []}
+boilerplate
 
-> extendEnv :: [(String,Value)] -> Env -> Env
-> extendEnv bs env = env {envEnv = bs ++ envEnv env}
->
-> envLookup :: String -> Env -> Interpreter Value
-> envLookup nm env =
->     maybe (lift $ throwE $ "Identifier not found " ++ nm) pure
->     $ lookup nm (envEnv env)
-
-> addForeignFun :: String -> [String] -> ([Value] -> Interpreter Value) -> Env -> Either String Env
-> addForeignFun nm tys f env =
->     pure ((extendEnv [(nm, ForeignFunV nm)] env)
->          {envForeignFuns = ((nm,tys), f) : envForeignFuns env})
-
-> lookupForeignFun :: String -> [String] -> Env -> Interpreter ([Value] -> Interpreter Value)
-> lookupForeignFun nm tys env =
->     maybe (lift $ throwE $ "ffi function not found: " ++ nm ++ "(" ++ intercalate "," tys ++")")
->       pure $ lookup (nm,tys) $ envForeignFuns env
-
-
+todo: import from the ffi example
 
 > addForeignFun' :: String -> ([String], ([Value] -> Interpreter Value)) -> Env -> Either String Env
 > addForeignFun' nm (tys, f) env = addForeignFun nm tys f env
@@ -263,10 +193,10 @@ env, ffi boilerplate
 > wrapNum n = pure $ NumV n
 
 
-> unwrapBool :: (String, Value -> Interpreter Bool)
+> {-unwrapBool :: (String, Value -> Interpreter Bool)
 > unwrapBool = ("boolean", \case
 >                           BoolV n -> pure n
->                           x -> lift $ throwE $ "type: expected boolean, got " ++ show x)
+>                           x -> lift $ throwE $ "type: expected boolean, got " ++ show x)-}
 
 > wrapBool :: Bool -> Interpreter Value
 > wrapBool n = pure $ BoolV n
@@ -280,7 +210,7 @@ env, ffi boilerplate
 > wrapText :: String -> Interpreter Value
 > wrapText n = pure $ TextV n-}
 
-> unaryOp :: (String, Value -> Interpreter a)
+> {-unaryOp :: (String, Value -> Interpreter a)
 >         -> (a -> Interpreter Value)
 >         -> (a -> a)
 >         -> ([String], ([Value] -> Interpreter Value))
@@ -291,8 +221,7 @@ env, ffi boilerplate
 >                 [a] -> do
 >                     ax <- (snd unwrap0) a
 >                     wrap (f ax)
->                 _ -> lift $ throwE $ "wrong number of args to function, expected 1, got " ++ show (length as))
-
+>                 _ -> lift $ throwE $ "wrong number of args to function, expected 1, got " ++ show (length as))-}
 
 
 > binaryOp :: (String, Value -> Interpreter a)
@@ -310,24 +239,18 @@ env, ffi boilerplate
 >                     wrap (f ax bx)
 >                 _ -> lift $ throwE $ "wrong number of args to function, expected 2, got " ++ show (length as))
 
-
 ------------------------------------------------------------------------------
 
-parse
------
+parser
 
 > parse :: String -> Either String Expr
 > parse src =
->     case P.parseProgram "" src of
->       Right (S.Program [] sts) -> convExpr (S.Block sts)
->       Right (S.Program x _) -> Left $ "prelude not supported " ++ show x
+>     case P.parseExpr "" src of
+>       Right e -> convExpr e
 >       Left e -> Left e
-
-
+>
 > convExpr :: S.Expr -> Either String Expr
 > convExpr (S.Sel (S.Num x)) = Right $ Num x
-> convExpr (S.Sel (S.Str x)) = Right $ Text x
-> convExpr (S.Sel (S.Tuple fs)) = TupleSel <$> mapM convExpr fs
 > convExpr (S.Iden s) = Right $ Iden s
 > convExpr (S.Parens e) = convExpr e
 > convExpr (S.App f es) = App <$> (convExpr f) <*> mapM convExpr es
@@ -350,38 +273,25 @@ parse
 >         bf (S.Binding (S.IdenP _ (S.PatName x)) ex) =
 >             (x,) <$> convExpr ex
 >         bf x = Left $ "unsupported binding " ++ show x
+> convExpr (S.If [(c,t)] (Just e)) = do
+>     If <$> convExpr c <*> convExpr t <*> convExpr e
 
-> convExpr (S.Block sts) = Block <$> mapM convSt sts
-
-> convExpr x = Left $ "unsupported expression " ++ show x
-
-> convSt :: S.Stmt -> Either String Stmt
-> convSt (S.StExpr e) = StExpr <$> convExpr e
-> convSt (S.LetDecl (S.Binding (S.IdenP _ (S.PatName nm)) v)) = LetDecl nm <$> convExpr v
-
-> convSt x = Left $ "unsupported statement " ++ show x
-
+>     
+> convExpr x = Left $ "unsupported syntax " ++ show x
 
 ------------------------------------------------------------------------------
 
 tests
 -----
 
-the tests are cheating slightly, because testing the code properly is
-deferred until more features are added. not sure if this is legit, an
-issue, good or bad for maintenance or for tutorial purposes
-
-> additionalTests :: [(String,String)]
-> additionalTests = [("x = 3\n\
->                     \x", "3")
->                   ,("3 + 4\n\
->                     \4 + 6", "10")
->                   ,("x = block:\n\
->                     \      3 + 4\n\
->                     \      4 + 6\n\
->                     \    end\n\
->                     \x + 2", "12")
->                   ]
+> interpreterExamples :: [(String, String)]
+> interpreterExamples =
+>     simpleInterpreterExamples ++
+>     [("if true: 1 else: 2 end", "1")
+>     ,("if false: 1 else: 2 end", "2")
+>     ,("if 1 == 1: 1 else: 2 end", "1")
+>     ,("if 1 == 2: 1 else: 2 end", "2")
+>     ]
 
 > tests :: TestTree
-> tests = makeSimpleTests "simplestatements" (simpleInterpreterExamples ++ additionalTests) evaluate
+> tests = makeSimpleTests "expr1if" interpreterExamples evaluate

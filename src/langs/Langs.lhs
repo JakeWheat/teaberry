@@ -5,18 +5,18 @@
 > import qualified SimpleExprReader
 > import qualified SimpleExprDesugared
 > import qualified SimplestCheck
-> import qualified SimpleExprFFI
-> import qualified SimpleExprIf
-> import qualified SimpleExprNWayIf
-> import qualified SimpleExprIfAndOr
-> import qualified SimpleExprTupleHack
-> import qualified SimpleStatements
-> import qualified SimpleStatementsDesugarLetDecl
-> import qualified SimpleStatementsSeq
-> import qualified SimpleStatementsWithoutCheck
-> import qualified SimpleStatementsCheck
-> import qualified SimpleStatementsCheckDesugarRefactor
-> import qualified SimpleVar
+> import qualified Expr1FFI
+> import qualified Expr1If
+> import qualified Expr1NWayIf
+> import qualified Expr1IfAndOr
+> import qualified Expr1TupleHack
+> import qualified Statements1
+> import qualified Statements1DesugarLetDecl
+> import qualified Statements1Seq
+> import qualified Statements1WithoutCheck
+> import qualified Statements1Check
+> import qualified Statements1CheckDesugarRefactor
+> import qualified Var1
 > import qualified Lists1
 > import qualified DataDecl1
 > import qualified Cases1
@@ -31,18 +31,18 @@
 >        ,SimpleExprReader.tests
 >        ,SimpleExprDesugared.tests
 >        ,SimplestCheck.tests
->        ,SimpleExprFFI.tests
->        ,SimpleExprIf.tests
->        ,SimpleExprNWayIf.tests
->        ,SimpleExprIfAndOr.tests
->        ,SimpleExprTupleHack.tests
->        ,SimpleStatements.tests
->        ,SimpleStatementsDesugarLetDecl.tests
->        ,SimpleStatementsSeq.tests
->        ,SimpleStatementsWithoutCheck.tests
->        ,SimpleStatementsCheck.tests
->        ,SimpleStatementsCheckDesugarRefactor.tests
->        ,SimpleVar.tests
+>        ,Expr1FFI.tests
+>        ,Expr1If.tests
+>        ,Expr1NWayIf.tests
+>        ,Expr1IfAndOr.tests
+>        ,Expr1TupleHack.tests
+>        ,Statements1.tests
+>        ,Statements1DesugarLetDecl.tests
+>        ,Statements1Seq.tests
+>        ,Statements1WithoutCheck.tests
+>        ,Statements1Check.tests
+>        ,Statements1CheckDesugarRefactor.tests
+>        ,Var1.tests
 >        ,Lists1.tests
 >        ,DataDecl1.tests
 >        ,Cases1.tests

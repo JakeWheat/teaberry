@@ -1,15 +1,17 @@
 
-Corresponding to the SimpleStatementsCheck
-the whole language and all the ffi bits and stuff
-except purely what is needed for the testing implementation
+simple expressions, extended with statements
+
+two kinds of statements: let decl, and expression
+it has blocks which can contain 1 or more statements
+blocks cannot end with a let decl
+
+desugars let decls to let expressions
 
 > {-# LANGUAGE TupleSections #-}
 > {-# LANGUAGE LambdaCase #-}
-> {-# LANGUAGE ScopedTypeVariables #-}
 
-> module SimpleStatementsWithoutCheck (tests
->                                     ,pretty
->                                     ) where
+> module Statements1DesugarLetDecl (tests
+>                                       ) where
 
 > import SimpleExpr (TestTree
 >                   ,makeSimpleTests
@@ -17,16 +19,13 @@ except purely what is needed for the testing implementation
 
 > import qualified Parse as P
 > import qualified Syntax as S
-> import qualified Pretty as Pr
 
 
 > import Control.Monad.Trans.Class (lift)
 > import Control.Monad.Trans.Except (Except, runExcept, throwE)
-> import Control.Monad.Trans.RWS (RWST, evalRWST, ask, local, get, put)
+> import Control.Monad.Trans.Reader (ReaderT, runReaderT, ask, local)
 
-> import Data.Char (isAlphaNum)
-
-> import Data.Scientific (Scientific, floatingOrInteger)
+> import Data.Scientific (Scientific)
 > import Data.List (intercalate)
 
 ------------------------------------------------------------------------------
@@ -46,8 +45,6 @@ syntax
 >           | Lam [String] Expr
 >           | Let [(String,Expr)] Expr
 >           | Block [Stmt]
->           | Seq Expr Expr
->           | If Expr Expr Expr
 >           deriving (Eq, Show)
 
 ------------------------------------------------------------------------------
@@ -55,39 +52,31 @@ syntax
 desugar
 -------
 
-> type Desugarer = RWST () () DesugarState (Except String)
+lists of statements are desugared to Seq
+block is removed completely
+so the desugaring removes statement completely, and blocks
+  and adds seq which does one expression then another
 
-> data DesugarState = DesugarState {uniqueCtr :: Int}
+what are the pros and cons of desugaring to the same ast?
 
-> startingDesugarState :: DesugarState
-> startingDesugarState = DesugarState 0
+> desugar :: Expr -> Either String Expr
 
-> _makeUniqueVar :: String -> Desugarer String
-> _makeUniqueVar pref = do
->     s <- get
->     let suff = uniqueCtr s
->     put $ s {uniqueCtr = suff + 1}
->     pure $ pref ++ "-" ++ show suff
 
---------------------------------------
+> desugar (Block sts) = do
+>     xs <- desugarLetDecl sts
+>     (Block . map StExpr) <$> mapM (desugar) xs
+>   where
 
-desugaring code
+>     -- todo: is there a way to simplify this more
+>     -- to not accumulate the lets, but turn each one into
+>     -- a let as it's seen and avoid the reverse too
+>     desugarLetDecl [] = pure []
+>     desugarLetDecl (LetDecl n v : xs) = desugarHaveLet [(n,v)] xs
+>     desugarLetDecl (StExpr x : xs) = (x :) <$> desugarLetDecl xs
 
-> runDesugar :: Expr -> Either String Expr
-> runDesugar expr =
->     fst <$> runExcept (evalRWST (desugar expr) () startingDesugarState)
-
-> desugar :: Expr -> Desugarer Expr
-> desugar (Block []) = lift $ throwE $ "empty block"
-> desugar (Block [StExpr e]) = desugar e
-> desugar (Block [LetDecl {}]) = lift $ throwE $ "block ends with let"
-
-> desugar (Block (LetDecl n v : es)) = do
->     v' <- desugar v
->     Let [(n,v')] <$> desugar (Block es)
-
-> desugar (Block (StExpr e : es)) =
->     Seq <$> desugar e <*> desugar (Block es)
+>     desugarHaveLet bs (LetDecl n v : xs) = desugarHaveLet ((n,v):bs) xs
+>     desugarHaveLet bs (StExpr e : xs) = ((Let (reverse bs) e) :) <$> desugarLetDecl xs
+>     desugarHaveLet _ [] = Left $ "block ends with letdecl"
 
 > desugar (Num i) = pure $ Num i
 > desugar (Text i) = pure $ Text i
@@ -99,14 +88,6 @@ desugaring code
 >     let f (n,v) = (n,) <$> desugar v
 >     Let <$> mapM f bs <*> desugar e
 
-shouldn't be hit
-
-> desugar (Seq a b) =
->     Seq <$> desugar a <*> desugar b
-
-> desugar (If c t e) =
->     If <$> desugar c <*> desugar t <*> desugar e
-
 ------------------------------------------------------------------------------
 
 values
@@ -116,7 +97,6 @@ values
 >            | BoolV Bool
 >            | TextV String
 >            | TupleV [Value]
->            | NothingV
 >            | FunV [String] Expr Env
 >            | ForeignFunV String
 
@@ -126,7 +106,6 @@ values
 > valueTypeName (BoolV {}) = "boolean"
 > valueTypeName (TupleV {}) = "tuple"
 > valueTypeName (FunV {}) = "function"
-> valueTypeName (NothingV) = "nothing"
 > valueTypeName (ForeignFunV {}) = "foreign-function"
 
 > instance Show Value where
@@ -134,7 +113,6 @@ values
 >   show (TextV n) = "TextV " ++ show n
 >   show (BoolV n) = "BoolV " ++ show n
 >   show (TupleV fs) = "TupleV [" ++ intercalate "," (map show fs) ++ "]"
->   show NothingV = "NothingV"
 >   show (FunV {}) = "FunV stuff"
 >   show (ForeignFunV n) = "ForeignFunV " ++ show n
 
@@ -143,25 +121,14 @@ values
 >     TextV a == TextV b = a == b
 >     BoolV a == BoolV b = a == b
 >     TupleV fs == TupleV gs = fs == gs
->     NothingV == NothingV = True
 >     _ == _ = False
 
 ------------------------------------------------------------------------------
 
-stub interpreter state
-
-> data InterpreterState = InterpreterState
-
-> emptyInterpreterState :: InterpreterState
-> emptyInterpreterState = InterpreterState
-
-> type Interpreter = RWST Env () InterpreterState (Except String)
-
-the interpreter code
+> type Interpreter = ReaderT Env (Except String)
 
 > runInterp :: Env -> Expr -> Either String Value
-> runInterp env expr =
->     fst <$> runExcept (evalRWST (interp expr) env emptyInterpreterState)
+> runInterp env expr = runExcept (runReaderT (interp expr) env)
 
 > interp :: Expr -> Interpreter Value
 > interp (Num n) = pure (NumV n)
@@ -173,29 +140,6 @@ the interpreter code
 > interp (App f es) = do
 >     fv <- interp f
 >     vs <- mapM interp es
->     app fv vs
-> interp (Lam ps e) = do
->     env <- ask
->     pure $ FunV ps e env
-> interp (Let bs e) = do
->     let newEnv [] = interp e
->         newEnv ((b,ex):bs') = do
->             v <- interp ex
->             local (extendEnv [(b,v)]) $ newEnv bs'
->     newEnv bs
-
-> interp (Block {}) = lift $ throwE $ "undesugared block passed to interpreter"
-> interp (Seq a b) = interp a *> interp b
-
-> interp (If c t e) = do
->     c' <- interp c
->     case c' of
->         BoolV True -> interp t
->         BoolV False -> interp e
->         _ -> lift $ throwE $ "expected bool in if test, got " ++ show c'
-
-> app :: Value -> [Value] -> Interpreter Value
-> app fv vs = do
 >     case fv of
 >         FunV ps bdy env' -> do
 >             as <- safeZip ps vs
@@ -208,14 +152,30 @@ the interpreter code
 >             hf vs
 >         _ -> lift $ throwE "non function value in app position"
 >   where
->     safeZip ps xs | length xs == length ps = pure $ zip ps xs
+>     safeZip ps vs | length vs == length ps = pure $ zip ps vs
 >                   | otherwise = lift $ throwE $ "wrong number of args to function"
+> interp (Lam ps e) = do
+>     env <- ask
+>     pure $ FunV ps e env
+> interp (Let bs e) = do
+>     let newEnv [] = interp e
+>         newEnv ((b,ex):bs') = do
+>             v <- interp ex
+>             local (extendEnv [(b,v)]) $ newEnv bs'
+>     newEnv bs
+
+> interp (Block []) = lift $ throwE "empty block"
+> interp (Block (LetDecl {}: _)) = lift $ throwE "non desugared letdecl"
+
+> interp (Block [StExpr e]) = interp e
+> interp (Block (StExpr e:es)) = interp e *> interp (Block es)
+
 
 
 > evaluate :: String -> Either String Value
 > evaluate s =  do
 >     ast <- parse s
->     ast' <- runDesugar ast
+>     ast' <- desugar ast
 >     runInterp testEnv ast'
 
 ------------------------------------------------------------------------------
@@ -224,41 +184,12 @@ ffi catalog
 
 
 > testEnv :: Env
-> testEnv = either error id $ addForeignFuns' (
+> testEnv = either error id $ addForeignFuns'
 >    [("+", binaryOp unwrapNum unwrapNum wrapNum (+))
->    ,("*", binaryOp unwrapNum unwrapNum wrapNum (*))
->    ,("+", binaryOp unwrapText unwrapText wrapText (++))
+>    ,("not", unaryOp unwrapBool wrapBool not)
 >    ,("==", binaryOp unwrapNum unwrapNum wrapBool (==))
->    ,("==", binaryOp unwrapText unwrapText wrapBool (==))
->    ,("==", binaryOp unwrapTuple unwrapTuple wrapBool (==))
-
 >    ]
->     ++ [("torepr", unarySimple x torepr) | x <- ["number", "text", "boolean", "tuple", "function", "foreign-function"]]
->     )
-
 >    emptyEnv
-
-> torepr :: Value -> Interpreter Value
-> torepr x = pure $ TextV $ torepr' x
-
-> torepr' :: Value -> String
-> torepr' (NumV n) = case extractInt n of
->                              Just x -> show x
->                              Nothing ->  show n
-> torepr' (BoolV n) = if n then "true" else "false"
-> torepr' (FunV {}) = "<Function>"
-> torepr' (ForeignFunV {}) = "<Function>"
-> torepr' (TextV s) = "\"" ++ s ++ "\""
-> torepr' (TupleV fs) =
->     "{" ++ intercalate ";" (map torepr' fs) ++ "}"
-
-> torepr' NothingV = "nothing"
-
-
-> extractInt :: Scientific -> Maybe Int
-> extractInt n = case floatingOrInteger n of
->                          (Right x :: Either Float Integer) -> Just $ fromIntegral x
->                          Left _ -> Nothing
 
 ------------------------------------------------------------------------------
 
@@ -305,17 +236,6 @@ env, ffi boilerplate
 >     addForeignFuns' xs env'
 >     
 
-> unarySimple :: String -> (Value -> Interpreter Value) -> ([String], [Value] -> Interpreter Value)
-> unarySimple ty f = ([ty]
->                  ,\case
->                        [x] -> f x
->                        y -> lift $ throwE $ "expected 1 arg, got " ++ show y)
->                  
-
-> unwrapTuple :: (String, Value -> Interpreter [Value])
-> unwrapTuple = ("tuple", \case
->                           TupleV fs -> pure fs
->                           x -> lift $ throwE $ "type: expected tuple, got " ++ show x)
 
 > unwrapNum :: (String, Value -> Interpreter Scientific)
 > unwrapNum = ("number", \case
@@ -326,9 +246,8 @@ env, ffi boilerplate
 > wrapNum n = pure $ NumV n
 
 
-
-> _unwrapBool :: (String, Value -> Interpreter Bool)
-> _unwrapBool = ("boolean", \case
+> unwrapBool :: (String, Value -> Interpreter Bool)
+> unwrapBool = ("boolean", \case
 >                           BoolV n -> pure n
 >                           x -> lift $ throwE $ "type: expected boolean, got " ++ show x)
 
@@ -336,19 +255,19 @@ env, ffi boilerplate
 > wrapBool n = pure $ BoolV n
 
 
-> unwrapText :: (String, Value -> Interpreter String)
+> {-unwrapText :: (String, Value -> Interpreter String)
 > unwrapText = ("text", \case
 >                           TextV n -> pure n
 >                           x -> lift $ throwE $ "type: expected text, got " ++ show x)
 
 > wrapText :: String -> Interpreter Value
-> wrapText n = pure $ TextV n
+> wrapText n = pure $ TextV n-}
 
-> _unaryOp :: (String, Value -> Interpreter a)
+> unaryOp :: (String, Value -> Interpreter a)
 >         -> (a -> Interpreter Value)
 >         -> (a -> a)
 >         -> ([String], ([Value] -> Interpreter Value))
-> _unaryOp unwrap0 wrap f =
+> unaryOp unwrap0 wrap f =
 >     ([fst unwrap0]
 >     ,\as -> do
 >             case as of
@@ -374,18 +293,11 @@ env, ffi boilerplate
 >                     wrap (f ax bx)
 >                 _ -> lift $ throwE $ "wrong number of args to function, expected 2, got " ++ show (length as))
 
+
 ------------------------------------------------------------------------------
 
 parse
 -----
-
-a rule is to try not to do any 'desugaring' here.
-
-It's supposed to be used as if we wrote the parser for each version
-from scratch, so the result should be what such a parser would
-produce. It's slightly ambiguous because this entire 'parser' is more
-like a desugaring process.
-
 
 > parse :: String -> Either String Expr
 > parse src =
@@ -424,9 +336,6 @@ like a desugaring process.
 
 > convExpr (S.Block sts) = Block <$> mapM convSt sts
 
-> convExpr (S.If [(c,t)] (Just e)) = do
->     If <$> convExpr c <*> convExpr t <*> convExpr e
-
 > convExpr x = Left $ "unsupported expression " ++ show x
 
 > convSt :: S.Stmt -> Either String Stmt
@@ -435,40 +344,6 @@ like a desugaring process.
 
 > convSt x = Left $ "unsupported statement " ++ show x
 
-------------------------------------------------------------------------------
-
-pretty
-------
-
-> pretty :: Expr -> String
-> pretty x = Pr.prettyExpr $ unconv x
-
-
-> unconv :: Expr -> S.Expr
-> unconv (Num n) = S.Sel (S.Num n)
-> unconv (Text n) = S.Sel (S.Str n)
-> unconv (TupleSel fs) = S.Sel (S.Tuple $ map unconv fs)
-> unconv (Iden s) = S.Iden s
->
-> unconv (App (Iden e) [a,b]) | isOp e = S.BinOp (unconv a) e (unconv b)
->   where isOp x = not $ any (\z -> isAlphaNum z || z `elem` "_") x
-> 
-> unconv (App e fs) = S.App (unconv e) $ map unconv fs
-> unconv (Lam ns e) = S.Lam (map unconvPattern ns) $ unconv e
-> unconv (Let bs e) = S.Let (map (uncurry unconvBinding) bs) (unconv e)
-> unconv (Block sts) = S.Block $ map unconvStmt sts
-> unconv (Seq a b) = S.Block $ map unconvStmt [StExpr a, StExpr b]
-> unconv (If c t e) = S.If [(unconv c, unconv t)] (Just $ unconv e)
-
-> unconvStmt :: Stmt -> S.Stmt
-> unconvStmt (LetDecl n e) = S.LetDecl (unconvBinding n e)
-> unconvStmt (StExpr e) = S.StExpr (unconv e)
-
-> unconvBinding :: String -> Expr -> S.Binding
-> unconvBinding n v = S.Binding (unconvPattern n) (unconv v)
-
-> unconvPattern ::String -> S.Pat
-> unconvPattern n = S.IdenP S.NoShadow (S.PatName n)
 
 ------------------------------------------------------------------------------
 
@@ -488,4 +363,4 @@ tests
 >                   ]
 
 > tests :: TestTree
-> tests = makeSimpleTests "simplestatements" (simpleInterpreterExamples ++ additionalTests) evaluate
+> tests = makeSimpleTests "statements1desugarletdecl" (simpleInterpreterExamples ++ additionalTests) evaluate

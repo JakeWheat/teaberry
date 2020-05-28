@@ -1,12 +1,16 @@
 
-simple exprs extended to add if
+extent the simpleexprif to add 'and' and 'or'
 
-boolean literals use constants in the env, not a separate syntax type
+they can't be regular functions if we want short circuiting. here,
+they are desugared to 'if' to implement short circuiting
+
+todo: import almost everything from simpleexprifandor
 
 > {-# LANGUAGE TupleSections #-}
 > {-# LANGUAGE LambdaCase #-}
 
-> module SimpleExprIf (tests) where
+> module Expr1IfAndOr (tests) where
+
 
 > import qualified Parse as P
 > import qualified Syntax as S
@@ -92,6 +96,62 @@ values
 >     BoolV a == BoolV b = a == b
 >     _ == _ = False
 
+------------------------------------------------------------------------------
+
+desugar
+
+> desugar :: Expr -> Either String Expr
+> desugar (Num i) = pure $ Num i
+> desugar (Iden i) = pure $ Iden i
+
+> desugar (App (Iden "and") [a,b]) = do
+>     a' <- desugar a
+>     b' <- desugar b
+>     pure $ If a' b' (Iden "false")
+> 
+> desugar (App (Iden "or") [a,b]) = do
+>     a' <- desugar a
+>     b' <- desugar b
+>     pure $ If a' (Iden "true") b'
+
+
+a and b
+->
+if a: b else: false end
+if not(a): false else: b end
+
+are these the same? if so, option 1 is better because there's less to
+it
+
+a or b
+->
+if a: true else: b end
+
+something isn't quite right: what if you make and into a value
+suddenly, it has the wrong behaviour?
+does it need to apply the short circuiting in the interpreter?
+
+try to break the behaviour using this implementation to demonstrate
+it's definitely flawed
+
+how to test short circuiting? only by side effects? maybe it needs to
+wait for vars to be trivially testable? or do a hack with print/writer
+or something? prefer a nice simple hack to waiting for a big feature
+
+regular functions + some way to show they're flawed
+naive desugar to if + some way to show it's flawed
+a better solution, maybe 2:
+  do in in the interpreter to make it work
+  prevent and and or from being used as values?
+
+
+> desugar (App f as) = App <$> desugar f <*> mapM desugar as
+> desugar (Lam ns e) = Lam ns <$> desugar e
+> desugar (Let bs e) = Let <$> mapM f bs <*> desugar e
+>   where
+>     f (n,v) = (n,) <$> desugar v
+> desugar (If c t e) = If <$> desugar c <*> desugar t <*> desugar e
+
 
 ------------------------------------------------------------------------------
 
@@ -148,7 +208,8 @@ short circuiting 'and' and 'or'.
 > evaluate :: String -> Either String Value
 > evaluate s =  do
 >     ast <- parse s
->     runInterp testEnv ast
+>     ast' <- desugar ast
+>     runInterp testEnv ast'
 
 ------------------------------------------------------------------------------
 
@@ -157,15 +218,10 @@ ffi catalog
 > testEnv :: Env
 > testEnv = either error id $ addForeignFuns'
 >    [("+", binaryOp unwrapNum unwrapNum wrapNum (+))
+>    ,("not", unaryOp unwrapBool wrapBool not)
 >    ,("==", binaryOp unwrapNum unwrapNum wrapBool (==))
 >    ]
 >    emptyEnv
-
-> {-plusNum :: Scientific -> Scientific -> Scientific
-> plusNum = (+)
-
-> equalsNum :: Scientific -> Scientific -> Bool
-> equalsNum = (==)-}
 
 --------------------------------------
 
@@ -193,10 +249,10 @@ todo: import from the ffi example
 > wrapNum n = pure $ NumV n
 
 
-> {-unwrapBool :: (String, Value -> Interpreter Bool)
+> unwrapBool :: (String, Value -> Interpreter Bool)
 > unwrapBool = ("boolean", \case
 >                           BoolV n -> pure n
->                           x -> lift $ throwE $ "type: expected boolean, got " ++ show x)-}
+>                           x -> lift $ throwE $ "type: expected boolean, got " ++ show x)
 
 > wrapBool :: Bool -> Interpreter Value
 > wrapBool n = pure $ BoolV n
@@ -210,7 +266,7 @@ todo: import from the ffi example
 > wrapText :: String -> Interpreter Value
 > wrapText n = pure $ TextV n-}
 
-> {-unaryOp :: (String, Value -> Interpreter a)
+> unaryOp :: (String, Value -> Interpreter a)
 >         -> (a -> Interpreter Value)
 >         -> (a -> a)
 >         -> ([String], ([Value] -> Interpreter Value))
@@ -221,7 +277,8 @@ todo: import from the ffi example
 >                 [a] -> do
 >                     ax <- (snd unwrap0) a
 >                     wrap (f ax)
->                 _ -> lift $ throwE $ "wrong number of args to function, expected 1, got " ++ show (length as))-}
+>                 _ -> lift $ throwE $ "wrong number of args to function, expected 1, got " ++ show (length as))
+
 
 
 > binaryOp :: (String, Value -> Interpreter a)
@@ -287,11 +344,15 @@ tests
 > interpreterExamples :: [(String, String)]
 > interpreterExamples =
 >     simpleInterpreterExamples ++
->     [("if true: 1 else: 2 end", "1")
->     ,("if false: 1 else: 2 end", "2")
->     ,("if 1 == 1: 1 else: 2 end", "1")
->     ,("if 1 == 2: 1 else: 2 end", "2")
+>     [("true or false", "true")
+>     ,("false or false", "false")
+>     ,("true and false", "false")
+>     ,("not(true)", "false")
+>     ,("not(false)", "true")
 >     ]
 
+todo: what's the earliest point where can check the short circuiting
+ is working?
+
 > tests :: TestTree
-> tests = makeSimpleTests "simpleexprif" interpreterExamples evaluate
+> tests = makeSimpleTests "expr1ifandor" interpreterExamples evaluate

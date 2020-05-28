@@ -89,18 +89,18 @@ Test-Suite Langs
                        SimpleExprReader
                        SimpleExprDesugared
                        SimplestCheck
-                       SimpleExprFFI
-                       SimpleExprIf
-                       SimpleExprNWayIf
-                       SimpleExprIfAndOr
-                       SimpleExprTupleHack
-                       SimpleStatements
-                       SimpleStatementsDesugarLetDecl
-                       SimpleStatementsSeq
-                       SimpleStatementsWithoutCheck
-                       SimpleStatementsCheck
-                       SimpleStatementsCheckDesugarRefactor
-                       SimpleVar
+                       Expr1FFI
+                       Expr1If
+                       Expr1NWayIf
+                       Expr1IfAndOr
+                       Expr1TupleHack
+                       Statements1
+                       Statements1DesugarLetDecl
+                       Statements1Seq
+                       Statements1WithoutCheck
+                       Statements1Check
+                       Statements1CheckDesugarRefactor
+                       Var1
                        Lists1
                        DataDecl1
                        Cases1

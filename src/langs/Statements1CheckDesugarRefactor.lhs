@@ -1,73 +1,13 @@
 
 Simplest version of the code which supports script with check blocks
-and closures. This allows writing fairly natural code and tests.
+and closures.
 
-This code expanded massively. Is it touching lots of code or not?
+Refactored to have a separate desugar statements function.
 
-Can you show a small language without these tests, and then a change
- that adds them, which is small and relatively self contained?
+TODO: this refactoring should be how it is in all the statements code
 
-
-
-implementation sketch:
-
-
-Running tests is comprised of the following bits in this file.
-
-in the desugar process, we replace the check block statements, and
-the 'is' tests, with regular in language code. these are rewritten
-slightly to call functions:
-
-add-tests(fn)
-takes a function value
-b
-log-check-block(unique-block-id, name)
-says there is a new test block with a unique id and it's name
-
-log-test-pass(blockid, text of test)
-log-test-fail(block,id, text of test, fail message)
-
-
-These functions are implemented in haskell. they get called when the
-program is run
-
-the function closures passed to add-tests are saved in the intepreter
-   monad state (as in language values)
-when the intepreter finishes, it runs these closures one by one
-they save the test results in another place in the interpreter monad
-state (as haskell values)
-after running all the saved tests, the logged results are converted
-to a usable (haskell) data structure for working with the results
-then there is a haskell function which formats these values nicely
-
-the haskell data types/values are:
-the test log values
-the transformed results values
-
-This is a way to get the test infrastructure good enough to be a base
-to build further experiments on: this can be used to test new features
-and to add additional test features one by one
-
-future work:
-implement raises, and the rest of the test checks
-move the implementation of the haskell ffi functions in language
-so they aren't using any ffi any more
-  need variables for this at least
-  and probably variants
-then the test runner at the end becomes in language only
-and implement the formating of the results in language too
-this is good for dogfooding the language
-it will also simplify the interpreter monad and haskell code
-the last step is to do modules: put all the test infrastructure
-in a module (later can make the code in it reusable for alternative
-test frameworks if needed)
-and adapt the tests so you track the package and module for each check,
-and can decide which tests to run, and not just all tests or none
-particularly, you might want to say: run only the tests for the top level file
-or this particular file,
-or everything in this dir, this package
-or all tests for all code that is used
-
+one exception: take the current base simple statements with the non
+ top level statements handling, and make a copy which still does that
 
 ------------------------------------------------------------------------------
 
@@ -77,8 +17,8 @@ or all tests for all code that is used
 > {-# LANGUAGE QuasiQuotes #-}
 > {-# LANGUAGE ScopedTypeVariables #-}
 
-> module SimpleStatementsCheck (tests
->                              ) where
+> module Statements1CheckDesugarRefactor (tests
+>                                        ) where
 
 > import Text.RawString.QQ
 
@@ -176,66 +116,19 @@ testing support in the desugarer monad
 
 desugaring code
 
-> runDesugar :: Expr -> Either String Expr
-> runDesugar expr =
->     fst <$> runExcept (evalRWST (desugar expr) () startingDesugarState)
+> runDesugar :: [Stmt] -> Either String Expr
+> runDesugar stmts =
+>     fst <$> runExcept (evalRWST (desugarStmts stmts) () startingDesugarState)
 
 > desugar :: Expr -> Desugarer Expr
 
---------------------------------------
+> desugar (Block sts) = desugarStmts sts
 
-check block + is  desugaring
+> desugar (Num i) = pure $ Num i
+> desugar (Text i) = pure $ Text i
+> desugar (TupleSel fs) = TupleSel <$> mapM desugar fs
+> desugar (Iden i) = pure $ Iden i
 
-it's a bunch of code, but mostly boilerplate
-
-check:
-  stmt1
-  ..
-end
-
-desugared to:
-
-internal-tests.add-tests(lam():
-  unique-checkblockid = n
-  internal-tests.log-check-block(unique-checkblockid, "blockname") -- the name is generated if the check block is anonymous
-  desugared stmt1
-  ...
-  nothing
-end
-
-> desugar (Block (Check nm bdy : es)) = do
->     (uniqueCheckBlockIDVarName,uniqueCheckBlockID) <- enterNewCheckBlock
->     blockName <- maybe getAnonBlockName pure nm
->     desugaredCheck <- desugar $
->         appI "add-tests"
->         [Lam [] (Block $
->                  [LetDecl uniqueCheckBlockIDVarName uniqueCheckBlockID
->                  ,StExpr $ appI "log-check-block"
->                              [Iden uniqueCheckBlockIDVarName
->                              ,Text blockName]]
->                  ++ bdy)]
->     exitCheckBlock
->     case es of
->         [] -> pure desugaredCheck
->         _ -> Seq desugaredCheck <$> desugar (Block es)
->   where
->     appI i as = App (Iden i) as
-
-aexpr is bexpr
-
-desugared to
-
-block:
-  unique-v0 = aexpr
-  unique-v1 = bexpr # uniques also avoid capturing the v0 here
-  unique-name = "aexpr is bexpr"
-  if unique-v0 == unique-v1:
-    internal-tests.log-test-pass(unique-checkblockid, unique-name)
-  else:
-    unique-failmsg = "Values not equal:\n" + torepr(v0) + "\n" + torepr(v1)
-    internal-tests.log-test-fail(unique-checkblockid, unique-name, unique-failmsg)
-  end
-end
 
 > desugar (App (Iden "is") [a,b]) = do
 >     uniqueV0 <- makeUniqueVar "is-v0"
@@ -263,26 +156,6 @@ end
 >     eqIdens c d = appI "==" [Iden c, Iden d]
 >     appI i es = App (Iden i) es
 
---------------------------------------
-
-the rest of the desugaring
-
-> desugar (Block []) = lift $ throwE $ "empty block"
-> desugar (Block [StExpr e]) = desugar e
-> desugar (Block [LetDecl {}]) = lift $ throwE $ "block ends with let"
-
-> desugar (Block (LetDecl n v : es)) = do
->     v' <- desugar v
->     Let [(n,v')] <$> desugar (Block es)
-
-> desugar (Block (StExpr e : es)) =
->     Seq <$> desugar e <*> desugar (Block es)
-
-
-> desugar (Num i) = pure $ Num i
-> desugar (Text i) = pure $ Text i
-> desugar (TupleSel fs) = TupleSel <$> mapM desugar fs
-> desugar (Iden i) = pure $ Iden i
 > desugar (App f as) = App <$> desugar f <*> mapM desugar as
 > desugar (Lam ns e) = Lam ns <$> desugar e
 > desugar (Let bs e) = do
@@ -296,6 +169,38 @@ shouldn't be hit?
 
 > desugar (If c t e) =
 >     If <$> desugar c <*> desugar t <*> desugar e
+
+
+> desugarStmts :: [Stmt] -> Desugarer Expr
+
+> desugarStmts (Check nm bdy : es) = do
+>     (uniqueCheckBlockIDVarName,uniqueCheckBlockID) <- enterNewCheckBlock
+>     blockName <- maybe getAnonBlockName pure nm
+>     desugaredCheck <- desugar $
+>         appI "add-tests"
+>         [Lam [] (Block $
+>                  [LetDecl uniqueCheckBlockIDVarName uniqueCheckBlockID
+>                  ,StExpr $ appI "log-check-block"
+>                              [Iden uniqueCheckBlockIDVarName
+>                              ,Text blockName]]
+>                  ++ bdy)]
+>     exitCheckBlock
+>     case es of
+>         [] -> pure desugaredCheck
+>         _ -> Seq desugaredCheck <$> desugarStmts es
+>   where
+>     appI i as = App (Iden i) as
+
+> desugarStmts [] = lift $ throwE $ "empty block"
+> desugarStmts [StExpr e] = desugar e
+> desugarStmts [LetDecl {}] = lift $ throwE $ "block ends with let"
+
+> desugarStmts (LetDecl n v : es) = do
+>     v' <- desugar v
+>     Let [(n,v')] <$> desugarStmts es
+
+> desugarStmts (StExpr e : es) =
+>     Seq <$> desugar e <*> desugarStmts es
 
 
 ------------------------------------------------------------------------------
@@ -762,13 +667,15 @@ produce. It's slightly ambiguous because this entire 'parser' is more
 like a desugaring process.
 
 
-> parse :: String -> Either String Expr
+> parse :: String -> Either String [Stmt]
 > parse src =
 >     case P.parseProgram "" src of
->       Right (S.Program [] sts) -> convExpr (S.Block sts)
+>       Right (S.Program [] sts) -> convStmts sts
 >       Right (S.Program x _) -> Left $ "prelude not supported " ++ show x
 >       Left e -> Left e
 
+> convStmts :: [S.Stmt] -> Either String [Stmt]
+> convStmts = mapM convSt
 
 > convExpr :: S.Expr -> Either String Expr
 > convExpr (S.Sel (S.Num x)) = Right $ Num x

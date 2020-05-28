@@ -5,13 +5,31 @@ two kinds of statements: let decl, and expression
 it has blocks which can contain 1 or more statements
 blocks cannot end with a let decl
 
-desugars let decls to let expressions
+a question:
+what is the top level?
+is it an expression?
+do you have to write block explicitly first if you want more than just
+a single expression?
+is the top level a list of statements
+if so, does it add the block implicitly or not?
+later might want to distinguish, since the top level
+  might become a special letrec
+  but non top level blocks are not letrec
+
+what's the easiest thing to do?
+parse a list of statements
+add the block in the ast automatically to wrap them
+this keeps syntax compatibility with the check version
+
+what's the ultimate thing to do? maybe come back to this after doing
+programs and imports and stuff
+
 
 > {-# LANGUAGE TupleSections #-}
 > {-# LANGUAGE LambdaCase #-}
 
-> module SimpleStatementsDesugarLetDecl (tests
->                                       ) where
+> module Statements1 (tests
+>                         ) where
 
 > import SimpleExpr (TestTree
 >                   ,makeSimpleTests
@@ -61,22 +79,10 @@ what are the pros and cons of desugaring to the same ast?
 
 > desugar :: Expr -> Either String Expr
 
-
-> desugar (Block sts) = do
->     xs <- desugarLetDecl sts
->     (Block . map StExpr) <$> mapM (desugar) xs
+> desugar (Block sts) = Block <$> mapM desugarSt sts
 >   where
-
->     -- todo: is there a way to simplify this more
->     -- to not accumulate the lets, but turn each one into
->     -- a let as it's seen and avoid the reverse too
->     desugarLetDecl [] = pure []
->     desugarLetDecl (LetDecl n v : xs) = desugarHaveLet [(n,v)] xs
->     desugarLetDecl (StExpr x : xs) = (x :) <$> desugarLetDecl xs
-
->     desugarHaveLet bs (LetDecl n v : xs) = desugarHaveLet ((n,v):bs) xs
->     desugarHaveLet bs (StExpr e : xs) = ((Let (reverse bs) e) :) <$> desugarLetDecl xs
->     desugarHaveLet _ [] = Left $ "block ends with letdecl"
+>     desugarSt (LetDecl n e) = LetDecl n <$> desugar e
+>     desugarSt (StExpr e) = StExpr <$> desugar e
 
 > desugar (Num i) = pure $ Num i
 > desugar (Text i) = pure $ Text i
@@ -164,11 +170,22 @@ values
 >             local (extendEnv [(b,v)]) $ newEnv bs'
 >     newEnv bs
 
+A bunch of tedious special cases. Using seq moves these to the
+desugarer. The special cases could be eliminated in the desugarer so
+you would never see them in the interpreter. I think this is what seq
+mainly brings - representing that these have been eliminated in the
+ast types. How do you put statements that don't desugar to expressions
+back into this system?
+
 > interp (Block []) = lift $ throwE "empty block"
-> interp (Block (LetDecl {}: _)) = lift $ throwE "non desugared letdecl"
+
+> interp (Block [LetDecl {}]) = lift $ throwE "blocks ends with letdecl"
+> interp (Block (LetDecl n e : es)) = do
+>     v <- interp e
+>     local (extendEnv [(n,v)]) $ interp (Block es)
 
 > interp (Block [StExpr e]) = interp e
-> interp (Block (StExpr e:es)) = interp e *> interp (Block es)
+> interp (Block (StExpr e : es)) = interp e *> interp (Block es)
 
 
 
@@ -350,6 +367,10 @@ parse
 tests
 -----
 
+the tests are cheating slightly, because testing the code properly is
+deferred until more features are added. not sure if this is legit, an
+issue, good or bad for maintenance or for tutorial purposes
+
 > additionalTests :: [(String,String)]
 > additionalTests = [("x = 3\n\
 >                     \x", "3")
@@ -363,4 +384,4 @@ tests
 >                   ]
 
 > tests :: TestTree
-> tests = makeSimpleTests "simplestatements" (simpleInterpreterExamples ++ additionalTests) evaluate
+> tests = makeSimpleTests "statements1" (simpleInterpreterExamples ++ additionalTests) evaluate

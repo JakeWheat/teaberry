@@ -32,7 +32,7 @@ contracts?
 > {-# LANGUAGE TupleSections #-}
 > {-# LANGUAGE LambdaCase #-}
 
-> module SimpleStatementsSeq (tests
+> module Statements1Seq (tests
 >                            ) where
 
 > import SimpleExpr (TestTree
@@ -383,4 +383,4 @@ tests
 >                   ]
 
 > tests :: TestTree
-> tests = makeSimpleTests "simplestatements" (simpleInterpreterExamples ++ additionalTests) evaluate
+> tests = makeSimpleTests "statements1seq" (simpleInterpreterExamples ++ additionalTests) evaluate

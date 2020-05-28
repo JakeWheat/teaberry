@@ -57,7 +57,7 @@ is-number
 > {-# LANGUAGE TupleSections #-}
 > {-# LANGUAGE LambdaCase #-}
 
-> module SimpleExprFFI (tests) where
+> module Expr1FFI (tests) where
 
 > import qualified Parse as P
 > import qualified Syntax as S
@@ -391,4 +391,4 @@ tests
 >     ]
 
 > tests :: TestTree
-> tests = makeSimpleTests "simpleexprffi" interpreterExamples evaluate
+> tests = makeSimpleTests "expr1ffi" interpreterExamples evaluate
