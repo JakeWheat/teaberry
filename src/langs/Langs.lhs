@@ -20,6 +20,7 @@
 > import qualified Lists1
 > import qualified DataDecl1
 > import qualified Cases1
+> import qualified CasesPlusVar
 
 > import qualified Test.Tasty as T
 
@@ -46,4 +47,5 @@
 >        ,Lists1.tests
 >        ,DataDecl1.tests
 >        ,Cases1.tests
+>        ,CasesPlusVar.tests
 >        ]

@@ -693,8 +693,6 @@ ffi catalog
 
 > variantFieldGetOrd :: Scientific -> Value -> Interpreter Value
 > variantFieldGetOrd fieldIndex v@(VariantV _ fs) =
->     --maybe (lift $ throwE $ "variant field not found #" ++ fieldIndex ++ ": " ++ torepr' v)
->     --      pure $ lookup fieldNm fs
 >     case extractInt fieldIndex of
 >         Nothing -> lift $ throwE $ "variant field get ord passed non integer: " ++ show fieldIndex
 >         Just i -> maybe (lift $ throwE $ "variant field # not found " ++ show fieldIndex ++ ": " ++ torepr' v)
@@ -1211,4 +1209,4 @@ end
 >                 Nothing -> T.assertBool "" True
 >                 Just fmx -> T.assertFailure fmx
 >     in trace (renderCheckResults crs)
->        $ T.testGroup "simpleagdt" $ map f crs
+>        $ T.testGroup "cases1" $ map f crs

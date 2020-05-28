@@ -1,16 +1,14 @@
 
-simplest statements thing with vars added
-
-TODO: make this work without using knowledge that an iden refers to a
- var to desugar.
+Merge cases and var - prep for refs
 
 > {-# LANGUAGE TupleSections #-}
 > {-# LANGUAGE LambdaCase #-}
 > {-# LANGUAGE QuasiQuotes #-}
 > {-# LANGUAGE ScopedTypeVariables #-}
+> {-# LANGUAGE MultiWayIf #-}
 
-> module Var1 (tests
->                  ) where
+> module CasesPlusVar (tests
+>               ) where
 
 > import Text.RawString.QQ
 
@@ -25,7 +23,7 @@ TODO: make this work without using knowledge that an iden refers to a
 
 > import Control.Monad.Trans.Class (lift)
 > import Control.Monad.Trans.Except (Except, runExcept, throwE)
-> import Control.Monad.Trans.RWS (RWST, evalRWST, ask, {-asks,-} local, get, gets, state, put, modify)
+> import Control.Monad.Trans.RWS (RWST, evalRWST, ask, local, get, gets, state, put, modify)
 
 > import Control.Monad (when)
 > import Data.Maybe (isJust, isNothing)
@@ -47,18 +45,27 @@ syntax
 >           | Check (Maybe String) [Stmt]
 >           | VarDecl String Expr
 >           | SetVar String Expr
+>           | DataDecl String [VariantDecl]
 >           deriving (Eq, Show)
 
-> data Expr = Num Scientific
+> data VariantDecl = VariantDecl String [String]
+>                  deriving (Eq,Show) 
+  
+> data Expr = -- selectors
+>             Num Scientific
 >           | Text String
 >           | TupleSel [Expr]
+>           | ListSel [Expr]
+>             -- other things
 >           | Iden String
 >           | App Expr [Expr]
 >           | Lam [String] Expr
 >           | Let [(String,Expr)] Expr
 >           | Block [Stmt]
 >           | Seq Expr Expr
->           | If Expr Expr Expr
+>           | If [(Expr,Expr)] (Maybe Expr)
+>           | DotExpr Expr String
+>           | Cases String Expr [(String, [String], Expr)] (Maybe Expr)
 >           | Box Expr
 >           | SetBox Expr Expr
 >           deriving (Eq, Show)
@@ -75,7 +82,6 @@ desugar
 >                                  ,nextAnonymousBlockNumber :: Int
 >                                  ,currentCheckBlockIDName :: Maybe String}
 
-
 > startingDesugarState :: DesugarState
 > startingDesugarState = DesugarState 0 0 0 Nothing
 
@@ -84,6 +90,7 @@ desugar
 >     let suff = uniqueCtr s
 >     in (pref ++ "-" ++ show suff
 >        ,s {uniqueCtr = suff + 1})
+
 
 --------------------------------------
 
@@ -123,8 +130,8 @@ desugaring code
 > desugar (Num i) = pure $ Num i
 > desugar (Text i) = pure $ Text i
 > desugar (TupleSel fs) = TupleSel <$> mapM desugar fs
-
 > desugar (Iden i) = pure $ Iden i
+
 
 > desugar (App (Iden "is") [a,b]) = do
 >     uniqueV0 <- makeUniqueVar "is-v0"
@@ -137,10 +144,10 @@ desugaring code
 >               ,LetDecl uniqueV1 b
 >               ,LetDecl uniqueName (Text $ pretty a ++ " is " ++ pretty b)
 >               ,StExpr $
->                If (eqIdens uniqueV0 uniqueV1)
->                   (appI "log-test-pass" [Iden checkBlockIDName
->                                         ,Iden uniqueName])
->                   (appI "log-test-fail"
+>                If [(eqIdens uniqueV0 uniqueV1
+>                   ,appI "log-test-pass" [Iden checkBlockIDName
+>                                         ,Iden uniqueName])]
+>                   (Just $ appI "log-test-fail"
 >                    [Iden checkBlockIDName
 >                    ,Iden uniqueName
 >                    ,Text "Values not equal:\n"
@@ -152,6 +159,9 @@ desugaring code
 >     eqIdens c d = appI "==" [Iden c, Iden d]
 >     appI i es = App (Iden i) es
 
+> desugar (App (Iden "or") [a,b]) =
+>     desugar (If [(a, Iden "true")] (Just b))
+
 > desugar (App f as) = App <$> desugar f <*> mapM desugar as
 > desugar (Lam ns e) = Lam ns <$> desugar e
 > desugar (Let bs e) = do
@@ -161,8 +171,17 @@ desugaring code
 > desugar (Seq a b) =
 >     Seq <$> desugar a <*> desugar b
 
-> desugar (If c t e) =
->     If <$> desugar c <*> desugar t <*> desugar e
+> desugar (If bs e) =
+>     If <$> mapM f bs <*> case e of
+>                              Nothing -> pure Nothing
+>                              Just e1 -> Just <$> desugar e1
+>   where
+>     f (c,t) = (,) <$> desugar c <*> desugar t
+  
+> desugar (DotExpr e f) = do
+>     desugar (App (Iden "variant-field-get") [Text f, e])
+
+> desugar (ListSel vs) = ListSel <$> mapM desugar vs
 
 > desugar (Box v) = Box <$> desugar v
 
@@ -172,7 +191,35 @@ no idea if this is good or not
 > desugar (SetBox b v) = SetBox <$> desugar b <*> desugar v
 
 
-  
+  cases(List) l:
+-> assert typeof l is List
+  l-unique = l (to evaluate once)
+  will need to be able to find the type from the variant name in the runtime
+    | empty => true
+    -> if variant-name == empty:
+         true
+    | link(f, r) => 1 + length(r)
+    ->
+      if variantname == link
+        f = l.{0}
+        r = l.{1}
+        1 + length(r)
+
+> desugar (Cases _ty t bs els) = do
+>     tv <- makeUniqueVar "casest"
+>     bs' <- mapM (f tv) bs
+>     desugar $ Let [(tv, t)] $ If bs' els
+>   where
+>     f tv (vnm, fnms, e) =
+>         let tst = appI "safe-variant-name" [Iden tv] `equals` Text vnm
+>             thn = zipWith (\fnm n -> LetDecl fnm (appI "variant-field-get-ord" [Num $ fromIntegral n, Iden tv]))
+>                           fnms [(0::Int)..]
+>         in pure (tst, Block (thn ++ [StExpr e]))
+>     appI i as = App (Iden i) as
+>     equals a b = App (Iden "==") [a,b]
+
+
+
 > desugarStmts :: [Stmt] -> Desugarer Expr
 
 > desugarStmts (Check nm bdy : es) = do
@@ -199,18 +246,55 @@ no idea if this is good or not
 
 > desugarStmts (LetDecl n v : es) = do
 >     v' <- desugar v
-      
 >     Let [(n,v')] <$> desugarStmts es
 
 > desugarStmts (VarDecl n v : es) = do
 >     v' <- Box <$> desugar v
 >     Let [(n,v')] <$> desugarStmts es
-  
+
+
 > desugarStmts (StExpr e : es) =
 >     Seq <$> desugar e <*> desugarStmts es
 
 > desugarStmts (SetVar n v : es) = do
 >     desugarStmts (StExpr (SetBox (Iden n) v) : es)
+
+
+> desugarStmts (DataDecl nm varnts  : es) = do
+>     x <- (\a b -> a ++ [b]) <$> (mapM makeIsVar varntNms) <*> makeIsDat
+>     y <- mapM makeVarnt varnts
+>     desugarStmts (x ++ y ++ es)
+>  where
+>    varntNms = map (\(VariantDecl vnm _) -> vnm) varnts
+>    makeIsVar vnm = do
+>        arg <- makeUniqueVar "is-x"
+>        pure $ LetDecl ("is-" ++ vnm)
+>               (Lam [arg] (appI "safe-variant-name" [Iden arg] `equals` Text vnm))
+>    makeIsDat = do
+>        arg <- makeUniqueVar "is-dat"
+>        let varChecks = map (\vnm -> appI ("is-" ++ vnm) [Iden arg]) varntNms
+>            f [] = lift $ throwE $ "make is dat with no variants"  
+>            f [a] = pure a
+>            f (a:as) = (a `orf`) <$> f as
+>        bdy <- f varChecks
+>        pure $ LetDecl ("is-" ++ nm) (Lam [arg] bdy)
+
+if there are no args to the variant, it's a binding to a non lambda
+value, not a lambda
+
+>    makeVarnt (VariantDecl vnm []) = pure $ LetDecl vnm (appI "make-variant" [Text vnm, ListSel []])
+
+pt = lam (x,y): I.App "make-variant" ["pt",[list: {"x";x},{"y";y}]]
+
+>    makeVarnt (VariantDecl vnm fs) =
+>        let fields = ListSel $ flip map fs $ \f -> TupleSel [Text f, Iden f]
+>        in pure $ LetDecl vnm
+>                  (Lam fs $ appI "make-variant" [Text vnm, fields])
+                                    
+
+>    appI i as = App (Iden i) as
+>    equals a b = App (Iden "==") [a,b]
+>    orf a b = App (Iden "or") [a,b]
 
 ------------------------------------------------------------------------------
 
@@ -221,7 +305,10 @@ values
 >            | BoolV Bool
 >            | TextV String
 >            | TupleV [Value]
+>            | ListV [Value]
 >            | NothingV
+>            | VariantV String -- variant name
+>                       [(String,Value)] -- fields
 >            | BoxV Int
 >            | FunV [String] Expr Env
 >            | ForeignFunV String
@@ -231,6 +318,8 @@ values
 > valueTypeName (TextV {}) = "text"
 > valueTypeName (BoolV {}) = "boolean"
 > valueTypeName (TupleV {}) = "tuple"
+> valueTypeName (ListV {}) = "list"
+> valueTypeName (VariantV {}) = "variant" -- or should it be the variant's type name?
 > valueTypeName (NothingV) = "nothing"
 > valueTypeName (BoxV {}) = "box"
 > valueTypeName (FunV {}) = "function"
@@ -241,6 +330,8 @@ values
 >   show (TextV n) = "TextV " ++ show n
 >   show (BoolV n) = "BoolV " ++ show n
 >   show (TupleV fs) = "TupleV [" ++ intercalate "," (map show fs) ++ "]"
+>   show (ListV fs) = "[list: " ++ intercalate "," (map show fs) ++ "]"
+>   show (VariantV nm fs) = nm ++ "(" ++ intercalate "," (map show fs) ++ ")"
 >   show NothingV = "NothingV"
 >   show (BoxV n) = "BoxV " ++ show n
 >   show (FunV {}) = "FunV stuff"
@@ -251,8 +342,8 @@ values
 >     BoolV a == BoolV b = a == b
 >     TextV a == TextV b = a == b
 >     TupleV fs == TupleV gs = fs == gs
+>     VariantV nm fs == VariantV lm gs = (nm,fs) == (lm,gs)
 >     NothingV == NothingV = True
->     -- todo: find out what regular eq should do for boxes
 >     _ == _ = False
 
 ------------------------------------------------------------------------------
@@ -310,6 +401,8 @@ holds the values of variables
 > interp (Num n) = pure (NumV n)
 > interp (Text t) = pure (TextV t)
 > interp (TupleSel es) = TupleV <$> mapM interp es
+> interp (ListSel es) = ListV <$> mapM interp es
+
 > interp (Iden a) = do
 >     env <- ask
 >     x <- envLookup a env
@@ -318,7 +411,7 @@ holds the values of variables
 >                   st <- get
 >                   fetchStore i (isStore st)
 >         _ -> pure x
-  
+
 > interp (App f es) = do
 >     fv <- interp f
 >     vs <- mapM interp es
@@ -336,14 +429,21 @@ holds the values of variables
 > interp (Block {}) = lift $ throwE $ "undesugared block passed to interpreter"
 > interp (Seq a b) = interp a *> interp b
 
-> interp (If c t e) = do
->     c' <- interp c
->     case c' of
->         BoolV True -> interp t
->         BoolV False -> interp e
->         _ -> lift $ throwE $ "expected bool in if test, got " ++ show c'
+> interp z@(If bs e) = do
+>     let f ((c,t):bs') = do
+>             c' <- interp c
+>             case c' of
+>                 BoolV True -> interp t
+>                 BoolV False -> f bs'
+>                 _ -> lift $ throwE $ "expected bool in if test, got " ++ show c'
+>         f [] = case e of
+>                    Just x -> interp x
+>                    Nothing -> lift $ throwE $ "no if branches matched and no else:\n"
+>                               ++ pretty z
+>     f bs
 
-----------------------
+> interp e@(DotExpr {}) = lift $ throwE $ "interp: undesugared dotexpr " ++ show e
+> interp e@(Cases {}) = lift $ throwE $ "interp: undesugared cases " ++ show e
 
 > interp (Box e) = do
 >     v <- interp e
@@ -364,9 +464,8 @@ holds the values of variables
 
 > interp (SetBox b _) = lift $ throwE $ "attemped to setbox non identifier: " ++ pretty b
 
-  
------------------------
 
+  
 > app :: Value -> [Value] -> Interpreter Value
 > app fv vs = do
 >     case fv of
@@ -389,11 +488,8 @@ holds the values of variables
 > evaluateWithChecks s =  do
 >     ast <- parse s
 >     ast' <- runDesugar ast
+>     {-trace (pretty ast') $ -}
 >     runInterp testEnv ast'
-
-------------------------------------------------------------------------------
-
-boilerplate
 
 ------------------------------------------------------------------------------
 
@@ -548,23 +644,31 @@ ffi catalog
 >    [("+", binaryOp unwrapNum unwrapNum wrapNum (+))
 >    ,("*", binaryOp unwrapNum unwrapNum wrapNum (*))
 >    ,("+", binaryOp unwrapText unwrapText wrapText (++))
->    ,("==", binaryOp unwrapNum unwrapNum wrapBool (==))
->    ,("==", binaryOp unwrapText unwrapText wrapBool (==))
->    ,("==", binaryOp unwrapTuple unwrapTuple wrapBool (==))
+>    ,("==", binaryOp anyIn anyIn wrapBool (==))
 
->    ,("add-tests", unarySimple "function" addTests)
->    ,("log-check-block", binaryV unwrapNum unwrapText logCheckBlock)
->    ,("log-test-pass", binaryV unwrapNum unwrapText logTestPass)
->    ,("log-test-fail", ternaryV unwrapNum unwrapText unwrapText logTestFail)
+>    ,("add-tests", unaryOp functionIn id addTests)
+>    ,("log-check-block", binaryOp unwrapNum unwrapText id logCheckBlock)
+>    ,("log-test-pass", binaryOp unwrapNum unwrapText id logTestPass)
+>    ,("log-test-fail", ternaryOp unwrapNum unwrapText unwrapText id logTestFail)
 
+>    ,("variant-field-get", binaryOp unwrapText variantIn id variantFieldGet)
+>    ,("variant-field-get-ord", binaryOp unwrapNum variantIn id variantFieldGetOrd)
+>    ,("safe-variant-name", unaryOp variantIn pure safeVariantName)
+>    -- hack to make it work for any data type     
+>    ,("safe-variant-name", unaryOp anyIn pure (const $ NothingV))
+>    ,("make-variant", binaryOp unwrapText unwrapList id makeVariant)
+
+>    ,("torepr", unaryOp anyIn pure torepr)
+>    ,("tostring", unaryOp anyIn pure tostring)
 >    ]
->     ++ [("torepr", unarySimple x torepr) | x <- ["number", "text", "boolean", "tuple", "function", "foreign-function"]]
->     )
+>     ++ [])
+>    $ emptyEnv {envEnv = [("true", BoolV True)
+>                         ,("false", BoolV False)
+>                         ,("empty", VariantV "empty" [])]}
 
->    emptyEnv
 
-> torepr :: Value -> Interpreter Value
-> torepr x = pure $ TextV $ torepr' x
+> torepr :: Value -> Value
+> torepr x = TextV $ torepr' x
 
 > torepr' :: Value -> String
 > torepr' (NumV n) = case extractInt n of
@@ -577,8 +681,19 @@ ffi catalog
 > torepr' (BoxV {}) = "<Box>"
 > torepr' (TupleV fs) =
 >     "{" ++ intercalate ";" (map torepr' fs) ++ "}"
+> torepr' (VariantV nm fs) =
+>     nm ++ "(" ++ intercalate "," (map (torepr' . snd) fs) ++ ")"
+> torepr' (ListV fs) =
+>     "[list: " ++ intercalate "," (map torepr' fs) ++ "]"
 
+ 
 > torepr' NothingV = "nothing"
+
+
+> tostring :: Value -> Value
+> tostring x@(TextV {}) = x
+> tostring x = torepr x
+
 
 
 > extractInt :: Scientific -> Maybe Int
@@ -586,7 +701,43 @@ ffi catalog
 >                          (Right x :: Either Float Integer) -> Just $ fromIntegral x
 >                          Left _ -> Nothing
 
+> safeVariantName :: Value -> Value
+> safeVariantName (VariantV x _) = TextV x
+> safeVariantName _ = NothingV
 
+> variantFieldGet :: String -> Value -> Interpreter Value
+> variantFieldGet fieldNm v@(VariantV _ fs) =
+>     maybe (lift $ throwE $ "variant field not found " ++ fieldNm ++ ": " ++ torepr' v)
+>           pure $ lookup fieldNm fs
+> variantFieldGet _ x =
+>     lift $ throwE $ "variant field get called on " ++ torepr' x
+
+> variantFieldGetOrd :: Scientific -> Value -> Interpreter Value
+> variantFieldGetOrd fieldIndex v@(VariantV _ fs) =
+>     case extractInt fieldIndex of
+>         Nothing -> lift $ throwE $ "variant field get ord passed non integer: " ++ show fieldIndex
+>         Just i -> maybe (lift $ throwE $ "variant field # not found " ++ show fieldIndex ++ ": " ++ torepr' v)
+>                   pure (safeIndex (map snd fs) i)
+>   where
+>     safeIndex [] _ = Nothing
+>     safeIndex _ n | n < 0 = Nothing
+>     safeIndex (x:_) 0 = Just x
+>     safeIndex (_:xs) n = safeIndex xs (n - 1)
+     
+       
+> variantFieldGetOrd _ x =
+>     lift $ throwE $ "variant field get ord called on " ++ torepr' x
+
+
+> makeVariant :: String -> [Value] -> Interpreter Value
+> makeVariant vnt listargs = do
+>     cd <- mapM unpackTuple listargs
+>     pure $ VariantV vnt cd
+>   where
+>     unpackTuple (TupleV [TextV nm, v]) = do
+>         pure (nm,v)
+>     unpackTuple (VariantV "tuple" x) = lift $ throwE $ "value in list in make-variant, expected tuple of is-ref, name and val, got " ++ show (map (\(_,b) -> torepr' b) x)
+>     unpackTuple x = lift $ throwE $ "expected tuple in make-variant, got " ++ torepr' x
 
 ------------------------------------------------------------------------------
 
@@ -599,8 +750,7 @@ env, ffi boilerplate
 
 > emptyEnv :: Env
 > emptyEnv = Env
->     {envEnv = [("true", BoolV True)
->               ,("false", BoolV False)]
+>     {envEnv = []
 >     ,envForeignFuns = []}
 
 > extendEnv :: [(String,Value)] -> Env -> Env
@@ -618,8 +768,10 @@ env, ffi boilerplate
 
 > lookupForeignFun :: String -> [String] -> Env -> Interpreter ([Value] -> Interpreter Value)
 > lookupForeignFun nm tys env =
->     maybe (lift $ throwE $ "ffi function not found: " ++ nm ++ "(" ++ intercalate "," tys ++")")
->       pure $ lookup (nm,tys) $ envForeignFuns env
+>     if | Just f <- lookup (nm,tys) $ envForeignFuns env -> pure f
+>        -- well dodgy "generic" functions, only works if all args are any
+>        | Just f <- lookup (nm, map (const "any") tys) $ envForeignFuns env -> pure f
+>        | otherwise -> lift $ throwE $ "ffi function not found: " ++ nm ++ "(" ++ intercalate "," tys ++")"
 
 
 
@@ -633,15 +785,8 @@ env, ffi boilerplate
 >     addForeignFuns' xs env'
 >     
 
-> unarySimple :: String -> (Value -> Interpreter Value) -> ([String], [Value] -> Interpreter Value)
-> unarySimple ty f = ([ty]
->                  ,\case
->                        [x] -> f x
->                        y -> lift $ throwE $ "expected 1 arg, got " ++ show y)
->                  
-
-> unwrapTuple :: (String, Value -> Interpreter [Value])
-> unwrapTuple = ("tuple", \case
+> _unwrapTuple :: (String, Value -> Interpreter [Value])
+> _unwrapTuple = ("tuple", \case
 >                           TupleV fs -> pure fs
 >                           x -> lift $ throwE $ "type: expected tuple, got " ++ show x)
 
@@ -649,6 +794,7 @@ env, ffi boilerplate
 > unwrapNum = ("number", \case
 >                           NumV n -> pure n
 >                           x -> lift $ throwE $ "type: expected number, got " ++ show x)
+
 
 > wrapNum :: Scientific -> Interpreter Value
 > wrapNum n = pure $ NumV n
@@ -672,11 +818,33 @@ env, ffi boilerplate
 > wrapText :: String -> Interpreter Value
 > wrapText n = pure $ TextV n
 
-> _unaryOp :: (String, Value -> Interpreter a)
->         -> (a -> Interpreter Value)
->         -> (a -> a)
+> variantIn :: (String, Value -> Interpreter Value)
+> variantIn = ("variant", \case
+>                           x@(VariantV {}) -> pure x
+>                           x -> lift $ throwE $ "type: expected variant, got " ++ show x)
+
+> unwrapList :: (String, Value -> Interpreter [Value])
+> unwrapList =
+>     ("list", \case
+>                  ListV vs -> pure vs
+>                  x -> lift $ throwE $ "type: expected list, got: " ++ torepr' x)
+  
+> anyIn :: (String, Value -> Interpreter Value)
+> anyIn = ("any", pure)
+
+> functionIn :: (String, Value -> Interpreter Value)
+> functionIn = ("function", \case
+>                           x@(FunV {}) -> pure x
+>                           x@(ForeignFunV {}) -> pure x
+>                           x -> lift $ throwE $ "type: expected function, got " ++ show x)
+
+  
+  
+> unaryOp :: (String, Value -> Interpreter a)
+>         -> (b -> Interpreter Value)
+>         -> (a -> b)
 >         -> ([String], ([Value] -> Interpreter Value))
-> _unaryOp unwrap0 wrap f =
+> unaryOp unwrap0 wrap f =
 >     ([fst unwrap0]
 >     ,\as -> do
 >             case as of
@@ -688,9 +856,9 @@ env, ffi boilerplate
 
 
 > binaryOp :: (String, Value -> Interpreter a)
->          -> (String, Value -> Interpreter a)
->          -> (b -> Interpreter Value)
->          -> (a -> a -> b)
+>          -> (String, Value -> Interpreter b)
+>          -> (c -> Interpreter Value)
+>          -> (a -> b -> c)
 >          -> ([String], ([Value] -> Interpreter Value))
 > binaryOp unwrap0 unwrap1 wrap f =
 >     ([fst unwrap0, fst unwrap1]
@@ -702,27 +870,13 @@ env, ffi boilerplate
 >                     wrap (f ax bx)
 >                 _ -> lift $ throwE $ "wrong number of args to function, expected 2, got " ++ show (length as))
 
-> binaryV :: (String, Value -> Interpreter a)
->         -> (String, Value -> Interpreter b)
->         -> (a -> b -> Interpreter Value)
->         -> ([String], ([Value] -> Interpreter Value))
-> binaryV unwrap0 unwrap1 f =
->     ([fst unwrap0, fst unwrap1]
->     ,\as -> do
->             case as of
->                 [a,b] -> do
->                     ax <- (snd unwrap0) a
->                     bx <- (snd unwrap1) b
->                     f ax bx
->                 _ -> lift $ throwE $ "wrong number of args to function, expected 2, got " ++ show (length as))
-
-
-> ternaryV :: (String, Value -> Interpreter a)
->          -> (String, Value -> Interpreter b)
->          -> (String, Value -> Interpreter c)
->          -> (a -> b -> c -> Interpreter Value)
->          -> ([String], ([Value] -> Interpreter Value))
-> ternaryV unwrap0 unwrap1 unwrap2 f =
+> ternaryOp :: (String, Value -> Interpreter a)
+>           -> (String, Value -> Interpreter b)
+>           -> (String, Value -> Interpreter c)
+>           -> (d -> Interpreter Value)
+>           -> (a -> b -> c -> d)
+>           -> ([String], ([Value] -> Interpreter Value))
+> ternaryOp unwrap0 unwrap1 unwrap2 wrap f =
 >     ([fst unwrap0, fst unwrap1, fst unwrap2]
 >     ,\as -> do
 >             case as of
@@ -730,8 +884,8 @@ env, ffi boilerplate
 >                     ax <- (snd unwrap0) a
 >                     bx <- (snd unwrap1) b
 >                     cx <- (snd unwrap2) c
->                     f ax bx cx
->                 _ -> lift $ throwE $ "wrong number of args to function, expected 3, got " ++ show (length as))
+>                     wrap (f ax bx cx)
+>                 _ -> lift $ throwE $ "wrong number of args to function, expected 4, got " ++ show (length as))
 
 
 ------------------------------------------------------------------------------
@@ -739,11 +893,19 @@ env, ffi boilerplate
 parse
 -----
 
+a rule is to try not to do any 'desugaring' here.
+
+It's supposed to be used as if we wrote the parser for each version
+from scratch, so the result should be what such a parser would
+produce. It's slightly ambiguous because this entire 'parser' is more
+like a desugaring process.
+
+
 > parse :: String -> Either String [Stmt]
 > parse src =
 >     case P.parseProgram "" src of
 >       Right (S.Program [] sts) -> convStmts sts
->       Right (S.Program x _) -> Left $ "prelude not supported " ++ show x
+>       Right (S.Program x _) -> Left $ "parse: prelude not supported " ++ show x
 >       Left e -> Left e
 
 > convStmts :: [S.Stmt] -> Either String [Stmt]
@@ -766,7 +928,7 @@ parse
 >         Right $ Lam ps' e'
 >       where
 >         pf (S.IdenP _ (S.PatName x)) = Right x
->         pf x = Left $ "unsupported pattern " ++ show x
+>         pf x = Left $ "parse: unsupported pattern " ++ show x
 > convExpr (S.Let bs e) = do
 >         bs' <- mapM bf bs
 >         e' <- convExpr e
@@ -774,23 +936,45 @@ parse
 >       where
 >         bf (S.Binding (S.IdenP _ (S.PatName x)) ex) =
 >             (x,) <$> convExpr ex
->         bf x = Left $ "unsupported binding " ++ show x
+>         bf x = Left $ "parse: unsupported binding " ++ show x
 
 > convExpr (S.Block sts) = Block <$> mapM convSt sts
 
-> convExpr (S.If [(c,t)] (Just e)) = do
->     If <$> convExpr c <*> convExpr t <*> convExpr e
+> convExpr (S.If bs e) = do
+>     If <$> mapM f bs <*> maybe (pure Nothing) ((Just <$>) . convExpr) e
+>   where
+>     f (c,t) = (,) <$> convExpr c <*> convExpr t
 
-> convExpr x = Left $ "unsupported expression " ++ show x
+> convExpr (S.DotExpr e f) =
+>     flip DotExpr f <$> (convExpr e)
+
+> convExpr (S.Cases ty e bs els) =
+>     Cases ty <$> convExpr e <*> mapM f bs <*> maybe (pure Nothing) ((Just <$>) .  convExpr) els
+>   where
+>     f (S.VariantP (S.PatName vnm) ps, ve)
+>         | Right ps' <- mapM unpat ps = (vnm, ps',) <$> convExpr ve
+>     f (S.IdenP _ (S.PatName vnm), ve) = (vnm, [],) <$> convExpr ve
+>     f x = Left $ "parse: unsupported pattern: " ++ show x
+>     unpat (S.IdenP _ (S.PatName x)) = pure x
+>     unpat x = Left $ "parse: unsupported pattern: " ++ show x
+
+> convExpr x = Left $ "parse: unsupported expression " ++ show x
 
 > convSt :: S.Stmt -> Either String Stmt
 > convSt (S.StExpr e) = StExpr <$> convExpr e
 > convSt (S.LetDecl (S.Binding (S.IdenP _ (S.PatName nm)) v)) = LetDecl nm <$> convExpr v
-> convSt (S.VarDecl (S.Binding (S.IdenP _ (S.PatName nm)) v)) = VarDecl nm <$> convExpr v
 > convSt (S.Check nm bdy) = Check nm <$> mapM convSt bdy
+> convSt (S.VarDecl (S.Binding (S.IdenP _ (S.PatName nm)) v)) = VarDecl nm <$> convExpr v
 > convSt (S.SetVar n e) = SetVar n <$> convExpr e
 
-> convSt x = Left $ "unsupported statement " ++ show x
+
+> convSt (S.DataDecl nm fs Nothing) =
+>     DataDecl nm <$> mapM convVarDecl fs
+
+> convSt x = Left $ "parse: unsupported statement " ++ show x
+
+> convVarDecl :: S.VariantDecl -> Either String VariantDecl
+> convVarDecl (S.VariantDecl nm fs) = pure $ VariantDecl nm (map snd fs)
 
 ------------------------------------------------------------------------------
 
@@ -805,6 +989,7 @@ pretty
 > unconv (Num n) = S.Sel (S.Num n)
 > unconv (Text n) = S.Sel (S.Str n)
 > unconv (TupleSel fs) = S.Sel (S.Tuple $ map unconv fs)
+> unconv (ListSel fs) = S.Construct (S.Iden "list") (map unconv fs)
 > unconv (Iden s) = S.Iden s
 >
 > unconv (App (Iden e) [a,b]) | isOp e = S.BinOp (unconv a) e (unconv b)
@@ -815,9 +1000,19 @@ pretty
 > unconv (Let bs e) = S.Let (map (uncurry unconvBinding) bs) (unconv e)
 > unconv (Block sts) = S.Block $ map unconvStmt sts
 > unconv (Seq a b) = S.Block $ map unconvStmt [StExpr a, StExpr b]
-> unconv (If c t e) = S.If [(unconv c, unconv t)] (Just $ unconv e)
+> unconv (If bs e) = S.If (map f bs) (fmap unconv e)
+>   where
+>     f (c,t) = (unconv c, unconv t)
+> unconv (DotExpr e f) = S.DotExpr (unconv e) f  
+> unconv (Cases ty t bs els) =
+>     S.Cases ty (unconv t) (map f bs) (fmap unconv els)
+>   where
+>     f (n,fs,e) = (S.VariantP (S.PatName n) (map unconvPattern fs), unconv e)
+>
 > unconv (Box {}) = error "unsupported internal box syntax in pretty"
 > unconv (SetBox {}) = error "unsupported internal setbox syntax in pretty"
+
+> --unconv x = error $ "unconv: " ++ show x
 
 > unconvStmt :: Stmt -> S.Stmt
 > unconvStmt (LetDecl n e) = S.LetDecl (unconvBinding n e)
@@ -826,10 +1021,15 @@ pretty
 > unconvStmt (VarDecl n e) = S.VarDecl (unconvBinding n e)
 > unconvStmt (SetVar n e) = S.SetVar n (unconv e)
 
+> unconvStmt (DataDecl nm vs) =
+>      S.DataDecl nm (map f vs) Nothing
+>    where
+>      f (VariantDecl vnm fs) = S.VariantDecl vnm $ map (S.Con,) fs
+
 > unconvBinding :: String -> Expr -> S.Binding
 > unconvBinding n v = S.Binding (unconvPattern n) (unconv v)
 
-> unconvPattern ::String -> S.Pat
+> unconvPattern :: String -> S.Pat
 > unconvPattern n = S.IdenP S.NoShadow (S.PatName n)
 
 ------------------------------------------------------------------------------
@@ -947,6 +1147,114 @@ check "var in closure":
 end
 
 
+check "if":
+  a = 4
+  if a == 2: 1
+  else if a == 3: 2
+  else if a == 4: 3
+  end is 3
+end
+
+data Point:
+  | pt(x, y)
+end
+
+p1 = pt(1,2)
+
+
+check:
+  is-Point(1) is false
+  is-Point({1;3}) is false
+  is-Point(p1) is true
+  is-pt(p1) is true
+  p1.x is 1
+  p1.y is 2
+end
+
+data Two:
+  | pt1(x, y)
+  | pt2(x, z)
+end
+
+t1 = pt1(1,2)
+t2 = pt2(3,4)
+
+pf = lam(a,n):
+  cases (Two) a:
+    | pt1(x,y) => if n == 0: x else: y end
+    | pt2(x,y) => if n == 0: x else: y end
+  end
+end
+
+
+check:
+  is-Two(t1) is true
+  is-Two(t2) is true
+  is-Point(t1) is false
+  is-pt1(t1) is true
+  is-pt2(t1) is false
+  is-pt1(t2) is false
+  is-pt2(t2) is true
+  t1.x is 1
+  t1.y is 2
+  t2.x is 3
+  t2.z is 4
+
+  pf(t1,0) is 1
+  pf(t1,1) is 2
+  pf(t2,0) is 3
+  pf(t2,1) is 4
+
+end
+
+
+data MyOption:
+  | my-none
+  | my-some(a)
+end
+
+check:
+  f = lam(a): cases(MyOption) a:
+      | my-none => "none"
+      | my-some(b) => "some" + tostring(b)
+      | else => a
+    end
+  end
+  x = my-none
+  f(x) is "none"
+  y = my-some(1)
+  f(y) is "some1"
+end
+
+data BTree:
+  | node(value #|:: Number|#, left #|:: BTree|#, right #|:: BTree|#)
+  | leaf(value #|:: Number|#)
+# where:
+
+end
+check:
+
+  a-btree = node(1, leaf(2), node(3, leaf(4), leaf(5)))
+
+  is-BTree(a-btree) is true
+  is-BTree("not-a-tree") is false
+  is-BTree(leaf(5)) is true
+  is-leaf(leaf(5)) is true
+  is-leaf(a-btree) is false
+  is-leaf("not-a-tree") is false
+  is-node(leaf(5)) is false
+  is-node(a-btree) is true
+  is-node("not-a-tree") is false
+
+  a-btree.value is 1
+  a-btree.left.value is 2
+  a-btree.right.value is 3
+  a-btree.right.left.value is 4
+  a-btree.right.right.value is 5
+
+end
+
+
 
 \end{code}
 >    |]
@@ -963,5 +1271,4 @@ end
 >                 Nothing -> T.assertBool "" True
 >                 Just fmx -> T.assertFailure fmx
 >     in trace (renderCheckResults crs)
->        $ T.testGroup "var1" $ map f crs
-
+>        $ T.testGroup "casesplusvar" $ map f crs
