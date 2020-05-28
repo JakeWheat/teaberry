@@ -105,5 +105,6 @@ Test-Suite Langs
                        DataDecl1
                        Cases1
                        CasesPlusVar
+                       Ref1
   main-is:             Langs.lhs
 
