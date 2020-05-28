@@ -265,8 +265,9 @@ values
 > valueTypeName (TextV {}) = "text"
 > valueTypeName (BoolV {}) = "boolean"
 > valueTypeName (TupleV {}) = "tuple"
-> valueTypeName (FunV {}) = "function"
 > valueTypeName (NothingV) = "nothing"
+> valueTypeName (BoxV {}) = "box"
+> valueTypeName (FunV {}) = "function"
 > valueTypeName (ForeignFunV {}) = "foreign-function"
 
 > instance Show Value where
@@ -275,15 +276,17 @@ values
 >   show (BoolV n) = "BoolV " ++ show n
 >   show (TupleV fs) = "TupleV [" ++ intercalate "," (map show fs) ++ "]"
 >   show NothingV = "NothingV"
+>   show (BoxV n) = "BoxV " ++ show n
 >   show (FunV {}) = "FunV stuff"
 >   show (ForeignFunV n) = "ForeignFunV " ++ show n
 
 > instance Eq Value where
 >     NumV a == NumV b = a == b
->     TextV a == TextV b = a == b
 >     BoolV a == BoolV b = a == b
+>     TextV a == TextV b = a == b
 >     TupleV fs == TupleV gs = fs == gs
 >     NothingV == NothingV = True
+>     -- todo: find out what regular eq should do for boxes
 >     _ == _ = False
 
 ------------------------------------------------------------------------------
@@ -603,6 +606,7 @@ ffi catalog
 > torepr' (FunV {}) = "<Function>"
 > torepr' (ForeignFunV {}) = "<Function>"
 > torepr' (TextV s) = "\"" ++ s ++ "\""
+> torepr' (BoxV {}) = "<Box>"
 > torepr' (TupleV fs) =
 >     "{" ++ intercalate ";" (map torepr' fs) ++ "}"
 
@@ -844,6 +848,9 @@ pretty
 > unconv (Block sts) = S.Block $ map unconvStmt sts
 > unconv (Seq a b) = S.Block $ map unconvStmt [StExpr a, StExpr b]
 > unconv (If c t e) = S.If [(unconv c, unconv t)] (Just $ unconv e)
+> unconv (Box {}) = error "unsupported internal box syntax in pretty"
+> unconv (Unbox {}) = error "unsupported internal unbox syntax in pretty"
+> unconv (SetBox {}) = error "unsupported internal setbox syntax in pretty"
 
 > unconvStmt :: Stmt -> S.Stmt
 > unconvStmt (LetDecl n e) = S.LetDecl (unconvBinding n e)

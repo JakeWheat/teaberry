@@ -692,12 +692,20 @@ ffi catalog
 >     lift $ throwE $ "variant field get called on " ++ torepr' x
 
 > variantFieldGetOrd :: Scientific -> Value -> Interpreter Value
-> variantFieldGetOrd fieldIndex (VariantV _ fs) =
+> variantFieldGetOrd fieldIndex v@(VariantV _ fs) =
 >     --maybe (lift $ throwE $ "variant field not found #" ++ fieldIndex ++ ": " ++ torepr' v)
 >     --      pure $ lookup fieldNm fs
 >     case extractInt fieldIndex of
 >         Nothing -> lift $ throwE $ "variant field get ord passed non integer: " ++ show fieldIndex
->         Just i -> pure (map snd fs !! i) -- todo: catch if it's out of range
+>         Just i -> maybe (lift $ throwE $ "variant field # not found " ++ show fieldIndex ++ ": " ++ torepr' v)
+>                   pure (safeIndex (map snd fs) i)
+>   where
+>     safeIndex [] _ = Nothing
+>     safeIndex _ n | n < 0 = Nothing
+>     safeIndex (x:_) 0 = Just x
+>     safeIndex (_:xs) n = safeIndex xs (n - 1)
+     
+       
 > variantFieldGetOrd _ x =
 >     lift $ throwE $ "variant field get ord called on " ++ torepr' x
 
