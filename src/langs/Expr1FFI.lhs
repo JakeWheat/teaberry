@@ -201,9 +201,10 @@ ffi catalog
 
 > testEnv :: Env
 > testEnv = either error id $ addForeignFuns'
->    [("+", binaryAOp unwrapNum wrapNum plusNum)
->    ,("+", binaryAOp unwrapText wrapText plusText)]
->    emptyEnv
+>    [("+", binaryOp unwrapNum unwrapNum wrapNum plusNum)
+>    ,("+", binaryOp unwrapText unwrapText wrapText plusText)]
+>    $ emptyEnv {envEnv = [("true", BoolV True)
+>                         ,("false", BoolV False)]}
 
 > plusNum :: Scientific -> Scientific -> Scientific
 > plusNum = (+)
@@ -211,7 +212,27 @@ ffi catalog
 > plusText :: String -> String -> String
 > plusText = (++)
 
-todo:
+Eventually, every ffi function must say what types it accepts for the
+numpty overloading system (that will be replaced later), and have an
+signature which is [Value] -> Interpreter Value.
+
+Create a bunch of helpers which can lift functions that accept
+specific types, or aren't already in the interpreter monad, so each
+ffi has the natural signature you want: unwrapped types, types
+wrapped in Value already, in or not in the interpreter monad, takes a
+[Value] or not, etc.
+
+Then these helpers are a bunch of annoying boilerplate to write and
+maintain, but implementing each ffi function is direct and simple,
+and adding them to the catalog is simple too.
+
+TODO: bring in the other helper functions and ideas from later
+versions into a extended ffi version which has all the different
+helpers that are used.
+
+
+--
+old notes:
 
 what's the best way to be able to add a new version of (+)?
 if functions are registered with their types, then can use a poor man's
@@ -306,17 +327,18 @@ Maybe good do better with some clever code or generics or something.
 > wrapText n = pure $ TextV n
 
 
-> binaryAOp :: (String, Value -> Interpreter a)
->         -> (a -> Interpreter Value)
->         -> (a -> a -> a)
->         -> ([String], ([Value] -> Interpreter Value))
-> binaryAOp unwrap wrap f =
->     ([fst unwrap, fst unwrap]
+> binaryOp :: (String, Value -> Interpreter a)
+>          -> (String, Value -> Interpreter b)
+>          -> (c -> Interpreter Value)
+>          -> (a -> b -> c)
+>          -> ([String], ([Value] -> Interpreter Value))
+> binaryOp unwrap0 unwrap1 wrap f =
+>     ([fst unwrap0, fst unwrap1]
 >     ,\as -> do
 >             case as of
 >                 [a,b] -> do
->                     ax <- (snd unwrap) a
->                     bx <- (snd unwrap) b
+>                     ax <- (snd unwrap0) a
+>                     bx <- (snd unwrap1) b
 >                     wrap (f ax bx)
 >                 _ -> lift $ throwE $ "wrong number of args to function, expected 2, got " ++ show (length as))
 
@@ -388,6 +410,7 @@ tests
 >     simpleInterpreterExamples ++
 >     [("'three'", "'three'")
 >     ,("'three' + 'four'", "'threefour'")
+>     ,("true", "true")
 >     ]
 
 > tests :: TestTree

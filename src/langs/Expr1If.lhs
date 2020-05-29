@@ -1,7 +1,7 @@
 
 simple exprs extended to add if
 
-boolean literals use constants in the env, not a separate syntax type
+boolean literals are constants in the default env
 
 > {-# LANGUAGE TupleSections #-}
 > {-# LANGUAGE LambdaCase #-}

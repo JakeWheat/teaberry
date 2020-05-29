@@ -26,13 +26,9 @@ consider doing a renamer approach
     ->
       if variantname == link
         1 + length(l.rest) -- renamed back to it's field name instead of introducing a new binding
-            -- or rename to l.{1} before there's a type checker
+            -- or rename to l.{1} before there's a type checker or something else that tracks
+            -- the names
       rhs
-
-see if can come up with a third version which is completely dynamic,
-the code doesn't know the variant definitions when desugaring
-how far can go with this? perhaps a good impl is this combined with
-the renamer approach
 
 
 > {-# LANGUAGE TupleSections #-}

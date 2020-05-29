@@ -298,10 +298,10 @@ value, not a lambda
 
 >    makeVarnt (VariantDecl vnm []) = pure $ LetDecl vnm (appI "make-variant" [Text vnm, ListSel []])
 
-  pt(x,y) ->
+  | pt(x,y) ->
 pt = lam (x,y): I.App "make-variant" ["pt",[list: {false, "x";x},{false, "y";y}]]
 
-    pt(ref x,y) ->
+  | pt(ref x,y) ->
 pt = lam (x,y): I.App "make-variant" ["pt",[list: {true, "x";x},{false, "y";y}]]
   
 
