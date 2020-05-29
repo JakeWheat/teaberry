@@ -107,5 +107,6 @@ Test-Suite Langs
                        CasesPlusVar
                        Ref1
                        Records1
+                       Import1
   main-is:             Langs.lhs
 

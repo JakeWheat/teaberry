@@ -1,5 +1,111 @@
 
-Implementation of records
+Implementation of import demo 1:
+
+implement a demo of how simple importing without good error handling
+would look if manually desugared
+
+everything is dynamic, to avoid tracking types or variant names or
+anything like that in the desugarer, and it also avoids doing any
+renaming in the desugarer. this is an exercise, to avoid creating
+some unholy mixture of stuff tracked in the desugar monad, and stuff
+done dynamically at runtime
+
+
+todo:
+
+copy over the sketch of the old low level module desugaring
+
+describe the solution right now
+
+describe the test plan in more detail
+
+more the other notes out of here
+
+do it all
+
+manually desugar what using multiple modules would look like including
+ pasting them all together into one source
+
+manually desugar datadecl, cases operations to show them working using
+the support functions (and implement them)
+
+next step is to make these autoamatic once the method is good, and it
+will remain as a stepping stone.
+
+a module roughly desugars like this:
+
+module my-module:
+
+a =
+b =
+...
+
+->
+
+my-module = block:
+    a =
+    b =
+    ...
+    {a:a, b:b, ...}
+end
+
+so now you can access my-module.a using exactly my-module.a
+
+then for imports:
+
+import my-module as B
+converted to:
+
+B = my-module
+
+nice and simple
+
+datadecls desugar the same - they just create lets
+
+safe-variant-name is adjusted to simply drop the prefix
+  | x.pt(x,b) => ...
+effectively desugared to
+  | pt(x,b) => ...
+
+this will work in all correct code, only if the code is incorrect, it
+will behave badly. this will be fixed with some simple helper
+functions in a later step
+
+
+code sketch:
+
+module 1:
+  create a range of different things
+  use them locally in tests
+next modules:
+import a module without an alias
+import a module with an alias
+
+import a different module with an alias the same as a previously imported
+  module before aliasing
+
+import a module with an alias matching the current module's name
+import the same module under two different aliases
+
+in each module where there isn't overlap:
+create the range of different things locally
+use them locally in tests
+use the imported aliased stuff in tests
+make sure the values and tests check each access of the item hits the
+right item, not the same named one from a different import
+
+things to check:
+regular binding value
+  function value
+var - create and update
+datadecl + cases
+  + stuff with refs
+
+try to split these into several different files?
+if there are some big differences?
+maybe just a values importer, then all the rest
+because the values importer can be very short - it doesn't need to
+ have support for vars or datadecls
 
 > {-# LANGUAGE TupleSections #-}
 > {-# LANGUAGE LambdaCase #-}
@@ -7,8 +113,8 @@ Implementation of records
 > {-# LANGUAGE ScopedTypeVariables #-}
 > {-# LANGUAGE MultiWayIf #-}
 
-> module Records1 (tests
->               ) where
+> module Import1 (tests
+>                ) where
 
 > import Text.RawString.QQ
 
@@ -348,6 +454,8 @@ values
 >            | BoxV Int
 >            | FunV [String] Expr Env
 >            | ForeignFunV String
+
+value type name is used for looking up overloaded foreign functions
 
 > valueTypeName :: Value -> String
 > valueTypeName (NumV {}) = "number"
@@ -724,6 +832,7 @@ ffi catalog
 >     ++ [])
 >    $ emptyEnv {envEnv = [("true", BoolV True)
 >                         ,("false", BoolV False)
+>                         ,("nothing", NothingV)
 >                         ,("empty", VariantV "empty" [])]}
 
 
@@ -1421,6 +1530,81 @@ check:
 end
 
 
+\end{code}
+>    |]
+
+
+> importsTestScript :: String
+> importsTestScript = [r|
+\begin{code} 
+
+# provide a as a, b as b end
+my-module1 = block:
+  a = 1
+  b = lam(x): x + 1 end
+  check:
+    a is 1
+    b(1) is 2
+  end
+  {a:a, b:b}
+end
+
+# import my-module as my-module
+
+check:
+  my-module1.a is 1
+  my-module1.b(2) is 3
+end
+
+# include from my-module: a as a, b as b end
+
+a = my-module1.a
+b = my-module1.b
+
+check:
+  a is 1
+  b(3) is 4
+end
+
+# import my-module as my-2
+
+my-2 = my-module1
+
+check:
+  my-2.a is 1
+  my-2.b(5) is 6
+end
+
+# module my-2
+# provide a as a, b as b end
+
+my-2 = block:
+  a = 2
+  b = lam(x): x + 2 end
+  check:
+    a is 2
+    b(1) is 3
+  end
+  {a:a, b:b}
+end
+
+# import my-2 as my-2
+
+check:
+  my-2.a is 2
+  my-2.b(5) is 7
+end
+
+check:
+  my-module1.a is 1
+  my-module1.b(2) is 3
+end
+
+
+
+nothing
+
+
 
 \end{code}
 >    |]
@@ -1428,7 +1612,10 @@ end
 
       
 > tests :: T.TestTree
-> tests =
+> tests = T.testGroup "imports1" [{-tests1,-}tests2]
+      
+> _tests1 :: T.TestTree
+> _tests1 =
 >     let crs = either error id $ evaluateWithChecks simpleTestScript
 >         f (CheckResult nm res) =
 >             T.testGroup nm $ map g res
@@ -1437,4 +1624,17 @@ end
 >                 Nothing -> T.assertBool "" True
 >                 Just fmx -> T.assertFailure fmx
 >     in trace (renderCheckResults crs)
->        $ T.testGroup "casesplusvar" $ map f crs
+>        $ T.testGroup "imports1a" $ map f crs
+
+
+> tests2 :: T.TestTree
+> tests2 =
+>     let crs = either error id $ evaluateWithChecks importsTestScript
+>         f (CheckResult nm res) =
+>             T.testGroup nm $ map g res
+>         g (nm, fm) = T.testCase nm $
+>             case fm of
+>                 Nothing -> T.assertBool "" True
+>                 Just fmx -> T.assertFailure fmx
+>     in trace (renderCheckResults crs)
+>        $ T.testGroup "imports1b" $ map f crs
