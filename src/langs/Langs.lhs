@@ -22,6 +22,7 @@
 > import qualified Cases1
 > import qualified CasesPlusVar
 > import qualified Ref1
+> import qualified Records1
 
 > import qualified Test.Tasty as T
 
@@ -50,4 +51,5 @@
 >        ,Cases1.tests
 >        ,CasesPlusVar.tests
 >        ,Ref1.tests
+>        ,Records1.tests
 >        ]

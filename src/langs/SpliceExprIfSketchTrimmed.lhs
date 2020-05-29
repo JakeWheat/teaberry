@@ -72,6 +72,20 @@ parser
 $(splice parse)
 $(splice convExpr filter not matches (sel . Str))
 
+question: if the last line in convExpr is something like
+convExpr x = Left $ "syntax not supported: " ++ show x
+
+we don't want to append after this line
+I don't want the code to be rearranged implicitly
+so the splice above must either say move this line below
+or there should be two splices, one without this line above
+and one just for this line below
+
+maybe with the named groups of splicable stuff, can start naming
+splice points, and do something high level, but which is still
+explicit and isn't something that tries to be implicitly aware of
+the meaning of the code
+
 > convExpr (S.If [(c,t)] (Just e)) = do
 >     If <$> convExpr c <*> convExpr t <*> convExpr e
 
