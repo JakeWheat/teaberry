@@ -204,7 +204,7 @@ no idea if this is good or not
 
 > desugarStmts (VarDecl n v : es) = do
 >     v' <- Box <$> desugar v
->     Let [(n,v')] <$> desugarStmts es
+>     desugarStmts (LetDecl n v' : es)
   
 > desugarStmts (StExpr e : es) =
 >     Seq <$> desugar e <*> desugarStmts es
