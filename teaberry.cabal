@@ -125,15 +125,6 @@ Test-Suite Langs
   hs-source-dirs:      src/langs
   main-is:             Langs.lhs
 
-
-executable teaberryrepl
-  import:              langs
-  main-is:             ReplI4.lhs
-  build-depends:       teaberry,
-                       haskeline
-  ghc-options:         -threaded
-  hs-source-dirs:      src/langs
-
 executable teaberry2
   import:              langs
   main-is:             Teaberry2.lhs

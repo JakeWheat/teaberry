@@ -55,28 +55,6 @@ this should be ready now
 > import Data.List (intercalate, sortBy, nubBy)
 > import Data.Ord (comparing)
 >
-> import Text.Megaparsec (Parsec
->                        ,errorBundlePretty
->                        --,many
->                        ,eof
->                        ,takeWhileP
->                        ,takeWhile1P
->                        ,choice
->                        --,notFollowedBy
->                        ,try
->                        ,anySingle
->                        ,(<|>)
->                        ,manyTill
->                        )
-> import qualified Text.Megaparsec as Q (parse)
-
-> import Data.Void (Void)
-> import Text.Megaparsec.Char (space
->                             --,char
->                             ,string
->                             )
-> import Control.Monad (void)
-
 > -- import Debug.Trace (trace)
 > import qualified TestUtils as T
 
@@ -1812,46 +1790,7 @@ end
 > tests2 = T.testGroup "imports4b" $ map makeTest importsTestScripts
 >   where
 >     makeTest s =
->       let ((_,src):ts) = reverse $ either error id $ parseModules s
+>       let ((_,src):ts) = reverse $ either error id $ T.parseModules s
 >           crs = evaluate' (makeFileSystemMock ts) src
 >       in T.makeTestsIO "imports4b" crs
 
---------------- 
-
-quick hack to simulate a bunch of separate files to be able to test the module system
-
-the motivation is to put a bunch of files in one string in order to cut
-down on boilerplate in the testing, and make the tests more readable
-  
-> parseModules :: String -> Either String [(String,String)]
-> parseModules src = either (Left . errorBundlePretty) Right $
->                    Q.parse (whiteSpace *> pModules) "" src
-
-> type Parser = Parsec Void String
-  
-> pModules :: Parser [(String,String)]
-> pModules = do
->     _ <- string "xmodule:" <* whiteSpace
->     pbody
->   where
->     pbody :: Parser [(String,String)]        
->     pbody = do
->       moduleName <- takeWhile1P Nothing (\a -> (isAlphaNum a || a `elem` "?-+_"))
->       body <- manyTill anySingle (void (try (string "xmodule:") <* whiteSpace) <|> eof)
->       ((moduleName, body):) <$> choice [pbody <|> ([] <$ eof)]
-
-> whiteSpace :: Parser ()
-> whiteSpace = space *> choice [blockComment *> whiteSpace
->                              ,lineComment *> whiteSpace
->                              ,pure ()]
-
-
-> lineComment :: Parser ()
-> lineComment = () <$ try (string "#") <* takeWhileP Nothing (/='\n')
-
-> blockComment :: Parser ()
-> blockComment = startComment *> ctu
->   where
->     startComment = void (try (string "#|"))
->     endComment = void $ try (string "|#")
->     ctu = endComment <|> ((blockComment <|> void anySingle) *> ctu)

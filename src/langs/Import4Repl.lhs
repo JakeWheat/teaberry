@@ -284,50 +284,51 @@ testing support in the desugarer monad
 desugaring code
 
 > runDesugar :: [(String,Module)] -> Either String Expr
-> runDesugar srcs = fst <$> runExcept (evalRWST (f [] [] =<< addv srcs) () startingDesugarState)
+> runDesugar srcs = fst <$> runExcept (evalRWST (f [] [] srcs) () startingDesugarState)
 >   where
->     addv [(nm,Module p stmts)] = do
->         stmts' <- addReturnEnv stmts
->         pure [(nm,Module p stmts')]
->     addv [] = pure []
->     addv (m:ms) = (m:) <$> addv ms
 >     f _ desugaredModules [] = g $ reverse desugaredModules
 >     -- should really learn how to use folds better
 >     -- I think it would make the code more regular and
 >     -- quicker to understand/review
 >     f mns desugaredModules ((n,m):ms) = do
->         (mns', dsm) <- desugarModule mns n m
+>         (mns', dsm) <- desugarModule (ms == []) mns n m
 >         f (mns' ++ mns) (dsm:desugaredModules) ms
 >     g :: [(String,Expr)] -> Desugarer Expr          
 >     g [] = lift $ throwE $ "empty list of modules"
 >     g [(_,e)] = pure e
 >     g ((n,e):es) = Let [(n,e)] <$> g es
 
-> addReturnEnv :: [Stmt] -> Desugarer [Stmt]
-> addReturnEnv [] = pure [StExpr $ TupleSel [Iden "nothing", App (Iden "env-to-record") []]]
-> addReturnEnv [StExpr x] = do
->     z <- makeUniqueVar "z"
->     pure [LetDecl z x
->          ,StExpr $ TupleSel [Iden z, App (Iden "env-to-record") []]]
-> addReturnEnv (x:xs) = do
->     (x:) <$> addReturnEnv xs
 
+desugar module:
+desugar the prelude
+
+add the last statement which is slightly different depending on
+whether this is the top level module:
+  it returns the last value and the env (for repl/embedded)
+or if if it's an imported module
+  it returns the env only
   
-> desugarModule :: [(String,String)] -> String -> Module -> Desugarer ([(String,String)], (String,Expr))
-> desugarModule otherModuleNames moduleName (Module ps xs) = do
+> desugarModule :: Bool -> [(String,String)] -> String -> Module -> Desugarer ([(String,String)], (String,Expr))
+> desugarModule isTopLevel otherModuleNames moduleName (Module ps stmts) = do
 >     uniqueModuleName <- makeUniqueVar moduleName
 >     ps' <- concat <$> mapM (desugarPreludeStmt otherModuleNames) ps
->     -- make a block with the last statement converting the env into a record
->     -- I can't believe this cheapo trick works
->     -- hack on a hack - if this is the 'last' module, it will
->     -- already have something here with env-to-record, don't replace it
->     let xss = ps' ++ case xs of
->                 (_:_) | StExpr (TupleSel [_, App (Iden "env-to-record") _]) <- last xs -> xs
->                 _ -> xs ++ [StExpr $ App (Iden "env-to-record") []]
-          
->     xs' <- desugarStmts xss
->     pure ([(moduleName,uniqueModuleName)], (uniqueModuleName, xs'))
+>     -- add the final value for repl/embedded and imported module support
+>     stmts' <- if isTopLevel
+>           then addTopRet stmts
+>           else -- non top level module, return the env
+>                -- this will become the provides call
+>                pure $ stmts ++ [StExpr $ App (Iden "env-to-record") []]
+>     stmts'' <- desugarStmts (ps' ++ stmts')
+>     pure ([(moduleName,uniqueModuleName)], (uniqueModuleName, stmts''))
+>   where
+>     mk x = StExpr $ TupleSel [x, App (Iden "env-to-record") []]
+>     addTopRet [] = pure [mk $ Iden "nothing"]
+>     addTopRet [StExpr x] = do
+>         z <- makeUniqueVar "z"
+>         pure [LetDecl z x, mk $ Iden z]
+>     addTopRet (x:xs) = (x:) <$> addTopRet xs
 
+  
 > desugarPreludeStmt :: [(String,String)] -> PreludeStmt -> Desugarer [Stmt]
 > desugarPreludeStmt mp (Import a b) = do
 >     srcName <- maybe (lift $ throwE $ "module not found in module name list: " ++ a ++ "\n" ++ show mp)

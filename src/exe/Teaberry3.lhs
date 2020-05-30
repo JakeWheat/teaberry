@@ -25,14 +25,19 @@ todo: config files, init files, etc.
 
 ------------------------------------------------------------------------------
 
+> {-# LANGUAGE MultiParamTypeClasses #-}
+> {-# LANGUAGE FunctionalDependencies #-}
+> {-# LANGUAGE ExistentialQuantification #-}
+
 > import Control.Monad.Trans
 > import System.Console.Haskeline
 >
-> import Import4Repl (TeaberryHandle
->                    ,newTeaberryHandle
->                    ,runScript
->                    ,valueToString
->                    )
+> import qualified Import4Repl as D (TeaberryHandle
+>                                   ,newTeaberryHandle
+>                                   ,runScript
+>                                   ,valueToString
+>                                   ,Value
+>                                   )
 
 
 > import Options.Applicative (Parser
@@ -69,11 +74,11 @@ run file or script
 
 > runSrc :: String -> IO ()
 > runSrc src = do
->     h <- newTeaberryHandle
->     x <- runScript h [] src
+>     h <- D.newTeaberryHandle
+>     x <- D.runScript h [] src
 >     case x of
 >         Left e -> error e
->         Right v -> case valueToString v of
+>         Right v -> case D.valueToString v of
 >             Nothing -> pure ()
 >             Just s -> putStrLn s
 
@@ -81,16 +86,16 @@ run file or script
 
 repl
 
-> process :: TeaberryHandle -> String -> IO ()
+> process :: D.TeaberryHandle -> String -> IO ()
 > process h src = do
->     x <- runScript h [] src
+>     x <- D.runScript h [] src
 >     case x of
 >         Left y -> putStrLn $ "error: " ++ y
->         Right v -> case valueToString v of
+>         Right v -> case D.valueToString v of
 >             Nothing -> pure ()
 >             Just s -> putStrLn s
 
-> repl :: TeaberryHandle -> InputT IO ()
+> repl :: D.TeaberryHandle -> InputT IO ()
 > repl h = go
 >   where
 >     go = do
@@ -103,11 +108,114 @@ repl
 
 > doRepl :: IO ()
 > doRepl = do
->     h <- newTeaberryHandle
+>     h <- D.newTeaberryHandle
 >     runInputT st (repl h)
 >   where
 >     st = defaultSettings {historyFile = (Just ".teaberryreplhistory")}
 
+------------------------------------------------------------------------------
+
+run file or script
+
+> {-runFile :: FilePath -> IO ()
+> runFile fp = do
+>     src <- readFile fp
+>     runSrc src-}
+
+> {-runSrcX :: Backend h v -> String -> IO ()
+> runSrcX be src = do
+>     h <- newHandle be
+>     x <- (runScript be) h [] src
+>     case x of
+>         Left e -> error e
+>         Right v -> case (valueToString be) v of
+>             Nothing -> pure ()
+>             Just s -> putStrLn s-}
+
+------------------------------------------------------------------------------
+
+repl
+
+> {-process :: D.TeaberryHandle -> String -> IO ()
+> process h src = do
+>     x <- D.runScript h [] src
+>     case x of
+>         Left y -> putStrLn $ "error: " ++ y
+>         Right v -> case D.valueToString v of
+>             Nothing -> pure ()
+>             Just s -> putStrLn s
+
+> repl :: D.TeaberryHandle -> InputT IO ()
+> repl h = go
+>   where
+>     go = do
+>         minput <- getInputLine "t > "
+>         case minput of
+>             Nothing -> pure ()
+>             Just input -> do
+>                 liftIO $ process h input
+>                 go
+
+> doRepl :: IO ()
+> doRepl = do
+>     h <- D.newTeaberryHandle
+>     runInputT st (repl h)
+>   where
+>     st = defaultSettings {historyFile = (Just ".teaberryreplhistory")}  -}
+
+
+------------------------------------------------------------------------------
+
+backends
+
+ > class Backend h v | h -> v, v -> h where
+ >     newHandle :: IO h
+ >     runScript :: h -> [(String,v)] -> String -> IO (Either String v)
+ >     valueToString :: v -> Maybe String
+ >
+ > data AnyBackend = forall a b. (Backend a b) => AnyBackend a b
+ >
+ > instance Backend AnyBackend where
+ >     newHandle = newHandle
+ >     runScript  :: h -> [(String,v)] -> String -> IO (Either String v)
+ >     valueToString :: v -> Maybe String
+
+class Renderable a where
+ boundingSphere :: a -> Sphere
+ hit :: a -> [Fragment] -- returns the "fragments" of all hits with ray
+
+ > defaultBackend :: Backend
+ > defaultBackend = Backend D.TeaberryHandle D.Value
+
+ > instance Backed BackendC 
+
+ data AnyRenderable = forall a. Renderable a => AnyRenderable a
+
+  instance Renderable AnyRenderable where
+      boundingSphere (AnyRenderable a) = boundingSphere a
+      hit (AnyRenderable a) = hit a
+  {-      ... -}
+
+Now, create lists with type [AnyRenderable], for example,
+
+    [ AnyRenderable x
+    , AnyRenderable y
+    , AnyRenderable z ]
+
+
+> {-instance Backend D.TeaberryHandle D.Value where
+>     newHandle = D.newTeaberryHandle
+>     runScript = D.runScript
+>     valueToString = D.valueToString-}
+>
+> {-data Backend h v = Backend
+>     {newHandle :: IO h
+>     ,runScript :: h -> [(String,v)] -> String -> IO (Either String v)
+>     ,valueToString :: v -> Maybe String}
+
+> defaultBackend = Backend {newHandle = D.newTeaberryHandle
+>                          ,runScript = D.runScript
+>                          ,valueToString = D.valueToString}-}
 
 ------------------------------------------------------------------------------
 
