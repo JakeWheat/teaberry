@@ -41,6 +41,7 @@ this should be ready now
 
 
 > import Control.Monad.Trans.Class (lift)
+> import Control.Monad.IO.Class (liftIO)
 > import Control.Monad.Trans.Except (Except, runExcept, throwE)
 > import Control.Monad.Trans.RWS (RWST, evalRWST, ask, local, get, gets, state, put, modify)
 > import Control.Exception.Safe (Exception, throwM, catch)
@@ -118,16 +119,20 @@ this should be ready now
 todo: write a version which only reads enough of each file to get the imports
 and only loads one file at a time and desugars it?
 is this worth it? wait until it becomes a performance issue
+
+todo: pass the top level name as a maybe, because at least some of the
+time, the caller of this code has a name for it
+and/or create a variation which is passed a filename instead of the source
+and reads the starting source from disk here too
   
-> loadSourceFiles :: FileSystemWrapper -> String -> IO (Either String [(String,Module)])
+> loadSourceFiles :: FileSystemWrapper -> String -> Interpreter [(String,Module)]
 > loadSourceFiles fsw src = do
 >     -- todo: memoize so loading a module twice doesn't read the
 >     -- file and parse it twice
 >     x <- f "toplevel" src
 >     -- reverse the list to put dependencies first
 >     -- nub it so it only includes each dependency once
->     let x' = nubBy (\a b -> fst a == fst b) $ reverse x
->     pure $ Right x'
+>     pure $ nubBy (\a b -> fst a == fst b) $ reverse x
 >   where
 >     -- parse the file, get the imports
 >     -- recurse on these imports, returning the filename and the
@@ -137,7 +142,7 @@ is this worth it? wait until it becomes a performance issue
 >                  rs = catMaybes $ map getImp ps
 >              ((nm,ast):) <$> (concat <$> mapM g rs)
 >     g fn = do
->         x <- (loadFile fsw) fn
+>         x <- liftIO $ (loadFile fsw) fn
 >         f fn x
 >         
 >     getImp (Import fn _) = Just fn
@@ -148,17 +153,23 @@ is this worth it? wait until it becomes a performance issue
 > evaluate = evaluate' makeRealFilesystemReader
 
 todo: use a monad transformer? is it worth it?
+try it out and see. want it to be worth it
+
+make this instance worth it: run loadsourcefiles inside the main
+interpreter monad
   
 > evaluate' :: FileSystemWrapper -> String -> IO (Either String [T.CheckResult])
-> evaluate' fsw src =  do
->     srcs <- loadSourceFiles fsw src
->     let x = case srcs of
->                 Left e -> Left e
->                 Right z -> runDesugar z
->     case x of
->         Left e -> pure $ Left e
->         Right ast' -> runInterp testEnv ast'
-
+> evaluate' fsw src =
+>     ((Right . fst) <$> evalRWST f testEnv emptyInterpreterState)
+>     `catch` (\e -> pure $ Left $ interpreterExceptionToString e)
+>   where
+>     f :: Interpreter [T.CheckResult]
+>     f = do
+>         srcs <- loadSourceFiles fsw src
+>         y <- either throwInterp pure $ runDesugar srcs
+>         _ <- interp y
+>         runAddedTests
+  
 ------------------------------------------------------------------------------
 
 syntax
@@ -589,15 +600,6 @@ holds the values of variables
 > throwInterp :: String -> Interpreter a
 > throwInterp e = throwM $ InterpreterException e
   
-> runInterp :: Env -> Expr -> IO (Either String [T.CheckResult])
-> runInterp env expr =
->     ((Right . fst) <$> evalRWST scriptWithTestStuff env emptyInterpreterState)
->     `catch` (\e -> pure $ Left $ interpreterExceptionToString e)
->   where
->     scriptWithTestStuff = do
->         _ <- interp expr
->         runAddedTests
-
 > interp :: Expr -> Interpreter Value
 > interp (Num n) = pure (NumV n)
 > interp (Text t) = pure (TextV t)
