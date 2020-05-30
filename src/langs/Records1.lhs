@@ -8,7 +8,13 @@ Implementation of records
 > {-# LANGUAGE MultiWayIf #-}
 
 > module Records1 (tests
->               ) where
+>                 ,Env
+>                 ,showEnv
+>                 ,evaluateFull
+>                 ,renderCheckResults
+>                 ,defaultEnv
+>                 ,torepr'
+>                 ) where
 
 > import Text.RawString.QQ
 
@@ -425,14 +431,16 @@ holds the values of variables
 
 > type Interpreter = RWST Env () InterpreterState (Except String)
 
-> runInterp :: Env -> Expr -> Either String [CheckResult]
+> runInterp :: Env -> Expr -> Either String (Value, Env, [CheckResult])
 > runInterp env expr =
 >     fst <$> runExcept (evalRWST scriptWithTestStuff env emptyInterpreterState)
 >   where
 >     scriptWithTestStuff = do
->         _ <- interp expr
->         runAddedTests
-
+>         v <- interp expr
+>         t <- runAddedTests
+>         envi <- ask
+>         pure (v,envi,t)          
+  
 > interp :: Expr -> Interpreter Value
 > interp (Num n) = pure (NumV n)
 > interp (Text t) = pure (TextV t)
@@ -549,8 +557,16 @@ holds the values of variables
 >     ast <- parse s
 >     ast' <- runDesugar ast
 >     {-trace (pretty ast') $ -}
->     runInterp testEnv ast'
+>     (\(_,_,x) -> x) <$> runInterp defaultEnv ast'
 
+> evaluateFull :: Env -> String -> Either String (Value, Env, [CheckResult])
+> evaluateFull en s =  do
+>     ast <- parse s
+>     ast' <- runDesugar ast
+>     {-trace (pretty ast') $ -}
+>     runInterp en ast'
+
+  
 ------------------------------------------------------------------------------
 
 haskell side testing infrastructure
@@ -699,8 +715,8 @@ formatted string
 ffi catalog
 
 
-> testEnv :: Env
-> testEnv = either error id $ addForeignFuns' (
+> defaultEnv :: Env
+> defaultEnv = either error id $ addForeignFuns' (
 >    [("+", binaryOp unwrapNum unwrapNum wrapNum (+))
 >    ,("*", binaryOp unwrapNum unwrapNum wrapNum (*))
 >    ,("/", binaryOp unwrapNum unwrapNum wrapNum divideScientific)
@@ -726,6 +742,7 @@ ffi catalog
 >     ++ [])
 >    $ emptyEnv {envEnv = [("true", BoolV True)
 >                         ,("false", BoolV False)
+>                         ,("nothing", NothingV)
 >                         ,("empty", VariantV "empty" [])]}
 
 
@@ -807,6 +824,12 @@ env, ffi boilerplate
 >     {envEnv :: [(String,Value)]
 >     ,envForeignFuns :: [((String,[String]), [Value] -> Interpreter Value)]}
 
+> showEnv :: Env -> String
+> showEnv e = intercalate "\n" ({-map g (envForeignFuns e) ++ -} map f (envEnv e))
+>    where
+>      f (a,b) = a ++ " = " ++ torepr' b
+>      --g((n,ts),_) = n ++ "(" ++ intercalate "," ts ++ ")"       
+  
 > emptyEnv :: Env
 > emptyEnv = Env
 >     {envEnv = []
