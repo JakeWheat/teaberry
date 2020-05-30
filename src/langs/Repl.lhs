@@ -1,16 +1,41 @@
 
 TODO:
 
+what would have the biggest improvement on making this more usable:
+import, loading files
+multiline editing
+hooked up to the main language
+
+watch mode - watch a file and rerun it when it changes
+  display errors or the output, test cases
+only showing failed tests
+
+script mode: support command line args for an in language script
+
+
+
 once the file loader is implemented, implement import and include in
 the repl
 
 find a way to separate the original env from stuff added in the repl to show it better
 + format it better
 
+command to dump the current env to a file as source
+option to include shadowed stuff? will this be garbage collected if
+it's no longer reachable? assume this, which means there's only one
+version, which dumps everything needed
+how to dump shared envs once lost the fact they are shared?
+how to dump shared store entries/ pickling?
+don't solve these immediately, put them on a list
 
 work on command line opts and commands
 
 add all the languages
+
+
+
+make sure it's transactional for errors: it resets to the env before
+ the statement with the error
 
 add all the other little features
 
@@ -28,38 +53,36 @@ replace the main command exe
 > import Control.Monad.Trans
 > import System.Console.Haskeline
 >
-> import Records1Repl
+> import Records1Repl (ReplImplHandle
+>                     ,startReplImpl
+>                     ,evaluateLine)
 
 > type Repl a = InputT IO a
 
-> process :: Env -> String -> IO Env
-> process en src =
->     case evaluateFull en src of
->         Left e -> do
->                   putStrLn $ "error: " ++ e
->                   pure en
->         Right (v,en',t) -> do
->             case t of
->                 [] -> pure ()
->                 _ -> putStrLn $ renderCheckResults t
->             case v of
->                 NothingV -> pure ()
->                 _ -> putStrLn $ torepr' v
->             --putStrLn $ showEnv en'
->             pure en'
+> process :: ReplImplHandle -> String -> IO ()
+> process h src = do
+>     x <- evaluateLine h src
+>     case x of
+>         Left y -> putStrLn $ "error: " ++ y
+>         Right Nothing -> pure ()
+>         Right (Just s) -> putStrLn s
 
 
-> repl :: Env -> Repl ()
-> repl en = do
->   minput <- getInputLine "t > "
->   case minput of
->     Nothing -> pure ()
->     Just input -> do
->         e <- liftIO $ process en input
->         repl e
+> repl :: ReplImplHandle -> Repl ()
+> repl h = go
+>   where
+>     go = do
+>         minput <- getInputLine "t > "
+>         case minput of
+>             Nothing -> pure ()
+>             Just input -> do
+>                 liftIO $ process h input
+>                 go
 
 > main :: IO ()
-> main = runInputT st (repl defaultEnv)
+> main = do
+>     h <- startReplImpl
+>     runInputT st (repl h)
 >   where
 >     st = defaultSettings {historyFile = (Just ".teaberryreplhistory")}
 

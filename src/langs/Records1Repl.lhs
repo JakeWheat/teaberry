@@ -1,38 +1,6 @@
 
 Records1 adjusted for a repl demo
 
-the env isn't coming out properly
-this is because letdecl desugars to let and then the env is hidden
-ideas: use a hack wrapper on the last expr to extract the env
-  this won't be ideal because it will pick up things it shouldn't
-  don't desugar letdecl, so it can work this way
-there's also the issues of 'block ends with let'
-which should be fixed so it doesn't give this error
-need both:
-don't desugar letdecl the same as let
-use letdecl as an expression (with seq)
-
-script is:
-a
-b
-...
-x
-
-convert this to:
-
-a
-b
-...
-z = x
-{z,return-env{}}
-
-the return-env will return the environment
-
-it will always desugar to this
-for non-repl execution, the return value is ignored
-
-when have modules, it should only do this on the 'top level' module
-
 > {-# LANGUAGE TupleSections #-}
 > {-# LANGUAGE LambdaCase #-}
 > {-# LANGUAGE QuasiQuotes #-}
@@ -40,13 +8,9 @@ when have modules, it should only do this on the 'top level' module
 > {-# LANGUAGE MultiWayIf #-}
 
 > module Records1Repl (tests
->                     ,Env
->                     ,showEnv
->                     ,evaluateFull
->                     ,renderCheckResults
->                     ,defaultEnv
->                     ,torepr'
->                     ,Value(..)
+>                     ,ReplImplHandle
+>                     ,startReplImpl
+>                     ,evaluateLine
 >                     ) where
 
 > import Text.RawString.QQ
@@ -75,6 +39,8 @@ when have modules, it should only do this on the 'top level' module
 >
 > import Debug.Trace (trace)
 
+> import Data.IORef (IORef, newIORef, readIORef, writeIORef)
+  
 ------------------------------------------------------------------------------
 
 syntax
@@ -120,6 +86,44 @@ syntax
 
 ------------------------------------------------------------------------------
 
+repl
+----
+
+> data ReplImplHandle = ReplImplHandle
+>     {henv :: IORef Env}
+  
+> startReplImpl :: IO ReplImplHandle
+> startReplImpl = do
+>     x <- newIORef defaultEnv
+>     pure $ ReplImplHandle x
+
+> evaluateLine :: ReplImplHandle -> String -> IO (Either String (Maybe String))
+> evaluateLine h src = do
+>     en <- readIORef (henv h)
+>     case evaluateFull en src of
+>         Left e -> pure $ Left e
+>         Right (v,en',t) -> do
+>             case t of
+>                 [] -> pure ()
+>                 _ -> putStrLn $ renderCheckResults t
+>             writeIORef (henv h) en'
+>             case v of
+>                 NothingV -> pure $ Right Nothing
+>                 _ -> pure $ Right $ Just $ torepr' v
+          
+
+maybe is used because the system doesn't display anything if Nothing
+is returned. todo: work out how to handle this better. I think the
+key issue is that it's overloading things which are only used for
+their side effects, and things which legit return a nothing
+value. maybe nothing should never be used for the second one?
+
+later can add more value types, e.g. images, and an error type,
+e.g. so the repl front end can decide how to display it in more
+detail?
+
+------------------------------------------------------------------------------
+
 desugar
 -------
 
@@ -130,6 +134,13 @@ desugar
 >                                  ,nextAnonymousBlockNumber :: Int
 >                                  ,currentCheckBlockIDName :: Maybe String}
 
+refactoring this
+  current check block id name -> put this in the reader
+  the other three are for uniques
+  strictly speaking, they could go in the reader too
+  since they are only updated at the top level
+  might be more effort than it's worth
+  
 > startingDesugarState :: DesugarState
 > startingDesugarState = DesugarState 0 0 0 Nothing
 
@@ -179,7 +190,16 @@ desugaring code
 x
 ->
 z = x
-{z,return-env{}}
+{z,env-to-record{}}
+
+this is used for the repl: we can treat the list of statements as a
+block, and get the expression value of this, and also save the env so
+we can use it next time, so you can do things like:
+  
+  > a = 7
+  nothing
+  > a / 4.1
+  1.707317073170732
 
 > addReturnEnv :: [Stmt] -> Desugarer [Stmt]
 > addReturnEnv [] = pure [StExpr $ TupleSel [Iden "nothing", App (Iden "env-to-record") []]]
@@ -493,7 +513,6 @@ holds the values of variables
 >     scriptWithTestStuff = do
 >         v <- interp expr
 >         t <- runAddedTests
->         --envi <- ask
 >         case v of
 >              TupleV [v', VariantV "record" e] -> pure (v',env {envEnv = e}, t)
 >              _ -> lift $ throwE $ "expected 2 element tuple, second one record, got " ++ torepr' v
@@ -891,8 +910,8 @@ env, ffi boilerplate
 >     {envEnv :: [(String,Value)]
 >     ,envForeignFuns :: [((String,[String]), [Value] -> Interpreter Value)]}
 
-> showEnv :: Env -> String
-> showEnv e = intercalate "\n" ({-map g (envForeignFuns e) ++ -} map f (envEnv e))
+> _showEnv :: Env -> String
+> _showEnv e = intercalate "\n" ({-map g (envForeignFuns e) ++ -} map f (envEnv e))
 >    where
 >      f (a,b) = a ++ " = " ++ torepr' b
 >      --g((n,ts),_) = n ++ "(" ++ intercalate "," ts ++ ")"       
