@@ -28,9 +28,13 @@ todo: config files, init files, etc.
 > {-# LANGUAGE MultiParamTypeClasses #-}
 > {-# LANGUAGE FunctionalDependencies #-}
 > {-# LANGUAGE ExistentialQuantification #-}
+> {-# LANGUAGE ScopedTypeVariables #-}
 
 > import Control.Monad.Trans
 > import System.Console.Haskeline
+
+> import Control.Exception.Safe (catch)
+
 >
 > import qualified Import4Repl as D (TeaberryHandle
 >                                   ,newTeaberryHandle
@@ -98,13 +102,16 @@ repl
 > repl :: D.TeaberryHandle -> InputT IO ()
 > repl h = go
 >   where
->     go = do
+>     go = withInterrupt (do
 >         minput <- getInputLine "t > "
 >         case minput of
 >             Nothing -> pure ()
 >             Just input -> do
 >                 liftIO $ process h input
->                 go
+>                 go)
+>         -- ctrl-c resets to the prompt, doesn't exit the repl
+>         `catch` (\(_::Interrupt) -> liftIO (putStr "^C") >> go)
+
 
 > doRepl :: IO ()
 > doRepl = do

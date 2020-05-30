@@ -29,8 +29,8 @@ Simplest import with file loader extended to support a repl
 > import Control.Monad.IO.Class (liftIO)
 > import Control.Monad.Trans.Except (Except, runExcept, throwE)
 > import Control.Monad.Trans.RWS (RWST, evalRWST, ask, local, get, gets, state, put, modify)
-> import Control.Exception.Safe (Exception, throwM, catch)
-
+> import Control.Exception.Safe (Exception, throwM, catch, displayException, SomeException)
+  
 > import Control.Monad (when)
 > import Data.Maybe (isJust, catMaybes)
 >
@@ -121,11 +121,15 @@ and reads the starting source from disk here too
 > evaluate :: Env -> String -> IO (Either String (Value, Env, [T.CheckResult]))
 > evaluate = evaluate' makeRealFilesystemReader
 
+
+todo: should evaluate return without the either, and let the caller
+catch synchronous exceptions if they want to?
  
 > evaluate' :: FileSystemWrapper -> Env -> String -> IO (Either String (Value, Env, [T.CheckResult]))
 > evaluate' fsw env src =
 >     ((Right . fst) <$> evalRWST f env emptyInterpreterState)
 >     `catch` (\e -> pure $ Left $ interpreterExceptionToString e)
+>     `catch` (\(e::SomeException) -> pure $ Left $ displayException e)
 >   where
 >     f :: Interpreter (Value, Env, [T.CheckResult])
 >     f = do
@@ -218,6 +222,9 @@ embedded api
 >             case t of
 >                 [] -> pure ()
 >                 _ -> putStrLn $ T.renderCheckResults t
+>             -- if you press ctrl-c in between the start of
+>             -- writeioref and if finishing, or even at another time,
+>             -- can this write become corrupted?
 >             writeIORef (henv h) en'
 >             pure $ Right v
 
