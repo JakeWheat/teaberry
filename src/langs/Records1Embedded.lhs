@@ -42,9 +42,7 @@ do demo of opaque ffi values
 
 > import Text.RawString.QQ
 
-> import qualified Test.Tasty as T
-> import qualified Test.Tasty.HUnit as T
-
+> import qualified TestUtils as T
 
 > import qualified Parse as P
 > import qualified Syntax as S
@@ -56,15 +54,14 @@ do demo of opaque ffi values
 > import Control.Monad.Trans.RWS (RWST, evalRWST, ask, local, get, gets, state, put, modify)
 
 > import Control.Monad (when)
-> import Data.Maybe (isJust, isNothing)
+> import Data.Maybe (isJust)
 >
 > import Data.Char (isAlphaNum)
 
 > import Scientific (Scientific, extractInt, divideScientific)
-> import Data.List (intercalate, partition, sortBy)
+> import Data.List (intercalate, sortBy)
 > import Data.Ord (comparing)
 >
-> import Debug.Trace (trace)
 
 > import Data.IORef (IORef, newIORef, readIORef, writeIORef)
   
@@ -133,7 +130,7 @@ embedded api
 >         Right (v,en',t) -> do
 >             case t of
 >                 [] -> pure ()
->                 _ -> putStrLn $ renderCheckResults t
+>                 _ -> putStrLn $ T.renderCheckResults t
 >             writeIORef (henv h) en'
 >             pure $ Right v
 
@@ -532,7 +529,7 @@ holds the values of variables
 > data InterpreterState =
 >     InterpreterState
 >     {addedTests :: [Value]
->     ,testResultLog :: [TestResultLog]
+>     ,testResultLog :: [T.TestResultLog]
 >     ,isStore :: Store
 >     }
 
@@ -541,7 +538,7 @@ holds the values of variables
 
 > type Interpreter = RWST Env () InterpreterState (Except String)
 
-> runInterp :: Env -> Expr -> Either String (Value, Env, [CheckResult])
+> runInterp :: Env -> Expr -> Either String (Value, Env, [T.CheckResult])
 > runInterp env expr =
 >     fst <$> runExcept (evalRWST scriptWithTestStuff env emptyInterpreterState)
 >   where
@@ -663,40 +660,19 @@ holds the values of variables
 
   
 
-> evaluateWithChecks :: String -> Either String [CheckResult]
+> evaluateWithChecks :: String -> Either String [T.CheckResult]
 > evaluateWithChecks s =  do
 >     ast <- parse s
 >     ast' <- runDesugar ast
 >     {-trace (pretty ast') $ -}
 >     (\(_,_,x) -> x) <$> runInterp defaultEnv ast'
 
-> evaluateFull :: Env -> String -> Either String (Value, Env, [CheckResult])
+> evaluateFull :: Env -> String -> Either String (Value, Env, [T.CheckResult])
 > evaluateFull en s =  do
 >     ast <- parse s
 >     ast' <- runDesugar ast
 >     --trace (pretty ast') $
 >     runInterp en ast'
-
-  
-------------------------------------------------------------------------------
-
-haskell side testing infrastructure
------------------------------------
-
-checkresult:
-
-this is the user api. Is this as simple and direct as possible?
-
-todo: will extend the name with the package and module as well
-want to be able to do a filter on which tests to run
-maybe the filter is just a predicate on the package, module and check
-block name
-
-> data CheckResult = CheckResult String -- the test block name
->                               [(String, Maybe String)]
->                  deriving Show
-> -- the second is Nothing if it's a pass
-> -- if it is Just, it's a fail, and contains the failure message
 
 --------------------------------------
 
@@ -705,9 +681,6 @@ ffi functions used by the desugared test code
 TODO: use/write helpers for working with state monad, etc.
 create a wrapper to convert an Interpreter () into NothingV
 
-> data TestResultLog = TestPass Scientific String -- check block id, test source
->                    | TestFail Scientific String String -- check block id, test source, failure message
->                    | TestBlock Scientific String
 
 add-tests(fn)
 takes a function value
@@ -721,19 +694,19 @@ says there is a new test block with a unique id and it's name
 
 > logCheckBlock :: Scientific -> String -> Interpreter Value
 > logCheckBlock n nm =
->     nothingWrapper $ \s -> s {testResultLog = TestBlock n nm : testResultLog s}
+>     nothingWrapper $ \s -> s {testResultLog = T.TestBlock n nm : testResultLog s}
 
 log-test-pass(blockid, text of test)
 
 > logTestPass :: Scientific -> String -> Interpreter Value
 > logTestPass n msg =
->     nothingWrapper $ \s -> s {testResultLog = TestPass n msg : testResultLog s}
+>     nothingWrapper $ \s -> s {testResultLog = T.TestPass n msg : testResultLog s}
 
 log-test-fail(block,id, text of test, fail message)
 
 > logTestFail :: Scientific -> String -> String -> Interpreter Value
 > logTestFail n msg failmsg = nothingWrapper $ \s ->
->     s {testResultLog = TestFail n msg failmsg : testResultLog s}
+>     s {testResultLog = T.TestFail n msg failmsg : testResultLog s}
 
 > nothingWrapper :: (InterpreterState -> InterpreterState) -> Interpreter Value
 > nothingWrapper f = modify f *> pure NothingV
@@ -742,84 +715,13 @@ log-test-fail(block,id, text of test, fail message)
 
 this is run at the end of the script to run all the saved tests
 
-> runAddedTests :: Interpreter [CheckResult]
+> runAddedTests :: Interpreter [T.CheckResult]
 > runAddedTests = do
 >     ts <- reverse <$> gets addedTests
 >     mapM_ (\v -> app v []) ts
 >     testLog <- reverse <$> gets testResultLog
->     either (lift . throwE) pure $ testLogToCheckResults testLog
+>     either (lift . throwE) pure $ T.testLogToCheckResults testLog
 
-this is run after that, to convert the log of test events, into a
-organised data structure to view the results
-
-> testLogToCheckResults :: [TestResultLog] -> Either String [CheckResult]
-> testLogToCheckResults trls = do
->     -- 'streaming' algorithm, very efficient
->     -- but the reason to do it is because it's an easy
->     -- way to catch a test result without a matching check block
->     -- relies on the test results being in the order you write
->     -- the corresponding tests in the source file
->     let f :: [(Scientific, CheckResult)] -> [TestResultLog] -> Either String [CheckResult]
->         -- finished, reverse the check results
->         f res [] = pure $ map reverseResults $ map snd $ reverse res
->         -- new check block, make sure it's id hasn't been seen already
->         f res ((TestBlock cid nm) : xs) = do
->             when (any (== cid) $ map fst res)
->                 $ Left $ "multiple check result name for check block with id " ++ show cid
->             f ((cid, CheckResult nm []) : res) xs
->         -- if we see a pass or a fail without having see a testblock
->         -- then it's a bug
->         f [] (TestPass {} : _) = Left $ "unmatched check block id in test result"
->         f [] (TestFail {} : _) = Left $ "unmatched check block id in test result"
->         -- pass or fail, the id should match the id of the last testblock entry
->         -- not sure if this extra checking is really needed
->         -- maybe it will be useful if try to run tests in multiple threads
->         -- in the future?
->         f ((cid, CheckResult cnm ts):cs) ((TestPass tid tnm) : xs)
->             | cid == tid =
->               f ((cid,CheckResult cnm ((tnm, Nothing):ts)):cs) xs
->             | otherwise = Left $ "unmatched check block id in test result"
->         f ((cid, CheckResult cnm ts):cs) ((TestFail tid tnm fmsg) : xs)
->             | cid == tid =
->               f ((cid,CheckResult cnm ((tnm, Just fmsg):ts)):cs) xs
->             | otherwise = Left $ "unmatched check block id in test result"
->     f [] trls
->   where
->     reverseResults (CheckResult nm ts) = CheckResult nm $ reverse ts
-
-function to convert the check result data structure into a nicely
-formatted string
-
-> renderCheckResults :: [CheckResult] -> String
-> renderCheckResults cs =
->     let bs = map renderCheck cs
->         totalPasses = sum $ map (\(n,_,_) -> n) bs
->         totalFails = sum $ map (\(_,n,_) -> n) bs
->         msgs = map (\(_,_,m) -> m) bs
->     in intercalate "\n\n" msgs
->        ++ "\n\n" ++ (show totalPasses) ++ "/" ++ show (totalPasses + totalFails)
->        ++ " tests passed in all check blocks"
->   where
->     renderCheck (CheckResult nm ts) =
->         let (ps,fs) = partition (isNothing . snd) ts
->             msgs = map renderTest ts
->         in (length ps
->            ,length fs
->            ,"Check block: " ++ nm ++ "\n"
->            ++ intercalate "\n" (map indent msgs)
->            ++ "\n  " ++ show (length ps) ++ "/" ++ show (length ts) ++ " tests passed in check block: " ++ nm
->            )
->     renderTest (a,b) =
->         "test (" ++ a ++ "): "
->         ++ case b of
->                Nothing -> "OK"
->                Just msg -> "failed, reason:\n" ++ indent msg
->     indent [] = []
->     indent x = "  " ++ indent' x
->     indent' [] = []
->     indent' x@[_] = x
->     indent' ('\n':y@(_:_)) = "\n  " ++ indent' y
->     indent' (x:y) = x : indent' y
 
 ------------------------------------------------------------------------------
 
@@ -1575,17 +1477,10 @@ end
 > tests1 :: T.TestTree
 > tests1 =
 >     let crs = either error id $ evaluateWithChecks simpleTestScript
->         f (CheckResult nm res) =
->             T.testGroup nm $ map g res
->         g (nm, fm) = T.testCase nm $
->             case fm of
->                 Nothing -> T.assertBool "" True
->                 Just fmx -> T.assertFailure fmx
->     in trace (renderCheckResults crs)
->        $ T.testGroup "records1embedded1" $ map f crs
+>     in T.makeTests "records1embedded1" crs
 
 > tests :: T.TestTree
-> tests = T.testGroup "records1embedded" [{-tests1,-}tests2]
+> tests = T.testGroup "records1embedded" [tests1,tests2]
 
 
 > tests2 :: T.TestTree

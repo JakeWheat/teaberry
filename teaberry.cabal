@@ -84,7 +84,8 @@ common langs
                        raw-strings-qq,
                        haskeline
   hs-source-dirs:      src/langs
-  other-modules:       SimpleExpr
+  other-modules:       TestUtils
+                       SimpleExpr
                        SimpleExprError
                        SimpleExprReader
                        SimpleExprDesugared

@@ -103,7 +103,7 @@ or all tests for all code that is used
 > import Scientific (Scientific, extractInt)
 > import Data.List (intercalate, partition)
 >
-> import Debug.Trace (trace)
+> --import Debug.Trace (trace)
 
 ------------------------------------------------------------------------------
 
@@ -525,8 +525,8 @@ organised data structure to view the results
 function to convert the check result data structure into a nicely
 formatted string
 
-> renderCheckResults :: [CheckResult] -> String
-> renderCheckResults cs =
+> _renderCheckResults :: [CheckResult] -> String
+> _renderCheckResults cs =
 >     let bs = map renderCheck cs
 >         totalPasses = sum $ map (\(n,_,_) -> n) bs
 >         totalFails = sum $ map (\(_,n,_) -> n) bs
@@ -941,5 +941,5 @@ end
 >             case fm of
 >                 Nothing -> T.assertBool "" True
 >                 Just fmx -> T.assertFailure fmx
->     in trace (renderCheckResults crs)
->        $ T.testGroup "simplestatementscheck" $ map f crs
+>     in --trace (renderCheckResults crs) $
+>        T.testGroup "simplestatementscheck" $ map f crs
