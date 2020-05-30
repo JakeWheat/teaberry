@@ -11,19 +11,16 @@ Simple repl front end using haskeline
 >                         ,valueToString
 >                         )
 
-> type Repl a = InputT IO a
-
 > process :: TeaberryHandle -> String -> IO ()
 > process h src = do
->     x <- runScript h src
+>     x <- runScript h [] src
 >     case x of
 >         Left y -> putStrLn $ "error: " ++ y
 >         Right v -> case valueToString v of
 >             Nothing -> pure ()
 >             Just s -> putStrLn s
 
-
-> repl :: TeaberryHandle -> Repl ()
+> repl :: TeaberryHandle -> InputT IO ()
 > repl h = go
 >   where
 >     go = do

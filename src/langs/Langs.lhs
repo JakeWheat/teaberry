@@ -1,6 +1,6 @@
 
 
-> {-import qualified SimpleExpr
+> import qualified SimpleExpr
 > import qualified SimpleExprError
 > import qualified SimpleExprReader
 > import qualified SimpleExprDesugared
@@ -23,18 +23,18 @@
 > import qualified CasesPlusVar
 > import qualified Ref1
 > import qualified Records1
-> import qualified Records1Repl-}
+> import qualified Records1Repl
 > import qualified Records1Embedded
-> {-import qualified Import1
+> import qualified Import1
 > import qualified Import2
-> import qualified Import3-}
+> import qualified Import3
 
 > import qualified Test.Tasty as T
 
 > main :: IO ()
 > main =
 >     T.defaultMain $ T.testGroup "all" $ 
->        [{-SimpleExpr.tests
+>        [SimpleExpr.tests
 >        ,SimpleExprError.tests
 >        ,SimpleExprReader.tests
 >        ,SimpleExprDesugared.tests
@@ -58,8 +58,8 @@
 >        ,Ref1.tests
 >        ,Records1.tests
 >        ,Records1Repl.tests
->        ,-}Records1Embedded.tests{-
+>        ,Records1Embedded.tests
 >        ,Import1.tests
 >        ,Import2.tests
->        ,Import3.tests-}
+>        ,Import3.tests
 >        ]

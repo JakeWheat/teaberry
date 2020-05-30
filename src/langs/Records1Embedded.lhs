@@ -5,6 +5,10 @@ todo:
 tests
 test the embedded iface running the check tests
 test running something with tests and there's a test failure
+test a script that throws a language error: parse error,
+  something that would be a type check error
+    + identifier not found
+  something that's a runtime error (e.g. file not found)
 
 get the adding an ffi function working - figure out the api to use
 use/replicate the wrappers already there?
@@ -14,11 +18,9 @@ is it worth making interpreter methods available to ffi functions
    (like looking something up in the closure?)
 should at least add io and stuff to the interpreter monad first
 
-want to keep value abstract or not for now?
-  or make it a wrapper just for the embedded api and not use
-  the same one as the interpreter?
-  is there any benefit right now to not using the interpreter
-  bigger
+what to do with values in the api:
+  could make an external value type with a simple conversion
+  to and from the interpreter value type?
 
 do demo of opaque ffi values
 
@@ -136,6 +138,8 @@ embedded api
 >             pure $ Right v
 
 shorthand to run functions with args directly for convenience
+todo: maybe there should be a way to run a script by generating an ast
+directly instead of generating a string
 
 > runFunction :: TeaberryHandle -> String -> [Value] -> IO (Either String Value)
 > runFunction h f as = do
