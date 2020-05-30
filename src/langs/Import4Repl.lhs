@@ -29,7 +29,7 @@ Simplest import with file loader extended to support a repl
 > import Control.Monad.IO.Class (liftIO)
 > import Control.Monad.Trans.Except (Except, runExcept, throwE)
 > import Control.Monad.Trans.RWS (RWST, evalRWST, ask, local, get, gets, state, put, modify)
-> import Control.Exception.Safe (Exception, throwM, catch, displayException, SomeException)
+> import Control.Exception.Safe (Exception, throwM)
   
 > import Control.Monad (when)
 > import Data.Maybe (isJust, catMaybes)
@@ -118,18 +118,14 @@ and reads the starting source from disk here too
 >     getImp _ = Nothing
 >         
 
-> evaluate :: Env -> String -> IO (Either String (Value, Env, [T.CheckResult]))
+> evaluate :: Env -> String -> IO (Value, Env, [T.CheckResult])
 > evaluate = evaluate' makeRealFilesystemReader
 
-
-todo: should evaluate return without the either, and let the caller
-catch synchronous exceptions if they want to?
- 
-> evaluate' :: FileSystemWrapper -> Env -> String -> IO (Either String (Value, Env, [T.CheckResult]))
+> evaluate' :: FileSystemWrapper -> Env -> String -> IO (Value, Env, [T.CheckResult])
 > evaluate' fsw env src =
->     ((Right . fst) <$> evalRWST f env emptyInterpreterState)
->     `catch` (\e -> pure $ Left $ interpreterExceptionToString e)
->     `catch` (\(e::SomeException) -> pure $ Left $ displayException e)
+>     fst <$> evalRWST f env emptyInterpreterState
+>     --`catch` (\e -> pure $ Left $ interpreterExceptionToString e)
+>     --`catch` (\(e::SomeException) -> pure $ Left $ displayException e)
 >   where
 >     f :: Interpreter (Value, Env, [T.CheckResult])
 >     f = do
@@ -211,33 +207,27 @@ embedded api
 >     x <- newIORef defaultEnv
 >     pure $ TeaberryHandle x
 
-> runScript :: TeaberryHandle -> [(String,Value)] -> String -> IO (Either String Value)
+> runScript :: TeaberryHandle -> [(String,Value)] -> String -> IO Value
 > runScript h lenv src = do
 >     enx <- readIORef (henv h)
 >     let en = extendEnv lenv enx
->     rs <- evaluate en src
->     case rs of
->         Left e -> pure $ Left e
->         Right (v,en',t) -> do
->             case t of
->                 [] -> pure ()
->                 _ -> putStrLn $ T.renderCheckResults t
->             -- if you press ctrl-c in between the start of
->             -- writeioref and if finishing, or even at another time,
->             -- can this write become corrupted?
->             writeIORef (henv h) en'
->             pure $ Right v
+>     (v,en',t) <- evaluate en src
+>     case t of
+>         [] -> pure ()
+>         _ -> putStrLn $ T.renderCheckResults t
+>     -- if you press ctrl-c in between the start of
+>     -- writeioref and if finishing, or even at another time,
+>     -- can this write become corrupted?
+>     writeIORef (henv h) en'
+>     pure v
 
-> runFunction :: TeaberryHandle -> String -> [Value] -> IO (Either String Value)
+> runFunction :: TeaberryHandle -> String -> [Value] -> IO Value
 > runFunction h f as = do
 >     -- how to give the args unique names? or just use shadow?
 >     -- (and the function)
 >     v <- runScript h [] f
->     case v of
->         Left e -> pure $ Left e
->         Right v' -> do
->             let as' = zipWith (\i x -> ("aaa-" ++ show i, x)) [(0::Int)..] as
->             runScript h (("fff", v'):as') $ "fff(" ++ intercalate "," (map fst as') ++ ")"
+>     let as' = zipWith (\i x -> ("aaa-" ++ show i, x)) [(0::Int)..] as
+>     runScript h (("fff", v):as') $ "fff(" ++ intercalate "," (map fst as') ++ ")"
 
 > valueToString :: Value -> Maybe String
 > valueToString v = case v of
@@ -639,12 +629,17 @@ holds the values of variables
 > emptyInterpreterState = InterpreterState [] [] emptyStore
 
 > data InterpreterException = InterpreterException String
->                           deriving Show
 
-> instance Exception InterpreterException
+annoying, work around to getting the error message out as wanted is to
+override show, which is wrong, instead of being able to override
+displayexception, which is less wrong
+  
+> instance Show InterpreterException where
+>    show (InterpreterException msg) = msg
 
-> interpreterExceptionToString :: InterpreterException -> String
-> interpreterExceptionToString (InterpreterException s) = s
+> instance Exception InterpreterException where
+>   --  displayException (InterpreterException msg) = msg
+
 
   
 > type Interpreter = RWST Env () InterpreterState IO
@@ -1860,7 +1855,7 @@ end
 
      
 > tests1 :: T.TestTree
-> tests1 = T.makeTestsIO "imports4repla" $ (fmap (\(_,_,x) -> x) <$> evaluate defaultEnv simpleTestScript)
+> tests1 = T.makeTestsIO "imports4repla" $ ((\(_,_,x) -> Right x) <$> evaluate defaultEnv simpleTestScript)
 
 > tests2 :: T.TestTree
 > tests2 = T.testGroup "imports4replb" $ map makeTest importsTestScripts
@@ -1868,7 +1863,7 @@ end
 >     makeTest s =
 >       let ((_,src):ts) = reverse $ either error id $ T.parseModules s
 >           crs = evaluate' (makeFileSystemMock ts) defaultEnv src
->       in T.makeTestsIO "imports4replb" (fmap (\(_,_,x) -> x) <$> crs)
+>       in T.makeTestsIO "imports4replb" ((\(_,_,x) -> Right x) <$> crs)
 
 
 > tests4 :: T.TestTree
@@ -1886,7 +1881,7 @@ end
 > testSanityArith = T.testCase "testSanityArith" $ do
 >     h <- newTeaberryHandle
 >     v <- runScript h [] "1 + 2"
->     T.assertEqual "" (Right (NumV 3)) v
+>     T.assertEqual "" (NumV 3) v
 
 
 > testEnvKept :: T.TestTree
@@ -1894,7 +1889,7 @@ end
 >     h <- newTeaberryHandle
 >     _ <- runScript h [] "a = 1"
 >     v <- runScript h [] "a"
->     T.assertEqual "" (Right (NumV 1)) v
+>     T.assertEqual "" (NumV 1) v
 
 > testEnvOverridden :: T.TestTree
 > testEnvOverridden = T.testCase "testEnvOverridden" $ do
@@ -1902,7 +1897,7 @@ end
 >     _ <- runScript h [] "a = 1"
 >     _ <- runScript h [] "a = 4"
 >     v <- runScript h [] "a"
->     T.assertEqual "" (Right (NumV 4)) v
+>     T.assertEqual "" (NumV 4) v
 
 *****
 TODO: test running something with tests and there's a test failure
@@ -1919,7 +1914,7 @@ a + b
 >         |]
 >     h <- newTeaberryHandle
 >     v <- runScript h [] script
->     T.assertEqual "" (Right (NumV 7)) v
+>     T.assertEqual "" (NumV 7) v
 
 todo: lots of boilerplate and abstraction details to work out
 
@@ -1939,7 +1934,7 @@ todo: lots of boilerplate and abstraction details to work out
 >     h <- newTeaberryHandle
 >     v <- runScript h [("a", NumV 3)
 >                      ,("b", NumV 11)] "a + b"
->     T.assertEqual "" (Right (NumV 14)) v
+>     T.assertEqual "" (NumV 14) v
 
 how to implement this without it staying in the env?
 todo: fix this, for now, they will stay in the env
@@ -1957,7 +1952,7 @@ should a stay in the env? not sure
 >     h <- newTeaberryHandle
 >     _ <- runScript h [] "f = lam(x,y): x + y end"
 >     v <- runFunction h "f" [NumV 5, NumV 11]
->     T.assertEqual "" (Right (NumV 16)) v
+>     T.assertEqual "" (NumV 16) v
 
 the next test should work as soon as partial application is
 implemented

@@ -33,7 +33,7 @@ todo: config files, init files, etc.
 > import Control.Monad.Trans
 > import System.Console.Haskeline
 
-> import Control.Exception.Safe (catch)
+> import Control.Exception.Safe (catch, SomeException, displayException)
 
 >
 > import qualified Import4Repl as D (TeaberryHandle
@@ -79,25 +79,22 @@ run file or script
 > runSrc :: String -> IO ()
 > runSrc src = do
 >     h <- D.newTeaberryHandle
->     x <- D.runScript h [] src
->     case x of
->         Left e -> error e
->         Right v -> case D.valueToString v of
->             Nothing -> pure ()
->             Just s -> putStrLn s
+>     v <- D.runScript h [] src
+>     case D.valueToString v of
+>         Nothing -> pure ()
+>         Just s -> putStrLn s
 
 ------------------------------------------------------------------------------
 
 repl
 
 > process :: D.TeaberryHandle -> String -> IO ()
-> process h src = do
->     x <- D.runScript h [] src
->     case x of
->         Left y -> putStrLn $ "error: " ++ y
->         Right v -> case D.valueToString v of
+> process h src = (do
+>     v <- D.runScript h [] src
+>     case D.valueToString v of
 >             Nothing -> pure ()
->             Just s -> putStrLn s
+>             Just s -> putStrLn s)
+>     `catch` (\(e::SomeException) -> putStrLn $ "Error: " ++ displayException e)
 
 > repl :: D.TeaberryHandle -> InputT IO ()
 > repl h = go
