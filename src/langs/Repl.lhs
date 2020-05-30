@@ -1,9 +1,34 @@
 
+TODO:
+
+once the file loader is implemented, implement import and include in
+the repl
+
+find a way to separate the original env from stuff added in the repl to show it better
++ format it better
+
+
+work on command line opts and commands
+
+add all the languages
+
+add all the other little features
+
+support ^C better
+  I think this needs threads/fork or something to be able to interrupt
+   something running
+  but can support ^C to reset the current input text
+
+see how can support multiline stuff
+
+write some tests for the process function
+
+replace the main command exe
 
 > import Control.Monad.Trans
 > import System.Console.Haskeline
 >
-> import Records1
+> import Records1Repl
 
 > type Repl a = InputT IO a
 
@@ -17,25 +42,26 @@
 >             case t of
 >                 [] -> pure ()
 >                 _ -> putStrLn $ renderCheckResults t
->             putStrLn $ torepr' v
+>             case v of
+>                 NothingV -> pure ()
+>                 _ -> putStrLn $ torepr' v
 >             --putStrLn $ showEnv en'
 >             pure en'
 
 
 > repl :: Env -> Repl ()
 > repl en = do
->   minput <- getInputLine "Repl> "
+>   minput <- getInputLine "t > "
 >   case minput of
->     Nothing -> outputStrLn "Goodbye."
+>     Nothing -> pure ()
 >     Just input -> do
 >         e <- liftIO $ process en input
 >         repl e
 
-
 > main :: IO ()
-> main = do
->   runInputT defaultSettings (repl defaultEnv)
-
+> main = runInputT st (repl defaultEnv)
+>   where
+>     st = defaultSettings {historyFile = (Just ".teaberryreplhistory")}
 
 
 how does a repl work with the system?

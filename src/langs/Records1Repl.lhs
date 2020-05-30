@@ -1,5 +1,37 @@
 
-Implementation of records
+Records1 adjusted for a repl demo
+
+the env isn't coming out properly
+this is because letdecl desugars to let and then the env is hidden
+ideas: use a hack wrapper on the last expr to extract the env
+  this won't be ideal because it will pick up things it shouldn't
+  don't desugar letdecl, so it can work this way
+there's also the issues of 'block ends with let'
+which should be fixed so it doesn't give this error
+need both:
+don't desugar letdecl the same as let
+use letdecl as an expression (with seq)
+
+script is:
+a
+b
+...
+x
+
+convert this to:
+
+a
+b
+...
+z = x
+{z,return-env{}}
+
+the return-env will return the environment
+
+it will always desugar to this
+for non-repl execution, the return value is ignored
+
+when have modules, it should only do this on the 'top level' module
 
 > {-# LANGUAGE TupleSections #-}
 > {-# LANGUAGE LambdaCase #-}
@@ -7,8 +39,15 @@ Implementation of records
 > {-# LANGUAGE ScopedTypeVariables #-}
 > {-# LANGUAGE MultiWayIf #-}
 
-> module Records1 (tests
->               ) where
+> module Records1Repl (tests
+>                     ,Env
+>                     ,showEnv
+>                     ,evaluateFull
+>                     ,renderCheckResults
+>                     ,defaultEnv
+>                     ,torepr'
+>                     ,Value(..)
+>                     ) where
 
 > import Text.RawString.QQ
 
@@ -130,7 +169,29 @@ desugaring code
 
 > runDesugar :: [Stmt] -> Either String Expr
 > runDesugar stmts =
->     fst <$> runExcept (evalRWST (desugarStmts stmts) () startingDesugarState)
+>     fst <$> runExcept (evalRWST f () startingDesugarState)
+>   where
+>     f = do
+>         stmts' <- addReturnEnv stmts
+>         desugarStmts stmts'
+
+...
+x
+->
+z = x
+{z,return-env{}}
+
+> addReturnEnv :: [Stmt] -> Desugarer [Stmt]
+> addReturnEnv [] = pure [StExpr $ TupleSel [Iden "nothing", App (Iden "env-to-record") []]]
+> addReturnEnv [StExpr x] = do
+>     z <- makeUniqueVar "z"
+>     pure [LetDecl z x
+>          ,StExpr $ TupleSel [Iden z, App (Iden "env-to-record") []]]
+> addReturnEnv (x:xs) = do
+>     (x:) <$> addReturnEnv xs
+
+
+  
 
 > desugar :: Expr -> Desugarer Expr
 
@@ -257,7 +318,7 @@ no idea if this is good or not
 
 > desugarStmts [] = lift $ throwE $ "empty block"
 > desugarStmts [StExpr e] = desugar e
-> desugarStmts [LetDecl {}] = lift $ throwE $ "block ends with let"
+> desugarStmts [x@(LetDecl {})] = desugarStmts [x, StExpr $ Iden "nothing"]
 
 > desugarStmts (LetDecl n v : es) = do
 >     v' <- desugar v
@@ -425,14 +486,18 @@ holds the values of variables
 
 > type Interpreter = RWST Env () InterpreterState (Except String)
 
-> runInterp :: Env -> Expr -> Either String [CheckResult]
+> runInterp :: Env -> Expr -> Either String (Value, Env, [CheckResult])
 > runInterp env expr =
 >     fst <$> runExcept (evalRWST scriptWithTestStuff env emptyInterpreterState)
 >   where
 >     scriptWithTestStuff = do
->         _ <- interp expr
->         runAddedTests
-
+>         v <- interp expr
+>         t <- runAddedTests
+>         --envi <- ask
+>         case v of
+>              TupleV [v', VariantV "record" e] -> pure (v',env {envEnv = e}, t)
+>              _ -> lift $ throwE $ "expected 2 element tuple, second one record, got " ++ torepr' v
+  
 > interp :: Expr -> Interpreter Value
 > interp (Num n) = pure (NumV n)
 > interp (Text t) = pure (TextV t)
@@ -549,8 +614,16 @@ holds the values of variables
 >     ast <- parse s
 >     ast' <- runDesugar ast
 >     {-trace (pretty ast') $ -}
->     runInterp testEnv ast'
+>     (\(_,_,x) -> x) <$> runInterp defaultEnv ast'
 
+> evaluateFull :: Env -> String -> Either String (Value, Env, [CheckResult])
+> evaluateFull en s =  do
+>     ast <- parse s
+>     ast' <- runDesugar ast
+>     --trace (pretty ast') $
+>     runInterp en ast'
+
+  
 ------------------------------------------------------------------------------
 
 haskell side testing infrastructure
@@ -699,8 +772,8 @@ formatted string
 ffi catalog
 
 
-> testEnv :: Env
-> testEnv = either error id $ addForeignFuns' (
+> defaultEnv :: Env
+> defaultEnv = either error id $ addForeignFuns' (
 >    [("+", binaryOp unwrapNum unwrapNum wrapNum (+))
 >    ,("*", binaryOp unwrapNum unwrapNum wrapNum (*))
 >    ,("/", binaryOp unwrapNum unwrapNum wrapNum divideScientific)
@@ -720,13 +793,22 @@ ffi catalog
 >    ,("safe-variant-name", unaryOp anyIn pure (const $ NothingV))
 >    ,("make-variant", binaryOp unwrapText unwrapList id makeVariant)
 
+>    ,("env-to-record", nullaryOp id envToRecord)
+
+     
 >    ,("torepr", unaryOp anyIn pure torepr)
 >    ,("tostring", unaryOp anyIn pure tostring)
 >    ]
 >     ++ [])
 >    $ emptyEnv {envEnv = [("true", BoolV True)
 >                         ,("false", BoolV False)
+>                         ,("nothing", NothingV)
 >                         ,("empty", VariantV "empty" [])]}
+
+> envToRecord :: Interpreter Value
+> envToRecord = do
+>     rd <- ask
+>     pure $ VariantV "record" $ envEnv rd
 
 
 > torepr :: Value -> Value
@@ -743,6 +825,8 @@ ffi catalog
 > torepr' (BoxV {}) = "<Box>"
 > torepr' (TupleV fs) =
 >     "{" ++ intercalate ";" (map torepr' fs) ++ "}"
+> torepr' (VariantV "record" fs) =
+>     "{" ++ intercalate "," (map (\(a,b) -> a ++ " = " ++  torepr' b) fs) ++ "}"
 > torepr' (VariantV nm fs) =
 >     nm ++ "(" ++ intercalate "," (map (torepr' . snd) fs) ++ ")"
 > torepr' (ListV fs) =
@@ -807,6 +891,12 @@ env, ffi boilerplate
 >     {envEnv :: [(String,Value)]
 >     ,envForeignFuns :: [((String,[String]), [Value] -> Interpreter Value)]}
 
+> showEnv :: Env -> String
+> showEnv e = intercalate "\n" ({-map g (envForeignFuns e) ++ -} map f (envEnv e))
+>    where
+>      f (a,b) = a ++ " = " ++ torepr' b
+>      --g((n,ts),_) = n ++ "(" ++ intercalate "," ts ++ ")"       
+  
 > emptyEnv :: Env
 > emptyEnv = Env
 >     {envEnv = []
@@ -897,7 +987,15 @@ env, ffi boilerplate
 >                           x@(ForeignFunV {}) -> pure x
 >                           x -> lift $ throwE $ "type: expected function, got " ++ show x)
 
-  
+> nullaryOp :: (a -> Interpreter Value)
+>           -> a
+>           -> ([String], ([Value] -> Interpreter Value))
+> nullaryOp wrap f =
+>     ([] ,\as ->
+>             case as of
+>                 [] -> wrap f
+>                 _ -> lift $ throwE $ "wrong number of args to function, expected 0, got " ++ show (length as))
+
   
 > unaryOp :: (String, Value -> Interpreter a)
 >         -> (b -> Interpreter Value)
