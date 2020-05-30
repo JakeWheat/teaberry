@@ -49,7 +49,7 @@ a.rest
 >
 > import Data.Char (isAlphaNum)
 
-> import Data.Scientific (Scientific, floatingOrInteger)
+> import Scientific (Scientific, extractInt)
 > import Data.List (intercalate, partition)
 >
 > import Debug.Trace (trace)
@@ -601,10 +601,6 @@ in link, it's parametric polymorphism, these are two completely different things
 > torepr' NothingV = "nothing"
 
 
-> extractInt :: Scientific -> Maybe Int
-> extractInt n = case floatingOrInteger n of
->                          (Right x :: Either Float Integer) -> Just $ fromIntegral x
->                          Left _ -> Nothing
 
 > safeVariantName :: Value -> Value
 > safeVariantName (VariantV x _) = TextV x

@@ -30,7 +30,7 @@ Implementation of records
 >
 > import Data.Char (isAlphaNum)
 
-> import Data.Scientific (Scientific, floatingOrInteger)
+> import Scientific (Scientific, extractInt, divideScientific)
 > import Data.List (intercalate, partition, sortBy)
 > import Data.Ord (comparing)
 >
@@ -703,6 +703,8 @@ ffi catalog
 > testEnv = either error id $ addForeignFuns' (
 >    [("+", binaryOp unwrapNum unwrapNum wrapNum (+))
 >    ,("*", binaryOp unwrapNum unwrapNum wrapNum (*))
+>    ,("/", binaryOp unwrapNum unwrapNum wrapNum divideScientific)
+>    ,("-", binaryOp unwrapNum unwrapNum wrapNum (-))
 >    ,("+", binaryOp unwrapText unwrapText wrapText (++))
 >    ,("==", binaryOp anyIn anyIn wrapBool (==))
 
@@ -753,13 +755,6 @@ ffi catalog
 > tostring :: Value -> Value
 > tostring x@(TextV {}) = x
 > tostring x = torepr x
-
-
-
-> extractInt :: Scientific -> Maybe Int
-> extractInt n = case floatingOrInteger n of
->                          (Right x :: Either Float Integer) -> Just $ fromIntegral x
->                          Left _ -> Nothing
 
 > safeVariantName :: Value -> Value
 > safeVariantName (VariantV x _) = TextV x

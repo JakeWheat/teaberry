@@ -19,7 +19,7 @@ boolean literals are constants in the default env
 > import Control.Monad.Trans.Class (lift)
 > import Control.Monad.Trans.Except (Except, runExcept, throwE)
 > import Control.Monad.Trans.Reader (ReaderT, runReaderT, ask, local)
-> import Data.Scientific (Scientific)
+> import Scientific (Scientific)
 > import Data.List (intercalate)
 
 ------------------------------------------------------------------------------

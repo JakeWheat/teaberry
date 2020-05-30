@@ -45,7 +45,7 @@ that should be it?
 >
 > import Data.Char (isAlphaNum)
 
-> import Data.Scientific (Scientific, floatingOrInteger)
+> import Scientific (Scientific, extractInt)
 > import Data.List (intercalate, partition)
 >
 > import Debug.Trace (trace)
@@ -574,11 +574,6 @@ ffi catalog
  
 > torepr' NothingV = "nothing"
 
-
-> extractInt :: Scientific -> Maybe Int
-> extractInt n = case floatingOrInteger n of
->                          (Right x :: Either Float Integer) -> Just $ fromIntegral x
->                          Left _ -> Nothing
 
 > safeVariantName :: Value -> Value
 > safeVariantName (VariantV x _) = TextV x

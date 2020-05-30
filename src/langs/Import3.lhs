@@ -2,13 +2,9 @@
 
 demonstrate importing data types and pattern matching on them
 
-TODO:
-
-add qualifed names to cases
-fix up the conv
-see if it all works with the hack to just strip the prefix on pattern
-names
-
+the implementation is: it ignores the prefixes on variant names in
+case expressions. This works fine when you write correct code, but
+the error handling is poor.
 
 
 > {-# LANGUAGE TupleSections #-}
@@ -40,7 +36,7 @@ names
 >
 > import Data.Char (isAlphaNum)
 
-> import Data.Scientific (Scientific, floatingOrInteger)
+> import Scientific (Scientific, extractInt)
 > import Data.List (intercalate, partition, sortBy)
 > import Data.Ord (comparing)
 >
@@ -826,10 +822,6 @@ ffi catalog
 
 
 
-> extractInt :: Scientific -> Maybe Int
-> extractInt n = case floatingOrInteger n of
->                          (Right x :: Either Float Integer) -> Just $ fromIntegral x
->                          Left _ -> Nothing
 
 > safeVariantName :: Value -> Value
 > safeVariantName (VariantV x _) = TextV $ dropQualifiers x
@@ -1793,7 +1785,7 @@ end
 
       
 > tests :: T.TestTree
-> tests = T.testGroup "imports3" [{-tests1,-}tests2]
+> tests = T.testGroup "imports3" [tests1,tests2]
       
 > tests1 :: T.TestTree
 > tests1 =

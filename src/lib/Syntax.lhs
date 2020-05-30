@@ -20,7 +20,7 @@ The high level syntax which the parser produces
 >               ) where
 
 > import Data.Data (Data,Typeable)
-> import Data.Scientific (Scientific,floatingOrInteger)
+> import Scientific (Scientific,extractInt)
 > import GHC.Generics (Generic)
 
 > data Program = Program [PreludeItem]
@@ -113,12 +113,6 @@ import * from <import-source>
 >               | Record [(String,Expr)]
 >               | NothingS
 >               deriving (Eq,Show,Data,Typeable,Generic) 
-
-> extractInt :: Scientific -> Maybe Int
-> extractInt n = case floatingOrInteger n of
->                          (Right x :: Either Float Integer) -> Just $ fromIntegral x
->                          Left _ -> Nothing
-
 
 > data VariantDecl = VariantDecl String [(Ref,String)]
 >                  deriving (Eq,Show,Data,Typeable,Generic) 

@@ -13,7 +13,7 @@ monads/do notation.
 >                   ,TestTree
 >                   ,makeSimpleTests)
 
-> import Data.Scientific (Scientific)
+> import Scientific (Scientific)
 
 ------------------------------------------------------------------------------
 

@@ -19,7 +19,7 @@ let is implemented as lambda
 > import Control.Monad.Trans.Except (Except, runExcept, throwE)
 > import Control.Monad.Trans.Reader (ReaderT, runReaderT, ask, local)
 
-> import Data.Scientific (Scientific)
+> import Scientific (Scientific)
 
 
 ------------------------------------------------------------------------------

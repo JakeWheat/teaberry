@@ -26,7 +26,7 @@ except purely what is needed for the testing implementation
 
 > import Data.Char (isAlphaNum)
 
-> import Data.Scientific (Scientific, floatingOrInteger)
+> import Scientific (Scientific, extractInt)
 > import Data.List (intercalate)
 
 ------------------------------------------------------------------------------
@@ -255,10 +255,6 @@ ffi catalog
 > torepr' NothingV = "nothing"
 
 
-> extractInt :: Scientific -> Maybe Int
-> extractInt n = case floatingOrInteger n of
->                          (Right x :: Either Float Integer) -> Just $ fromIntegral x
->                          Left _ -> Nothing
 
 ------------------------------------------------------------------------------
 

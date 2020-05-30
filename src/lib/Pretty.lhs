@@ -24,9 +24,8 @@
 >               ,PreludeItem(..)
 >               ,ProvideItem(..)
 >               ,ImportSource(..)
->               ,Ref(..)
->               ,extractInt)
->  
+>               ,Ref(..))
+> import Scientific (showScientific)
 
 > prettyExpr :: Expr -> String
 > prettyExpr = render . expr
@@ -39,9 +38,7 @@
 
 
 > expr :: Expr -> Doc
-> expr (Sel (Num n)) = text $ case extractInt n of
->                              Just x -> show x
->                              Nothing ->  show n
+> expr (Sel (Num n)) = text $ showScientific n
 > expr (Sel (Str s)) = doubleQuotes (text s)
 > expr (Sel (Tuple es)) = text "{" <> nest 2 (xSep ";" (map expr es) <> text "}")
 > expr (Sel (Record flds)) = text "{" <> nest 2 (commaSep (map fld flds) <> text "}")

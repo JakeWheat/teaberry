@@ -37,7 +37,7 @@ using a hack sort of ffi for haskell.
 > import Control.Monad.Trans.RWS (RWST, runRWST, ask, get, {-put,-} local, {-tell,-} state)
 > import Data.Maybe (isNothing)
 > import Data.List (partition, intercalate, sortOn)
-> import Data.Scientific (Scientific)
+> import Scientific (Scientific)
 > import Text.Show.Pretty (ppShow)
 
 > import qualified InterpreterSyntax as I

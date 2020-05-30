@@ -3,7 +3,7 @@ The syntax which the interpreter uses
 
 > module InterpreterSyntax where
 
-> import Data.Scientific (Scientific)
+> import Scientific (Scientific)
 
 > data Program = Program Expr
 >               deriving (Eq,Show)

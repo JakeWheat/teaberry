@@ -47,6 +47,7 @@ library
                        Pretty
                        PrettyInterpreter
                        Engine
+                       Scientific
                        Paths_teaberry
   autogen-modules:     Paths_teaberry
   hs-source-dirs:      src/lib
