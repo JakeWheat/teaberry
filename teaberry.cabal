@@ -108,6 +108,7 @@ common langs
                        Ref1
                        Records1
                        Records1Repl
+                       Records1Embedded
                        Import1
                        Import2
                        Import3
@@ -124,6 +125,14 @@ Test-Suite Langs
 executable teaberryrepl
   import:              langs
   main-is:             Repl.lhs
+  build-depends:       teaberry,
+                       haskeline
+  ghc-options:         -threaded
+  hs-source-dirs:      src/langs
+
+executable teaberry2
+  import:              langs
+  main-is:             Teaberry2.lhs
   build-depends:       teaberry,
                        haskeline
   ghc-options:         -threaded

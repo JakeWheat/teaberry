@@ -1,25 +1,29 @@
 
+
 Simple repl front end using haskeline
 
 > import Control.Monad.Trans
 > import System.Console.Haskeline
 >
-> import Records1Repl (ReplImplHandle
->                     ,startReplImpl
->                     ,evaluateLine)
+> import Records1Embedded (TeaberryHandle
+>                         ,newTeaberryHandle
+>                         ,runScript
+>                         ,valueToString
+>                         )
 
 > type Repl a = InputT IO a
 
-> process :: ReplImplHandle -> String -> IO ()
+> process :: TeaberryHandle -> String -> IO ()
 > process h src = do
->     x <- evaluateLine h src
+>     x <- runScript h src
 >     case x of
 >         Left y -> putStrLn $ "error: " ++ y
->         Right Nothing -> pure ()
->         Right (Just s) -> putStrLn s
+>         Right v -> case valueToString v of
+>             Nothing -> pure ()
+>             Just s -> putStrLn s
 
 
-> repl :: ReplImplHandle -> Repl ()
+> repl :: TeaberryHandle -> Repl ()
 > repl h = go
 >   where
 >     go = do
@@ -32,7 +36,7 @@ Simple repl front end using haskeline
 
 > main :: IO ()
 > main = do
->     h <- startReplImpl
+>     h <- newTeaberryHandle
 >     runInputT st (repl h)
 >   where
 >     st = defaultSettings {historyFile = (Just ".teaberryreplhistory")}
