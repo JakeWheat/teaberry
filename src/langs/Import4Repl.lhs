@@ -32,7 +32,7 @@ Simplest import with file loader extended to support a repl
 > import Control.Exception.Safe (Exception, throwM, catch)
 
 > import Control.Monad (when)
-> import Data.Maybe (isJust, catMaybes, isNothing)
+> import Data.Maybe (isJust, catMaybes)
 >
 > import Data.Char (isAlphaNum)
 
@@ -291,15 +291,15 @@ desugaring code
 >   where
 >     go = do
 >          (mns,srcs') <- desugarEm [] [] srcs
->          (_,ast') <- desugarModule mns Nothing ast
->          let y = (combineEm $ reverse srcs') ast'
+>          ast' <- desugarTopLevelModule mns ast
+>          let y = (combineEm srcs') ast'
 >          pure y
->     desugarEm mns desugaredModules [] = pure (mns,desugaredModules)
+>     desugarEm mns desugaredModules [] = pure (mns, reverse desugaredModules)
 >     -- should learn how to use folds better
 >     -- would make the code more regular and
 >     -- quicker to understand/review?
 >     desugarEm mns desugaredModules ((n,m):ms) = do
->         (unm, dsm) <- desugarModule mns (Just n) m
+>         (unm, dsm) <- desugarImportedModule mns n m
 >         desugarEm ((n ,unm) : mns) ((unm,dsm):desugaredModules) ms
 >     combineEm [] = id
 >     combineEm ((n,e):es) = Let [(n,e)] <$> combineEm es
@@ -313,19 +313,27 @@ whether this is the top level module:
   it returns the last value and the env (for repl/embedded)
 or if if it's an imported module
   it returns the env only
+
+> desugarImportedModule :: [(String,String)] -> String -> Module -> Desugarer (String,Expr)
+> desugarImportedModule mns moduleName ast = do
+>     stmts <- desugarModule False mns ast
+>     umn <- makeUniqueVar moduleName
+>     pure (umn, stmts)
+
+> desugarTopLevelModule :: [(String,String)] -> Module -> Desugarer Expr
+> desugarTopLevelModule mns ast = do
+>     desugarModule True mns ast
   
-> desugarModule :: [(String,String)] -> Maybe String -> Module -> Desugarer (String,Expr)
-> desugarModule otherModuleNames moduleName (Module ps stmts) = do
+> desugarModule :: Bool -> [(String,String)] -> Module -> Desugarer Expr
+> desugarModule isTopLevel otherModuleNames (Module ps stmts) = do
 >     ps' <- concat <$> mapM (desugarPreludeStmt otherModuleNames) ps
 >     -- add the final value for repl/embedded and imported module support
->     stmts' <- if isNothing moduleName
+>     stmts' <- if isTopLevel
 >               then addTopRet stmts
 >               else -- non top level module, return the env
 >                    -- this will become the provides call
 >                    pure $ stmts ++ [StExpr $ App (Iden "env-to-record") []]
->     stmts'' <- desugarStmts (ps' ++ stmts')
->     umn <- maybe (pure "") makeUniqueVar moduleName
->     pure (umn, stmts'')
+>     desugarStmts (ps' ++ stmts')
 >   where
 >     mk x = StExpr $ TupleSel [x, App (Iden "env-to-record") []]
 >     addTopRet [] = pure [mk $ Iden "nothing"]
