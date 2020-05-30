@@ -104,6 +104,29 @@ add this to the module name lookup
 > import Data.Ord (comparing)
 >
 > import Debug.Trace (trace)
+
+> import Text.Megaparsec (Parsec
+>                        ,errorBundlePretty
+>                        --,many
+>                        ,eof
+>                        ,takeWhileP
+>                        ,takeWhile1P
+>                        ,choice
+>                        --,notFollowedBy
+>                        ,try
+>                        ,anySingle
+>                        ,(<|>)
+>                        ,manyTill
+>                        )
+> import qualified Text.Megaparsec as Q (parse)
+
+> import Data.Void (Void)
+> import Text.Megaparsec.Char (space
+>                             --,char
+>                             ,string
+>                             )
+> import Control.Monad (void)
+
   
 ------------------------------------------------------------------------------
 
@@ -312,21 +335,6 @@ no idea if this is good or not
 
 > desugar (SetBox i@(Iden {}) v) = SetBox i <$> desugar v
 > desugar (SetBox b v) = SetBox <$> desugar b <*> desugar v
-
-
-  cases(List) l:
--> assert typeof l is List
-  l-unique = l (to evaluate once)
-  will need to be able to find the type from the variant name in the runtime
-    | empty => true
-    -> if variant-name == empty:
-         true
-    | link(f, r) => 1 + length(r)
-    ->
-      if variantname == link
-        f = l.{0}
-        r = l.{1}
-        1 + length(r)
 
 > desugar (Cases _ty t bs els) = do
 >     tv <- makeUniqueVar "casest"
@@ -1567,21 +1575,21 @@ end
 >    |])]
 
 
-> importsTestScript :: [(String,String)]
-> importsTestScript =
->    [("my-module",[r|
+ 
+> importsTestScript :: String
+> importsTestScript = [r|
 \begin{code} 
 
+xmodule: my-module
+  
 a = 1
 b = lam(x): x + 1 end
 check:
   a is 1
   b(1) is 2
 end
-\end{code}
->    |])
->    ,("main1",[r|
-\begin{code} 
+
+xmodule: main1
 
 import my-module as my-module
 
@@ -1590,10 +1598,7 @@ check:
   my-module.b(2) is 3
 end
 
-\end{code}
->    |])
->    ,("main1.5",[r|
-\begin{code} 
+xmodule: main1-5
 
 import my-module as my-module1
 
@@ -1602,10 +1607,7 @@ check:
   my-module1.b(2) is 3
 end
 
-\end{code}
->    |])
->    ,("main2",[r|
-\begin{code} 
+xmodule: main2
 
 import my-module as my-module
 include from my-module: a as a, b as b end
@@ -1614,10 +1616,9 @@ check:
   a is 1
   b(3) is 4
 end
-\end{code}
->    |])
->    ,("main3",[r|
-\begin{code} 
+
+
+xmodule: main3
 
 import my-module as my-2
 check:
@@ -1625,10 +1626,7 @@ check:
   my-2.b(5) is 6
 end
 
-\end{code}
->    |])
->    ,("my-2",[r|
-\begin{code} 
+xmodule: my-2
 
 a = 2
 b = lam(x): x + 2 end
@@ -1636,10 +1634,8 @@ check:
   a is 2
   b(1) is 3
 end
-\end{code}
->    |])
->    ,("main3",[r|
-\begin{code} 
+
+xmodule: main3
 
 import my-2 as my-module
 import my-module as my-2
@@ -1655,7 +1651,7 @@ check:
 end
 
 \end{code}
->    |])]
+>  |]
 
       
 > tests :: T.TestTree
@@ -1675,8 +1671,10 @@ end
 
 
 > tests2 :: T.TestTree
-> tests2 =
->     let crs = either error id $ evaluateWithChecks importsTestScript
+> tests2 = --trace (either show (intercalate "\n" . map show) $ parseModules importsTestScript2) $
+>     let ts = either error id $ parseModules importsTestScript
+>         crs = --trace (intercalate "\n" $ map show ts) $ 
+>               either error id $ evaluateWithChecks ts
 >         f (CheckResult nm res) =
 >             T.testGroup nm $ map g res
 >         g (nm, fm) = T.testCase nm $
@@ -1685,3 +1683,44 @@ end
 >                 Just fmx -> T.assertFailure fmx
 >     in trace (renderCheckResults crs)
 >        $ T.testGroup "imports1b" $ map f crs
+
+
+---------------
+
+quick hack to simulate a bunch of separate files to be able to test the module system
+
+the motivation is to put a bunch of files in one string in order to cut
+down on boilerplate in the testing, and make the tests more readable
+  
+> parseModules :: String -> Either String [(String,String)]
+> parseModules src = either (Left . errorBundlePretty) Right $
+>                    Q.parse (whiteSpace *> pModules) "" src
+
+> type Parser = Parsec Void String
+  
+> pModules :: Parser [(String,String)]
+> pModules = do
+>     _ <- string "xmodule:" <* whiteSpace
+>     pbody
+>   where
+>     pbody :: Parser [(String,String)]        
+>     pbody = do
+>       moduleName <- takeWhile1P Nothing (\a -> (isAlphaNum a || a `elem` "?-+_"))
+>       body <- manyTill anySingle (void (try (string "xmodule:") <* whiteSpace) <|> eof)
+>       ((moduleName, body):) <$> choice [pbody <|> ([] <$ eof)]
+
+> whiteSpace :: Parser ()
+> whiteSpace = space *> choice [blockComment *> whiteSpace
+>                              ,lineComment *> whiteSpace
+>                              ,pure ()]
+
+
+> lineComment :: Parser ()
+> lineComment = () <$ try (string "#") <* takeWhileP Nothing (/='\n')
+
+> blockComment :: Parser ()
+> blockComment = startComment *> ctu
+>   where
+>     startComment = void (try (string "#|"))
+>     endComment = void $ try (string "|#")
+>     ctu = endComment <|> ((blockComment <|> void anySingle) *> ctu)
