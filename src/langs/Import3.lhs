@@ -1603,6 +1603,8 @@ end
 
 xmodule: main1
 
+# regular data type + cases
+
 data Point:
   | pt(x, y)
 end
@@ -1618,6 +1620,8 @@ check:
 end
 
 xmodule: main2
+
+# include data type + cases demo
 
 import main1 as main1
 include from main1: pt as pt, f as f, a as a end
@@ -1644,6 +1648,8 @@ end
 
 xmodule: main3
 
+# import data type + cases use under qualifier demo
+
 import main1 as main1
 
 check:
@@ -1665,14 +1671,118 @@ check:
   g(b) is 3
 end
 
-# todo:
 
-# shadow the remote data type
+xmodule: main3
+
+# shadow imported data type with local data type with same name and
+# same variant names, use both
+
+import main1 as main1
+
+data Point:
+  | pt(x, y)
+end
+
+f = lam(x): cases(Point) x:
+      | pt(x,y) => x + 2
+    end end
+
+a = pt(1,2)
+
+b = main1.pt(3,4)
+
+g = lam(x): cases(main1.Point) x:
+      | main1.pt(x,y) => x + 1
+    end end
+
+
+check:
+  main1.f(main1.a) is 1
+  f(a) is 3
+  g(b) is 4
+end
+
+xmodule: main3
 
 # import data type under different alias
+
+import main1 as xxx
+
+check:
+  xxx.f(xxx.a) is 1
+end
+
+b = xxx.pt(2,3)
+
+check:
+  xxx.f(b) is 2
+end
+
+g = lam(x): cases(xxx.Point) x:
+      | xxx.pt(x,y) => x + 1
+    end end
+ 
+check:
+  g(xxx.a) is 2
+  g(b) is 3
+end
 
 # import data type under different alias
 # import another data type under previous one's module name
+
+xmodule: main1alt
+
+data Point:
+  | pt(x, y)
+end
+
+f = lam(x): cases(Point) x:
+      | pt(x,y) => x + 5
+    end end
+
+a = pt(3,4)
+
+check:
+  f(a) is 8
+end
+
+xmodule: xmain4
+
+import main1 as main1alt
+import main1alt as main1
+
+data Point:
+  | pt(x, y)
+end
+
+f = lam(x): cases(Point) x:
+      | pt(x,y) => x + 2
+    end end
+
+a = pt(1,2)
+
+b = main1.pt(3,4)
+
+g = lam(x): cases(main1.Point) x:
+      | main1.pt(x,y) => x + 1
+    end end
+
+c = main1alt.pt(5,6)
+
+h = lam(x): cases(main1alt.Point) x:
+      | main1alt.pt(x,y) => x + 7
+    end end
+
+
+
+check:
+  main1alt.f(main1alt.a) is 1
+  main1.f(main1.a) is 8
+  f(a) is 3
+  g(b) is 4
+  h(c) is 12
+end
+
 
 
 
