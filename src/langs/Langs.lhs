@@ -23,8 +23,9 @@
 > import qualified CasesPlusVar
 > import qualified Ref1
 > import qualified Records1
-> import qualified Import1-}
-> import qualified Import2
+> import qualified Import1
+> import qualified Import2-}
+> import qualified Import3
 
 > import qualified Test.Tasty as T
 
@@ -55,5 +56,6 @@
 >        ,Ref1.tests
 >        ,Records1.tests
 >        ,Import1.tests
->        ,-}Import2.tests
+>        ,Import2.tests
+>        ,-}Import3.tests
 >        ]

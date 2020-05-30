@@ -109,5 +109,6 @@ Test-Suite Langs
                        Records1
                        Import1
                        Import2
+                       Import3
   main-is:             Langs.lhs
 

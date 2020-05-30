@@ -1,53 +1,14 @@
 
-Implementation of import demo 1:
 
-implement a demo of how simple importing without good error handling
-would look if manually desugared
+demonstrate importing data types and pattern matching on them
 
-everything is dynamic, to avoid tracking types or variant names or
-anything like that in the desugarer, and it also avoids doing any
-renaming in the desugarer. this is an exercise, to avoid creating
-some unholy mixture of stuff tracked in the desugar monad, and stuff
-done dynamically at runtime
+TODO:
 
-a module roughly desugars like this:
+add qualifed names to cases
+fix up the conv
+see if it all works with the hack to just strip the prefix on pattern
+names
 
-module my-module:
-
-a =
-b =
-...
-
-->
-
-my-module = block:
-    a =
-    b =
-    ...
-    {a:a, b:b, ...}
-end
-
-so now you can access my-module.a using exactly my-module.a
-
-then for imports:
-
-import my-module as B
-converted to:
-
-B = my-module
-
-nice and simple
-
-datadecls desugar the same - they just create lets
-
-safe-variant-name is adjusted to simply drop the prefix
-  | x.pt(x,b) => ...
-effectively desugared to
-  | pt(x,b) => ...
-
-this will work in all correct code, only if the code is incorrect, it
-will behave badly. this will be fixed with some simple helper
-functions in a later step
 
 
 > {-# LANGUAGE TupleSections #-}
@@ -56,7 +17,7 @@ functions in a later step
 > {-# LANGUAGE ScopedTypeVariables #-}
 > {-# LANGUAGE MultiWayIf #-}
 
-> module Import1 (tests
+> module Import3 (tests
 >                ) where
 
 > import Text.RawString.QQ
@@ -74,7 +35,7 @@ functions in a later step
 > import Control.Monad.Trans.Except (Except, runExcept, throwE)
 > import Control.Monad.Trans.RWS (RWST, evalRWST, ask, local, get, gets, state, put, modify)
 
-> import Control.Monad (when)
+> import Control.Monad (when, forM)
 > import Data.Maybe (isJust, isNothing)
 >
 > import Data.Char (isAlphaNum)
@@ -85,10 +46,44 @@ functions in a later step
 >
 > import Debug.Trace (trace)
 
+> import Text.Megaparsec (Parsec
+>                        ,errorBundlePretty
+>                        --,many
+>                        ,eof
+>                        ,takeWhileP
+>                        ,takeWhile1P
+>                        ,choice
+>                        --,notFollowedBy
+>                        ,try
+>                        ,anySingle
+>                        ,(<|>)
+>                        ,manyTill
+>                        )
+> import qualified Text.Megaparsec as Q (parse)
+
+> import Data.Void (Void)
+> import Text.Megaparsec.Char (space
+>                             --,char
+>                             ,string
+>                             )
+> import Control.Monad (void)
+
+  
 ------------------------------------------------------------------------------
 
 syntax
 ------
+
+  
+> data Module = Module [PreludeStmt] [Stmt]
+>             deriving (Eq, Show)
+
+> data PreludeStmt = Import String String
+>                  | Include String [(String, String)]
+>                  deriving (Eq, Show)
+
+import a as b
+include from X: a as a, b as b end
 
 > data Stmt = StExpr Expr
 >           | LetDecl String Expr
@@ -177,14 +172,45 @@ testing support in the desugarer monad
 
 desugaring code
 
-> runDesugar :: [Stmt] -> Either String Expr
-> runDesugar stmts =
->     fst <$> runExcept (evalRWST (desugarStmts stmts) () startingDesugarState)
+> runDesugar :: [(String,Module)] -> Either String Expr
+> runDesugar srcs = fst <$> runExcept (evalRWST (f [] [] srcs) () startingDesugarState)
+>   where
+>     f _ desugaredModules [] = g $ reverse desugaredModules
+>     -- should really learn how to use folds better
+>     -- I think it would make the code more regular and
+>     -- quicker to understand/review
+>     f mns desugaredModules ((n,m):ms) = do
+>         (mns', dsm) <- desugarModule mns n m
+>         f (mns' ++ mns) (dsm:desugaredModules) ms
+>     g :: [(String,Expr)] -> Desugarer Expr          
+>     g [] = lift $ throwE $ "empty list of modules"
+>     g [(_,e)] = pure e
+>     g ((n,e):es) = Let [(n,e)] <$> g es
+
+> desugarModule :: [(String,String)] -> String -> Module -> Desugarer ([(String,String)], (String,Expr))
+> desugarModule otherModuleNames moduleName (Module ps xs) = do
+>     uniqueModuleName <- makeUniqueVar moduleName
+>     ps' <- concat <$> mapM (desugarPreludeStmt otherModuleNames) ps
+>     -- make a block with the last statement converting the env into a record
+>     -- I can't believe this cheapo trick works
+>     xs' <- desugar (Block (ps' ++ xs ++ [StExpr $ App (Iden "env-to-record") []]))
+>     pure ([(moduleName,uniqueModuleName)], (uniqueModuleName, xs'))
+
+> desugarPreludeStmt :: [(String,String)] -> PreludeStmt -> Desugarer [Stmt]
+> desugarPreludeStmt mp (Import a b) = do
+>     srcName <- maybe (lift $ throwE $ "module not found in module name list: " ++ a ++ "\n" ++ show mp)
+>                pure $ lookup a mp
+>     pure [LetDecl b (Iden srcName)]
+
+> desugarPreludeStmt mp (Include nm is) = do
+>     srcName <- maybe (lift $ throwE $ "module not found in module name list: " ++ nm ++ "\n" ++ show mp)
+>                pure $ lookup nm mp
+>     pure $ flip map is $ \(n1,n2) -> LetDecl n2 (DotExpr (Iden srcName) n1)
+
 
 > desugar :: Expr -> Desugarer Expr
 
 > desugar (Block sts) = desugarStmts sts
-
 > desugar (Num i) = pure $ Num i
 > desugar (Text i) = pure $ Text i
 > desugar (TupleSel fs) = TupleSel <$> mapM desugar fs
@@ -251,28 +277,13 @@ no idea if this is good or not
 > desugar (SetBox i@(Iden {}) v) = SetBox i <$> desugar v
 > desugar (SetBox b v) = SetBox <$> desugar b <*> desugar v
 
-
-  cases(List) l:
--> assert typeof l is List
-  l-unique = l (to evaluate once)
-  will need to be able to find the type from the variant name in the runtime
-    | empty => true
-    -> if variant-name == empty:
-         true
-    | link(f, r) => 1 + length(r)
-    ->
-      if variantname == link
-        f = l.{0}
-        r = l.{1}
-        1 + length(r)
-
 > desugar (Cases _ty t bs els) = do
 >     tv <- makeUniqueVar "casest"
 >     bs' <- mapM (f tv) bs
 >     desugar $ Let [(tv, t)] $ If bs' els
 >   where
 >     f tv (vnm, fnms, e) =
->         let tst = appI "safe-variant-name" [Iden tv] `equals` Text vnm
+>         let tst = appI "safe-variant-name" [Iden tv] `equals` Text (dropQualifiers vnm)
 >             thn = zipWith (\fnm n -> LetDecl fnm (appI "variant-field-get-ord" [Num $ fromIntegral n, Iden tv]))
 >                           fnms [(0::Int)..]
 >         in pure (tst, Block (thn ++ [StExpr e]))
@@ -314,7 +325,7 @@ no idea if this is good or not
 
 > desugarStmts (VarDecl n v : es) = do
 >     v' <- Box <$> desugar v
->     Let [(n,v')] <$> desugarStmts es
+>     desugarStmts (LetDecl n v' : es)
 
 
 > desugarStmts (StExpr e : es) =
@@ -595,11 +606,11 @@ holds the values of variables
 
   
 
-> evaluateWithChecks :: String -> Either String [CheckResult]
+> evaluateWithChecks :: [(String,String)] -> Either String [CheckResult]
 > evaluateWithChecks s =  do
->     ast <- parse s
+>     ast <- forM s $ \(n,src) -> (n,) <$> parse src
 >     ast' <- runDesugar ast
->     {-trace (pretty ast') $ -}
+>     {-trace (pretty ast') $-}
 >     runInterp testEnv ast'
 
 ------------------------------------------------------------------------------
@@ -757,10 +768,8 @@ ffi catalog
 >    ,("+", binaryOp unwrapText unwrapText wrapText (++))
 >    ,("==", binaryOp anyIn anyIn wrapBool (==))
 
->    ,("add-tests", unaryOp functionIn id addTests)
->    ,("log-check-block", binaryOp unwrapNum unwrapText id logCheckBlock)
->    ,("log-test-pass", binaryOp unwrapNum unwrapText id logTestPass)
->    ,("log-test-fail", ternaryOp unwrapNum unwrapText unwrapText id logTestFail)
+>    ,("torepr", unaryOp anyIn pure torepr)
+>    ,("tostring", unaryOp anyIn pure tostring)
 
 >    ,("variant-field-get", binaryOp unwrapText variantIn id variantFieldGet)
 >    ,("variant-field-get-ord", binaryOp unwrapNum variantIn id variantFieldGetOrd)
@@ -768,9 +777,14 @@ ffi catalog
 >    -- hack to make it work for any data type     
 >    ,("safe-variant-name", unaryOp anyIn pure (const $ NothingV))
 >    ,("make-variant", binaryOp unwrapText unwrapList id makeVariant)
+>    ,("env-to-record", nullaryOp id envToRecord)
 
->    ,("torepr", unaryOp anyIn pure torepr)
->    ,("tostring", unaryOp anyIn pure tostring)
+
+>    ,("add-tests", unaryOp functionIn id addTests)
+>    ,("log-check-block", binaryOp unwrapNum unwrapText id logCheckBlock)
+>    ,("log-test-pass", binaryOp unwrapNum unwrapText id logTestPass)
+>    ,("log-test-fail", ternaryOp unwrapNum unwrapText unwrapText id logTestFail)
+
 >    ]
 >     ++ [])
 >    $ emptyEnv {envEnv = [("true", BoolV True)
@@ -778,6 +792,10 @@ ffi catalog
 >                         ,("nothing", NothingV)
 >                         ,("empty", VariantV "empty" [])]}
 
+> envToRecord :: Interpreter Value
+> envToRecord = do
+>     rd <- ask
+>     pure $ VariantV "record" $ envEnv rd
 
 > torepr :: Value -> Value
 > torepr x = TextV $ torepr' x
@@ -814,8 +832,11 @@ ffi catalog
 >                          Left _ -> Nothing
 
 > safeVariantName :: Value -> Value
-> safeVariantName (VariantV x _) = TextV x
+> safeVariantName (VariantV x _) = TextV $ dropQualifiers x
 > safeVariantName _ = NothingV
+
+> dropQualifiers :: String -> String
+> dropQualifiers = reverse . takeWhile (/='.') . reverse
 
 > variantFieldGet :: String -> Value -> Interpreter Value
 > variantFieldGet fieldNm v@(VariantV _ fs) =
@@ -962,12 +983,21 @@ env, ffi boilerplate
 >         -> ([String], ([Value] -> Interpreter Value))
 > unaryOp unwrap0 wrap f =
 >     ([fst unwrap0]
->     ,\as -> do
->             case as of
+>     ,\as -> case as of
 >                 [a] -> do
 >                     ax <- (snd unwrap0) a
 >                     wrap (f ax)
 >                 _ -> lift $ throwE $ "wrong number of args to function, expected 1, got " ++ show (length as))
+
+> nullaryOp :: (a -> Interpreter Value)
+>           -> a
+>           -> ([String], ([Value] -> Interpreter Value))
+> nullaryOp wrap f =
+>     ([] ,\as ->
+>             case as of
+>                 [] -> wrap f
+>                 _ -> lift $ throwE $ "wrong number of args to function, expected 0, got " ++ show (length as))
+
 
 
 
@@ -978,8 +1008,7 @@ env, ffi boilerplate
 >          -> ([String], ([Value] -> Interpreter Value))
 > binaryOp unwrap0 unwrap1 wrap f =
 >     ([fst unwrap0, fst unwrap1]
->     ,\as -> do
->             case as of
+>     ,\as -> case as of
 >                 [a,b] -> do
 >                     ax <- (snd unwrap0) a
 >                     bx <- (snd unwrap1) b
@@ -1017,13 +1046,26 @@ produce. It's slightly ambiguous because this entire 'parser' is more
 like a desugaring process.
 
 
-> parse :: String -> Either String [Stmt]
+> parse :: String -> Either String Module
 > parse src =
 >     case P.parseProgram "" src of
->       Right (S.Program [] sts) -> convStmts sts
->       Right (S.Program x _) -> Left $ "parse: prelude not supported " ++ show x
+>       Right (S.Program ps sts) -> Module <$> mapM convPrelude ps <*> convStmts sts
 >       Left e -> Left e
 
+> convPrelude :: S.PreludeItem -> Either String PreludeStmt
+
+> convPrelude (S.Import (S.ImportName x) y) = pure $ Import x y
+
+> convPrelude (S.IncludeFrom x as) | Just as' <- mapM f as =
+>     pure $ Include x as'
+>   where
+>     f (S.ProvideAlias a b) = Just (a,b)
+>     f _ = Nothing          
+  
+> convPrelude x = Left $ "unsupported prelude statement " ++ show x
+
+
+  
 > convStmts :: [S.Stmt] -> Either String [Stmt]
 > convStmts = mapM convSt
 
@@ -1072,10 +1114,12 @@ like a desugaring process.
 > convExpr (S.Cases ty e bs els) =
 >     Cases ty <$> convExpr e <*> mapM f bs <*> maybe (pure Nothing) ((Just <$>) .  convExpr) els
 >   where
->     f (S.VariantP (S.PatName vnm) ps, ve)
->         | Right ps' <- mapM unpat ps = (vnm, ps',) <$> convExpr ve
->     f (S.IdenP _ (S.PatName vnm), ve) = (vnm, [],) <$> convExpr ve
+>     f (S.VariantP vnm ps, ve)
+>         | Right ps' <- mapM unpat ps = (convPatName vnm, ps',) <$> convExpr ve
+>     f (S.IdenP _ vnm, ve) = (convPatName vnm, [],) <$> convExpr ve
 >     f x = Left $ "parse: unsupported pattern: " ++ show x
+>     convPatName (S.PatName x) = x
+>     convPatName (S.QPatName x y) = x ++ "." ++ y
 >     unpat (S.IdenP _ (S.PatName x)) = pure x
 >     unpat x = Left $ "parse: unsupported pattern: " ++ show x
 
@@ -1178,8 +1222,8 @@ pretty
 tests
 -----
 
-> simpleTestScript :: String
-> simpleTestScript = [r|
+> simpleTestScript :: [(String,String)]
+> simpleTestScript = [("main", [r|
 \begin{code} 
 
 check "basic tests":
@@ -1474,88 +1518,172 @@ end
 
 
 \end{code}
->    |]
+>    |])]
 
 
-> importsTestScript :: String
-> importsTestScript = [r|
+ 
+> importsTestScripts :: [String]
+> importsTestScripts =
+>     [{-[r|
 \begin{code} 
 
-# provide a as a, b as b end
-my-module1 = block:
-  a = 1
-  b = lam(x): x + 1 end
-  check:
-    a is 1
-    b(1) is 2
-  end
-  {a:a, b:b}
+xmodule: my-module
+  
+a = 1
+b = lam(x): x + 1 end
+check:
+  a is 1
+  b(1) is 2
 end
 
-# import my-module as my-module
+xmodule: main1
+
+import my-module as my-module
+
+check:
+  my-module.a is 1
+  my-module.b(2) is 3
+end
+
+xmodule: main1-5
+
+import my-module as my-module1
 
 check:
   my-module1.a is 1
   my-module1.b(2) is 3
 end
 
-# include from my-module: a as a, b as b end
+xmodule: main2
 
-a = my-module1.a
-b = my-module1.b
+import my-module as my-module
+include from my-module: a as a, b as b end
 
 check:
   a is 1
   b(3) is 4
 end
 
-# import my-module as my-2
 
-my-2 = my-module1
+xmodule: main3
+
+import my-module as my-2
+check:
+  my-2.a is 1
+  my-2.b(5) is 6
+end
+
+xmodule: my-2
+
+a = 2
+b = lam(x): x + 2 end
+check:
+  a is 2
+  b(1) is 3
+end
+
+xmodule: main3
+
+import my-2 as my-module
+import my-module as my-2
 
 check:
   my-2.a is 1
   my-2.b(5) is 6
 end
 
-# module my-2
-# provide a as a, b as b end
-
-my-2 = block:
-  a = 2
-  b = lam(x): x + 2 end
-  check:
-    a is 2
-    b(1) is 3
-  end
-  {a:a, b:b}
+check:
+  my-module.a is 2
+  my-module.b(2) is 4
 end
 
-# import my-2 as my-2
+\end{code}
+>  |],-} [r|
+\begin{code}
+
+xmodule: main1
+
+data Point:
+  | pt(x, y)
+end
+
+f = lam(x): cases(Point) x:
+      | pt(x,y) => x
+    end end
+
+a = pt(1,2)
 
 check:
-  my-2.a is 2
-  my-2.b(5) is 7
+  f(a) is 1
 end
+
+xmodule: main2
+
+import main1 as main1
+include from main1: pt as pt, f as f, a as a end
 
 check:
-  my-module1.a is 1
-  my-module1.b(2) is 3
+  f(a) is 1
+end
+
+b = pt(2,3)
+
+check:
+  f(b) is 2
+end
+
+g = lam(x): cases(Point) x:
+      | pt(x,y) => x + 1
+    end end
+ 
+check:
+  g(a) is 2
+  g(b) is 3
 end
 
 
+xmodule: main3
 
-nothing
+import main1 as main1
+
+check:
+  main1.f(main1.a) is 1
+end
+
+b = main1.pt(2,3)
+
+check:
+  main1.f(b) is 2
+end
+
+g = lam(x): cases(main1.Point) x:
+      | main1.pt(x,y) => x + 1
+    end end
+ 
+check:
+  g(main1.a) is 2
+  g(b) is 3
+end
+
+# todo:
+
+# shadow the remote data type
+
+# import data type under different alias
+
+# import data type under different alias
+# import another data type under previous one's module name
 
 
 
 \end{code}
->    |]
+>  |]
 
+>      ]
 
       
 > tests :: T.TestTree
-> tests = T.testGroup "imports1" [tests1,tests2]
+> tests = T.testGroup "imports3" [{-tests1,-}tests2]
       
 > tests1 :: T.TestTree
 > tests1 =
@@ -1567,17 +1695,63 @@ nothing
 >                 Nothing -> T.assertBool "" True
 >                 Just fmx -> T.assertFailure fmx
 >     in trace (renderCheckResults crs)
->        $ T.testGroup "imports1a" $ map f crs
+>        $ T.testGroup "imports3a" $ map f crs
 
 
 > tests2 :: T.TestTree
-> tests2 =
->     let crs = either error id $ evaluateWithChecks importsTestScript
->         f (CheckResult nm res) =
->             T.testGroup nm $ map g res
->         g (nm, fm) = T.testCase nm $
->             case fm of
->                 Nothing -> T.assertBool "" True
->                 Just fmx -> T.assertFailure fmx
->     in trace (renderCheckResults crs)
->        $ T.testGroup "imports1b" $ map f crs
+> tests2 = --trace (either show (intercalate "\n" . map show) $ parseModules importsTestScript2) $
+>     T.testGroup "imports3b" $ map makeTest importsTestScripts
+>   where
+>     makeTest s = 
+>       let ts = either error id $ parseModules s
+>           crs = --trace (intercalate "\n" $ map show ts) $ 
+>                 either error id $ evaluateWithChecks ts
+>           f (CheckResult nm res) =
+>               T.testGroup nm $ map g res
+>           g (nm, fm) = T.testCase nm $
+>               case fm of
+>                   Nothing -> T.assertBool "" True
+>                   Just fmx -> T.assertFailure fmx
+>       in trace (renderCheckResults crs)
+>          $ T.testGroup "imports3b" $ map f crs
+
+
+---------------
+
+quick hack to simulate a bunch of separate files to be able to test the module system
+
+the motivation is to put a bunch of files in one string in order to cut
+down on boilerplate in the testing, and make the tests more readable
+  
+> parseModules :: String -> Either String [(String,String)]
+> parseModules src = either (Left . errorBundlePretty) Right $
+>                    Q.parse (whiteSpace *> pModules) "" src
+
+> type Parser = Parsec Void String
+  
+> pModules :: Parser [(String,String)]
+> pModules = do
+>     _ <- string "xmodule:" <* whiteSpace
+>     pbody
+>   where
+>     pbody :: Parser [(String,String)]        
+>     pbody = do
+>       moduleName <- takeWhile1P Nothing (\a -> (isAlphaNum a || a `elem` "?-+_"))
+>       body <- manyTill anySingle (void (try (string "xmodule:") <* whiteSpace) <|> eof)
+>       ((moduleName, body):) <$> choice [pbody <|> ([] <$ eof)]
+
+> whiteSpace :: Parser ()
+> whiteSpace = space *> choice [blockComment *> whiteSpace
+>                              ,lineComment *> whiteSpace
+>                              ,pure ()]
+
+
+> lineComment :: Parser ()
+> lineComment = () <$ try (string "#") <* takeWhileP Nothing (/='\n')
+
+> blockComment :: Parser ()
+> blockComment = startComment *> ctu
+>   where
+>     startComment = void (try (string "#|"))
+>     endComment = void $ try (string "|#")
+>     ctu = endComment <|> ((blockComment <|> void anySingle) *> ctu)

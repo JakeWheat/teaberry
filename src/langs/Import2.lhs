@@ -1,15 +1,5 @@
 
 
-TODO:
-
-update the syntax/parsing
-skip the prelude bits in desugar
-dumb paste the desugared asts together
-get it compiling and running (with a lot of errors)
-do the prelude desugaring
-now it should work
-
-
 Implementation of import demo 2:
 
 simple implementation desugaring the most basic import and
@@ -41,6 +31,9 @@ stmts
     stmts
     env-to-record() # {a : a, b : b,  ... }
   end
+
+env-to-record takes the runtime environment at that point and turns it
+into a record value to return from the block
 
 then to import this:
 module-name-unique-suffix = block ...
@@ -126,7 +119,6 @@ add this to the module name lookup
 >                             ,string
 >                             )
 > import Control.Monad (void)
-
   
 ------------------------------------------------------------------------------
 
