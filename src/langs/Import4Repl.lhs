@@ -32,7 +32,7 @@ Simplest import with file loader extended to support a repl
 > import Control.Exception.Safe (Exception, throwM, catch)
 
 > import Control.Monad (when)
-> import Data.Maybe (isJust, catMaybes)
+> import Data.Maybe (isJust, catMaybes, isNothing)
 >
 > import Data.Char (isAlphaNum)
 
@@ -91,23 +91,26 @@ time, the caller of this code has a name for it
 and/or create a variation which is passed a filename instead of the source
 and reads the starting source from disk here too
   
-> loadSourceFiles :: FileSystemWrapper -> String -> Interpreter [(String,Module)]
+> loadSourceFiles :: FileSystemWrapper -> String -> Interpreter (Module, [(String,Module)])
 > loadSourceFiles fsw src = do
 >     -- todo: memoize so loading a module twice doesn't read the
 >     -- file and parse it twice
->     x <- f "toplevel" src
+>     let (ast,rs) = parseMod src
 >     -- reverse the list to put dependencies first
 >     -- nub it so it only includes each dependency once
->     pure $ nubBy (\a b -> fst a == fst b) $ reverse x
+>     x <- (nubBy (\a b -> fst a == fst b) . reverse . concat)
+>          <$> mapM loadAndRecurse rs
+>     pure $ (ast, x)             
 >   where
 >     -- parse the file, get the imports
 >     -- recurse on these imports, returning the filename and the
 >     -- file contents
->     f nm s = do
->              let ast@(Module ps _) = either error id $ parse s
->                  rs = catMaybes $ map getImp ps
->              ((nm,ast):) <$> (concat <$> mapM g rs)
->     g fn = do
+>     parseMod s = let ast@(Module ps _) = either error id $ parse s
+>                      rs = catMaybes $ map getImp ps
+>                  in (ast, rs)
+>     f nm s = let (ast,rs) = parseMod s
+>              in (((nm,ast):) . concat) <$> mapM loadAndRecurse rs
+>     loadAndRecurse fn = do
 >         x <- liftIO $ (loadFile fsw) fn
 >         f fn x
 >         
@@ -126,8 +129,8 @@ and reads the starting source from disk here too
 >   where
 >     f :: Interpreter (Value, Env, [T.CheckResult])
 >     f = do
->         srcs <- loadSourceFiles fsw src
->         y <- either throwInterp pure $ runDesugar srcs
+>         (ast,srcs) <- loadSourceFiles fsw src
+>         y <- either throwInterp pure $ runDesugar ast srcs
 >         v <- {-trace (pretty y) $ -}interp y
 >         t <- runAddedTests
 >         case v of
@@ -283,20 +286,23 @@ testing support in the desugarer monad
 
 desugaring code
 
-> runDesugar :: [(String,Module)] -> Either String Expr
-> runDesugar srcs = fst <$> runExcept (evalRWST (f [] [] srcs) () startingDesugarState)
+> runDesugar :: Module -> [(String,Module)] -> Either String Expr
+> runDesugar ast srcs = fst <$> runExcept (evalRWST go () startingDesugarState)
 >   where
->     f _ desugaredModules [] = g $ reverse desugaredModules
->     -- should really learn how to use folds better
->     -- I think it would make the code more regular and
->     -- quicker to understand/review
->     f mns desugaredModules ((n,m):ms) = do
->         (mns', dsm) <- desugarModule (ms == []) mns n m
->         f (mns' ++ mns) (dsm:desugaredModules) ms
->     g :: [(String,Expr)] -> Desugarer Expr          
->     g [] = lift $ throwE $ "empty list of modules"
->     g [(_,e)] = pure e
->     g ((n,e):es) = Let [(n,e)] <$> g es
+>     go = do
+>          (mns,srcs') <- desugarEm [] [] srcs
+>          (_,ast') <- desugarModule mns Nothing ast
+>          let y = (combineEm $ reverse srcs') ast'
+>          pure y
+>     desugarEm mns desugaredModules [] = pure (mns,desugaredModules)
+>     -- should learn how to use folds better
+>     -- would make the code more regular and
+>     -- quicker to understand/review?
+>     desugarEm mns desugaredModules ((n,m):ms) = do
+>         (unm, dsm) <- desugarModule mns (Just n) m
+>         desugarEm ((n ,unm) : mns) ((unm,dsm):desugaredModules) ms
+>     combineEm [] = id
+>     combineEm ((n,e):es) = Let [(n,e)] <$> combineEm es
 
 
 desugar module:
@@ -308,18 +314,18 @@ whether this is the top level module:
 or if if it's an imported module
   it returns the env only
   
-> desugarModule :: Bool -> [(String,String)] -> String -> Module -> Desugarer ([(String,String)], (String,Expr))
-> desugarModule isTopLevel otherModuleNames moduleName (Module ps stmts) = do
->     uniqueModuleName <- makeUniqueVar moduleName
+> desugarModule :: [(String,String)] -> Maybe String -> Module -> Desugarer (String,Expr)
+> desugarModule otherModuleNames moduleName (Module ps stmts) = do
 >     ps' <- concat <$> mapM (desugarPreludeStmt otherModuleNames) ps
 >     -- add the final value for repl/embedded and imported module support
->     stmts' <- if isTopLevel
->           then addTopRet stmts
->           else -- non top level module, return the env
->                -- this will become the provides call
->                pure $ stmts ++ [StExpr $ App (Iden "env-to-record") []]
+>     stmts' <- if isNothing moduleName
+>               then addTopRet stmts
+>               else -- non top level module, return the env
+>                    -- this will become the provides call
+>                    pure $ stmts ++ [StExpr $ App (Iden "env-to-record") []]
 >     stmts'' <- desugarStmts (ps' ++ stmts')
->     pure ([(moduleName,uniqueModuleName)], (uniqueModuleName, stmts''))
+>     umn <- maybe (pure "") makeUniqueVar moduleName
+>     pure (umn, stmts'')
 >   where
 >     mk x = StExpr $ TupleSel [x, App (Iden "env-to-record") []]
 >     addTopRet [] = pure [mk $ Iden "nothing"]
