@@ -141,3 +141,12 @@ executable teaberry2
                        haskeline
   ghc-options:         -threaded
   hs-source-dirs:      src/langs
+
+executable teaberry3
+  import:              langs
+  main-is:             Teaberry3.lhs
+  build-depends:       teaberry,
+                       haskeline,
+                       optparse-applicative
+  ghc-options:         -threaded
+  hs-source-dirs:      src/langs,src/exe

@@ -1,5 +1,4 @@
 
-
 Simple repl front end using haskeline
 
 > import Control.Monad.Trans

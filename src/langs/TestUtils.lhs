@@ -11,6 +11,7 @@
 >                  ,renderCheckResults
 >                  ,makeTests
 >                  ,makeTestsIO
+>                  ,parseModules
 >                  ) where
 
 > import qualified Test.Tasty as T
@@ -25,6 +26,30 @@
 
 > -- used for creating the test lists for tasty to run
 > import System.IO.Unsafe (unsafePerformIO)
+
+> import Text.Megaparsec (Parsec
+>                        ,errorBundlePretty
+>                        --,many
+>                        ,eof
+>                        ,takeWhileP
+>                        ,takeWhile1P
+>                        ,choice
+>                        --,notFollowedBy
+>                        ,try
+>                        ,anySingle
+>                        ,(<|>)
+>                        ,manyTill
+>                        )
+> import qualified Text.Megaparsec as Q (parse)
+
+> import Data.Void (Void)
+> import Text.Megaparsec.Char (space
+>                             --,char
+>                             ,string
+>                             )
+> import Control.Monad (void)
+> import Data.Char (isAlphaNum)
+
 
 
 test logging
@@ -133,4 +158,44 @@ convert tests to hunit tests
 >     f (nm,mfm) = T.testCase nm $ case mfm of
 >         Nothing -> T.assertBool "" True
 >         Just fmx -> T.assertFailure fmx
+
+------------------------------------------------------------------------------
+
+simple parser for "modules", to allow you to write multiple modules in one string
+the only reason for this is to make the tests for modules more
+readable so all the source is in one place instead of in supplemental files
+
+  
+> parseModules :: String -> Either String [(String,String)]
+> parseModules src = either (Left . errorBundlePretty) Right $
+>                    Q.parse (whiteSpace *> pModules) "" src
+
+> type Parser = Parsec Void String
+  
+> pModules :: Parser [(String,String)]
+> pModules = do
+>     _ <- string "xmodule:" <* whiteSpace
+>     pbody
+>   where
+>     pbody :: Parser [(String,String)]        
+>     pbody = do
+>       moduleName <- takeWhile1P Nothing (\a -> (isAlphaNum a || a `elem` "?-+_"))
+>       body <- manyTill anySingle (void (try (string "xmodule:") <* whiteSpace) <|> eof)
+>       ((moduleName, body):) <$> choice [pbody <|> ([] <$ eof)]
+
+> whiteSpace :: Parser ()
+> whiteSpace = space *> choice [blockComment *> whiteSpace
+>                              ,lineComment *> whiteSpace
+>                              ,pure ()]
+
+
+> lineComment :: Parser ()
+> lineComment = () <$ try (string "#") <* takeWhileP Nothing (/='\n')
+
+> blockComment :: Parser ()
+> blockComment = startComment *> ctu
+>   where
+>     startComment = void (try (string "#|"))
+>     endComment = void $ try (string "|#")
+>     ctu = endComment <|> ((blockComment <|> void anySingle) *> ctu)
 

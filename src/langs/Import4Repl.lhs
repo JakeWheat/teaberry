@@ -10,10 +10,13 @@ Simplest import with file loader extended to support a repl
 > {-# LANGUAGE MultiWayIf #-}
 
 > module Import4Repl (tests
->                     ,ReplImplHandle
->                     ,startReplImpl
->                     ,evaluateLine
->                ) where
+>                    ,TeaberryHandle
+>                    ,newTeaberryHandle
+>                    ,runScript
+>                    ,runFunction
+>                    ,Value
+>                    ,valueToString
+>                    ) where
 
 > import Text.RawString.QQ
 
@@ -37,27 +40,6 @@ Simplest import with file loader extended to support a repl
 > import Data.List (intercalate, sortBy, nubBy)
 > import Data.Ord (comparing)
 >
-> import Text.Megaparsec (Parsec
->                        ,errorBundlePretty
->                        --,many
->                        ,eof
->                        ,takeWhileP
->                        ,takeWhile1P
->                        ,choice
->                        --,notFollowedBy
->                        ,try
->                        ,anySingle
->                        ,(<|>)
->                        ,manyTill
->                        )
-> import qualified Text.Megaparsec as Q (parse)
-
-> import Data.Void (Void)
-> import Text.Megaparsec.Char (space
->                             --,char
->                             ,string
->                             )
-> import Control.Monad (void)
 
 > --import Debug.Trace (trace)
 > import qualified TestUtils as T
@@ -211,20 +193,21 @@ include from X: a as a, b as b end
 
 ------------------------------------------------------------------------------
 
-repl
-----
-  
-> data ReplImplHandle = ReplImplHandle
+embedded api
+------------
+
+> data TeaberryHandle = TeaberryHandle
 >     {henv :: IORef Env}
   
-> startReplImpl :: IO ReplImplHandle
-> startReplImpl = do
+> newTeaberryHandle :: IO TeaberryHandle
+> newTeaberryHandle = do
 >     x <- newIORef defaultEnv
->     pure $ ReplImplHandle x
+>     pure $ TeaberryHandle x
 
-> evaluateLine :: ReplImplHandle -> String -> IO (Either String (Maybe String))
-> evaluateLine h src = do
->     en <- readIORef (henv h)
+> runScript :: TeaberryHandle -> [(String,Value)] -> String -> IO (Either String Value)
+> runScript h lenv src = do
+>     enx <- readIORef (henv h)
+>     let en = extendEnv lenv enx
 >     rs <- evaluate en src
 >     case rs of
 >         Left e -> pure $ Left e
@@ -233,9 +216,23 @@ repl
 >                 [] -> pure ()
 >                 _ -> putStrLn $ T.renderCheckResults t
 >             writeIORef (henv h) en'
->             case v of
->                 NothingV -> pure $ Right Nothing
->                 _ -> pure $ Right $ Just $ torepr' v
+>             pure $ Right v
+
+> runFunction :: TeaberryHandle -> String -> [Value] -> IO (Either String Value)
+> runFunction h f as = do
+>     -- how to give the args unique names? or just use shadow?
+>     -- (and the function)
+>     v <- runScript h [] f
+>     case v of
+>         Left e -> pure $ Left e
+>         Right v' -> do
+>             let as' = zipWith (\i x -> ("aaa-" ++ show i, x)) [(0::Int)..] as
+>             runScript h (("fff", v'):as') $ "fff(" ++ intercalate "," (map fst as') ++ ")"
+
+> valueToString :: Value -> Maybe String
+> valueToString v = case v of
+>     NothingV -> Nothing
+>     _ -> Just $ torepr' v
 
 ------------------------------------------------------------------------------
 
@@ -1834,7 +1831,7 @@ end
 >   |]-}
 
 > tests :: T.TestTree
-> tests = T.testGroup "imports4repl" [tests1,tests2{-,tests3-}]
+> tests = T.testGroup "imports4repl" [tests1,tests2,tests4]
 
 > {-tests3 :: T.TestTree
 > tests3 = T.makeTestsIO "imports4c" $ evaluate simpleTestScript33-}
@@ -1847,46 +1844,105 @@ end
 > tests2 = T.testGroup "imports4replb" $ map makeTest importsTestScripts
 >   where
 >     makeTest s =
->       let ((_,src):ts) = reverse $ either error id $ parseModules s
+>       let ((_,src):ts) = reverse $ either error id $ T.parseModules s
 >           crs = evaluate' (makeFileSystemMock ts) defaultEnv src
 >       in T.makeTestsIO "imports4replb" (fmap (\(_,_,x) -> x) <$> crs)
 
---------------- 
 
-quick hack to simulate a bunch of separate files to be able to test the module system
+> tests4 :: T.TestTree
+> tests4 = T.testGroup "imports4repl4"
+>     [testSanityArith
+>     ,testEnvKept
+>     ,testEnvOverridden
+>     ,testAScript
+>     ,testRunScriptWithValues
+>     ,testRunFunctionSimple
+>     --,testRunFunctionPartialApp
+>     ]
 
-the motivation is to put a bunch of files in one string in order to cut
-down on boilerplate in the testing, and make the tests more readable
-  
-> parseModules :: String -> Either String [(String,String)]
-> parseModules src = either (Left . errorBundlePretty) Right $
->                    Q.parse (whiteSpace *> pModules) "" src
-
-> type Parser = Parsec Void String
-  
-> pModules :: Parser [(String,String)]
-> pModules = do
->     _ <- string "xmodule:" <* whiteSpace
->     pbody
->   where
->     pbody :: Parser [(String,String)]        
->     pbody = do
->       moduleName <- takeWhile1P Nothing (\a -> (isAlphaNum a || a `elem` "?-+_"))
->       body <- manyTill anySingle (void (try (string "xmodule:") <* whiteSpace) <|> eof)
->       ((moduleName, body):) <$> choice [pbody <|> ([] <$ eof)]
-
-> whiteSpace :: Parser ()
-> whiteSpace = space *> choice [blockComment *> whiteSpace
->                              ,lineComment *> whiteSpace
->                              ,pure ()]
+> testSanityArith :: T.TestTree
+> testSanityArith = T.testCase "testSanityArith" $ do
+>     h <- newTeaberryHandle
+>     v <- runScript h [] "1 + 2"
+>     T.assertEqual "" (Right (NumV 3)) v
 
 
-> lineComment :: Parser ()
-> lineComment = () <$ try (string "#") <* takeWhileP Nothing (/='\n')
+> testEnvKept :: T.TestTree
+> testEnvKept = T.testCase "testEnvKept" $ do
+>     h <- newTeaberryHandle
+>     _ <- runScript h [] "a = 1"
+>     v <- runScript h [] "a"
+>     T.assertEqual "" (Right (NumV 1)) v
 
-> blockComment :: Parser ()
-> blockComment = startComment *> ctu
->   where
->     startComment = void (try (string "#|"))
->     endComment = void $ try (string "|#")
->     ctu = endComment <|> ((blockComment <|> void anySingle) *> ctu)
+> testEnvOverridden :: T.TestTree
+> testEnvOverridden = T.testCase "testEnvOverridden" $ do
+>     h <- newTeaberryHandle
+>     _ <- runScript h [] "a = 1"
+>     _ <- runScript h [] "a = 4"
+>     v <- runScript h [] "a"
+>     T.assertEqual "" (Right (NumV 4)) v
+
+*****
+TODO: test running something with tests and there's a test failure
+
+
+> testAScript :: T.TestTree
+> testAScript = T.testCase "testAScript" $ do
+>     let script = [r|
+\begin{code}
+a = 3
+b = 4
+a + b
+\end{code}
+>         |]
+>     h <- newTeaberryHandle
+>     v <- runScript h [] script
+>     T.assertEqual "" (Right (NumV 7)) v
+
+todo: lots of boilerplate and abstraction details to work out
+
+> {-testFFI :: T.TestTree
+> testFFI = T.testCase "testFFI" $ do
+>     let myFFI :: [Value] -> Interpreter Value
+>         myFFI = \case
+>             [NumV a] = pure $ NumV $ a + 1
+>             _ = lift $ throwE $ "expected num"
+>     h <- newTeaberryHandle
+>     addFFI h ("myfun", myFFI)
+>     v <- runScript h "myfun(3)"
+>     T.assertEqual "" (Right (NumV 4)) v-}
+
+> testRunScriptWithValues :: T.TestTree
+> testRunScriptWithValues = T.testCase "testRunScriptWithValues" $ do
+>     h <- newTeaberryHandle
+>     v <- runScript h [("a", NumV 3)
+>                      ,("b", NumV 11)] "a + b"
+>     T.assertEqual "" (Right (NumV 14)) v
+
+how to implement this without it staying in the env?
+todo: fix this, for now, they will stay in the env
+
+when should stuff stay in the env generally?
+"a = 1"
+a should stay in the env
+"a = 1
+a + 2"
+should a stay in the env? not sure
+
+
+> testRunFunctionSimple :: T.TestTree
+> testRunFunctionSimple = T.testCase "testRunFunctionSimple" $ do
+>     h <- newTeaberryHandle
+>     _ <- runScript h [] "f = lam(x,y): x + y end"
+>     v <- runFunction h "f" [NumV 5, NumV 11]
+>     T.assertEqual "" (Right (NumV 16)) v
+
+the next test should work as soon as partial application is
+implemented
+
+> {-testRunFunctionPartialApp :: T.TestTree
+> testRunFunctionPartialApp = T.testCase "testRunFunctionPartialApp" $ do
+>     h <- newTeaberryHandle
+>     _ <- runScript h [] "f = lam(x,y): x + y end"
+>     v <- runFunction h "f(_,4)" [NumV 5]
+>     T.assertEqual "" (Right (NumV 9)) v-}
