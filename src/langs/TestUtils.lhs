@@ -1,5 +1,4 @@
 
-
 > module TestUtils (T.TestTree
 >                  ,T.testGroup
 >                  ,T.testCase
@@ -11,6 +10,7 @@
 >                  ,testLogToCheckResults
 >                  ,renderCheckResults
 >                  ,makeTests
+>                  ,makeTestsIO
 >                  ) where
 
 > import qualified Test.Tasty as T
@@ -22,6 +22,10 @@
 > --import Debug.Trace (trace)
 
 > import Scientific (Scientific)
+
+> -- used for creating the test lists for tasty to run
+> import System.IO.Unsafe (unsafePerformIO)
+
 
 test logging
 
@@ -118,3 +122,15 @@ convert tests to hunit tests
 >     f (nm,mfm) = T.testCase nm $ case mfm of
 >         Nothing -> T.assertBool "" True
 >         Just fmx -> T.assertFailure fmx
+
+> makeTestsIO :: String -> IO (Either String [CheckResult]) -> T.TestTree
+> makeTestsIO gnm cs =
+>     case unsafePerformIO cs of
+>         Left e -> T.testCase gnm $ T.assertFailure e
+>         Right csx -> T.testGroup gnm $ map g csx
+>   where
+>     g (CheckResult hnm ts) = T.testGroup hnm $ map f ts  
+>     f (nm,mfm) = T.testCase nm $ case mfm of
+>         Nothing -> T.assertBool "" True
+>         Just fmx -> T.assertFailure fmx
+

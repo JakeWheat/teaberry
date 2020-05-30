@@ -28,6 +28,8 @@
 > import qualified Import1
 > import qualified Import2
 > import qualified Import3
+> --import qualified Import4
+> import qualified Import2IO
 
 > import qualified Test.Tasty as T
 
@@ -62,4 +64,6 @@
 >        ,Import1.tests
 >        ,Import2.tests
 >        ,Import3.tests
+>        ,Import2IO.tests
+>        --,Import4.tests
 >        ]
