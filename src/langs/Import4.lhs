@@ -1,11 +1,28 @@
 
+Demonstrate a file loader for imports:
 
-demonstrate importing data types and pattern matching on them
+todo:
+the file loader algo part
+implement another intermediate language, make this import5
+the other intermediate will put IO in the interpreter stack
 
-the implementation is: it ignores the prefixes on variant names in
-case expressions. This works fine when you write correct code, but
-the error handling is poor.
 
+
+you load a script, it has imports - now the system should find the
+files for these imports, load them, and keep going until it has all
+the imports, in a good order (original script last, every import is
+for a module earlier in the list)
+
+algo:
+read script
+parse source
+pull out the import names: from import statements in the prelude
+recursively load each of these
+when there is a module that's already been loaded
+insert it in the collected list again
+then when done: reverse the entire list
+  and remove duplicates keeping the first occurance of each
+this should be ready now
 
 > {-# LANGUAGE TupleSections #-}
 > {-# LANGUAGE LambdaCase #-}
@@ -13,7 +30,7 @@ the error handling is poor.
 > {-# LANGUAGE ScopedTypeVariables #-}
 > {-# LANGUAGE MultiWayIf #-}
 
-> module Import3 (tests
+> module Import4 (tests
 >                ) where
 
 > import Text.RawString.QQ
@@ -26,14 +43,15 @@ the error handling is poor.
 > import Control.Monad.Trans.Class (lift)
 > import Control.Monad.Trans.Except (Except, runExcept, throwE)
 > import Control.Monad.Trans.RWS (RWST, evalRWST, ask, local, get, gets, state, put, modify)
+> import Control.Exception.Safe (Exception, throwM, catch)
 
-> import Control.Monad (when, forM)
-> import Data.Maybe (isJust)
+> import Control.Monad (when)
+> import Data.Maybe (isJust, catMaybes)
 >
 > import Data.Char (isAlphaNum)
 
 > import Scientific (Scientific, extractInt)
-> import Data.List (intercalate, sortBy)
+> import Data.List (intercalate, sortBy, nubBy)
 > import Data.Ord (comparing)
 >
 > import Text.Megaparsec (Parsec
@@ -58,10 +76,89 @@ the error handling is poor.
 >                             )
 > import Control.Monad (void)
 
-> --import Debug.Trace (trace)
+> -- import Debug.Trace (trace)
 > import qualified TestUtils as T
 
+------------------------------------------------------------------------------
+
+"fileloader"
+------------
+
+
+wrapper around evaluate which can follow the imports and load them
+
+has a numpty little mock system, so you can write a set of files in
+one place here in the testing, as well as load from disk
+
+> data FileSystemWrapper = FileSystemWrapper {
+>     loadFile :: FilePath -> IO String
+> }
+
+> makeFileSystemMock :: [(FilePath, String)] -> FileSystemWrapper
+> makeFileSystemMock lkp =
+>     FileSystemWrapper
+>     {loadFile = \fn -> maybe (error $ "file not found in mock: " ++ fn)
+>                        pure $ lookup fn lkp}
+
+> makeRealFilesystemReader :: FileSystemWrapper
+> makeRealFilesystemReader = FileSystemWrapper {loadFile = readFile}
   
+algo:
+read script
+parse source
+pull out the import names: from import statements in the prelude
+recursively load each of these
+when there is a module that's already been loaded
+insert it in the collected list again
+then when done: reverse the entire list
+  and remove duplicates keeping the first occurance of each
+this should be ready now
+
+  
+todo: write a version which only reads enough of each file to get the imports
+and only loads one file at a time and desugars it?
+is this worth it? wait until it becomes a performance issue
+  
+> loadSourceFiles :: FileSystemWrapper -> String -> IO (Either String [(String,Module)])
+> loadSourceFiles fsw src = do
+>     -- todo: memoize so loading a module twice doesn't read the
+>     -- file and parse it twice
+>     x <- f "toplevel" src
+>     -- reverse the list to put dependencies first
+>     -- nub it so it only includes each dependency once
+>     let x' = nubBy (\a b -> fst a == fst b) $ reverse x
+>     pure $ Right x'
+>   where
+>     -- parse the file, get the imports
+>     -- recurse on these imports, returning the filename and the
+>     -- file contents
+>     f nm s = do
+>              let ast@(Module ps _) = either error id $ parse s
+>                  rs = catMaybes $ map getImp ps
+>              ((nm,ast):) <$> (concat <$> mapM g rs)
+>     g fn = do
+>         x <- (loadFile fsw) fn
+>         f fn x
+>         
+>     getImp (Import fn _) = Just fn
+>     getImp _ = Nothing
+>         
+
+> evaluate :: String -> IO (Either String [T.CheckResult])
+> evaluate = evaluate' makeRealFilesystemReader
+
+todo: use a monad transformer? is it worth it?
+  
+> evaluate' :: FileSystemWrapper -> String -> IO (Either String [T.CheckResult])
+> evaluate' fsw src =  do
+>     srcs <- loadSourceFiles fsw src
+>     let x = case srcs of
+>                 Left e -> Left e
+>                 Right z -> runDesugar z
+>     case x of
+>         Left e -> pure $ Left e
+>         Right ast' -> runInterp testEnv ast'
+
 ------------------------------------------------------------------------------
 
 syntax
@@ -460,7 +557,7 @@ holds the values of variables
 > extendStore i v (Store xs) = Store ((i,v):xs)
 
 > fetchStore :: Int -> Store -> Interpreter Value
-> fetchStore i (Store xs) = maybe (lift $ throwE $ "invalid fetch on store: " ++ show i) pure
+> fetchStore i (Store xs) = maybe (throwInterp $ "invalid fetch on store: " ++ show i) pure
 >                           $ lookup i xs
 
 > updateISStore :: (Store -> Store) -> (InterpreterState -> InterpreterState)
@@ -478,11 +575,24 @@ holds the values of variables
 > emptyInterpreterState :: InterpreterState
 > emptyInterpreterState = InterpreterState [] [] emptyStore
 
-> type Interpreter = RWST Env () InterpreterState (Except String)
+> data InterpreterException = InterpreterException String
+>                           deriving Show
 
-> runInterp :: Env -> Expr -> Either String [T.CheckResult]
+> instance Exception InterpreterException
+
+> interpreterExceptionToString :: InterpreterException -> String
+> interpreterExceptionToString (InterpreterException s) = s
+
+  
+> type Interpreter = RWST Env () InterpreterState IO
+
+> throwInterp :: String -> Interpreter a
+> throwInterp e = throwM $ InterpreterException e
+  
+> runInterp :: Env -> Expr -> IO (Either String [T.CheckResult])
 > runInterp env expr =
->     fst <$> runExcept (evalRWST scriptWithTestStuff env emptyInterpreterState)
+>     ((Right . fst) <$> evalRWST scriptWithTestStuff env emptyInterpreterState)
+>     `catch` (\e -> pure $ Left $ interpreterExceptionToString e)
 >   where
 >     scriptWithTestStuff = do
 >         _ <- interp expr
@@ -520,7 +630,7 @@ holds the values of variables
 >             local (extendEnv [(b,v)]) $ newEnv bs'
 >     newEnv bs
 
-> interp (Block {}) = lift $ throwE $ "undesugared block passed to interpreter"
+> interp (Block {}) = throwInterp $ "undesugared block passed to interpreter"
 > interp (Seq a b) = interp a *> interp b
 
 > interp z@(If bs e) = do
@@ -529,15 +639,15 @@ holds the values of variables
 >             case c' of
 >                 BoolV True -> interp t
 >                 BoolV False -> f bs'
->                 _ -> lift $ throwE $ "expected bool in if test, got " ++ show c'
+>                 _ -> throwInterp $ "expected bool in if test, got " ++ show c'
 >         f [] = case e of
 >                    Just x -> interp x
->                    Nothing -> lift $ throwE $ "no if branches matched and no else:\n"
+>                    Nothing -> throwInterp $ "no if branches matched and no else:\n"
 >                               ++ pretty z
 >     f bs
 
-> interp e@(DotExpr {}) = lift $ throwE $ "interp: undesugared dotexpr " ++ show e
-> interp e@(Cases {}) = lift $ throwE $ "interp: undesugared cases " ++ show e
+> interp e@(DotExpr {}) = throwInterp $ "interp: undesugared dotexpr " ++ show e
+> interp e@(Cases {}) = throwInterp $ "interp: undesugared cases " ++ show e
 
 > interp (Box e) = do
 >     v <- interp e
@@ -549,7 +659,7 @@ holds the values of variables
 >     v' <- interp v
 >     i <- case b' of
 >              BoxV i -> pure i
->              _ -> lift $ throwE $ "attemped to setbox non box value: " ++ torepr' b'
+>              _ -> throwInterp $ "attemped to setbox non box value: " ++ torepr' b'
 >     modify $ \s -> (updateISStore (extendStore i v') s)
 >     pure v'
 
@@ -558,7 +668,7 @@ holds the values of variables
 >     v' <- interp v
 >     i <- case b' of
 >              BoxV i -> pure i
->              _ -> lift $ throwE $ "attemped to setbox non box value: " ++ torepr' b'
+>              _ -> throwInterp $ "attemped to setbox non box value: " ++ torepr' b'
 >     modify $ \s -> (updateISStore (extendStore i v') s)
 >     pure v'
       
@@ -568,9 +678,9 @@ holds the values of variables
 >         BoxV i -> do
 >                   st <- get
 >                   fetchStore i (isStore st)
->         _ -> lift $ throwE $ "attemped to unbox non box value: " ++ torepr' b'
+>         _ -> throwInterp $ "attemped to unbox non box value: " ++ torepr' b'
 
-> interp (UnboxRef {}) = lift $ throwE "undesugared unboxref"
+> interp (UnboxRef {}) = throwInterp "undesugared unboxref"
 
   
 > app :: Value -> [Value] -> Interpreter Value
@@ -585,10 +695,10 @@ holds the values of variables
 >             env <- ask
 >             hf <- lookupForeignFun nm tys env
 >             hf vs
->         _ -> lift $ throwE "non function value in app position"
+>         _ -> throwInterp "non function value in app position"
 >   where
 >     safeZip ps xs | length xs == length ps = pure $ zip ps xs
->                   | otherwise = lift $ throwE $ "wrong number of args to function"
+>                   | otherwise = throwInterp $ "wrong number of args to function"
 
 > box :: Value -> Interpreter Value
 > box v = do
@@ -596,15 +706,6 @@ holds the values of variables
 >          let i = newStoreLoc (isStore s)
 >          in (i, updateISStore (extendStore i v) s)
 >     pure $ BoxV i
-
-  
-
-> evaluateWithChecks :: [(String,String)] -> Either String [T.CheckResult]
-> evaluateWithChecks s =  do
->     ast <- forM s $ \(n,src) -> (n,) <$> parse src
->     ast' <- runDesugar ast
->     {-trace (pretty ast') $-}
->     runInterp testEnv ast'
 
 ------------------------------------------------------------------------------
 
@@ -649,7 +750,7 @@ this is run at the end of the script to run all the saved tests
 >     ts <- reverse <$> gets addedTests
 >     mapM_ (\v -> app v []) ts
 >     testLog <- reverse <$> gets testResultLog
->     either (lift . throwE) pure $ T.testLogToCheckResults testLog
+>     either throwInterp pure $ T.testLogToCheckResults testLog
 
 ------------------------------------------------------------------------------
 
@@ -731,16 +832,16 @@ ffi catalog
 
 > variantFieldGet :: String -> Value -> Interpreter Value
 > variantFieldGet fieldNm v@(VariantV _ fs) =
->     maybe (lift $ throwE $ "variant field not found " ++ fieldNm ++ ": " ++ torepr' v)
+>     maybe (throwInterp $ "variant field not found " ++ fieldNm ++ ": " ++ torepr' v)
 >           pure $ lookup fieldNm fs
 > variantFieldGet _ x =
->     lift $ throwE $ "variant field get called on " ++ torepr' x
+>     throwInterp $ "variant field get called on " ++ torepr' x
 
 > variantFieldGetOrd :: Scientific -> Value -> Interpreter Value
 > variantFieldGetOrd fieldIndex v@(VariantV _ fs) =
 >     case extractInt fieldIndex of
->         Nothing -> lift $ throwE $ "variant field get ord passed non integer: " ++ show fieldIndex
->         Just i -> maybe (lift $ throwE $ "variant field # not found " ++ show fieldIndex ++ ": " ++ torepr' v)
+>         Nothing -> throwInterp $ "variant field get ord passed non integer: " ++ show fieldIndex
+>         Just i -> maybe (throwInterp $ "variant field # not found " ++ show fieldIndex ++ ": " ++ torepr' v)
 >                   pure (safeIndex (map snd fs) i)
 >   where
 >     safeIndex [] _ = Nothing
@@ -750,7 +851,7 @@ ffi catalog
      
        
 > variantFieldGetOrd _ x =
->     lift $ throwE $ "variant field get ord called on " ++ torepr' x
+>     throwInterp $ "variant field get ord called on " ++ torepr' x
 
 
 > makeVariant :: String -> [Value] -> Interpreter Value
@@ -764,8 +865,8 @@ ffi catalog
 >             v' <- box v
 >             pure (nm,v')
 >         else pure (nm,v)
->     unpackTuple (VariantV "tuple" x) = lift $ throwE $ "value in list in make-variant, expected tuple of is-ref, name and val, got " ++ show (map (\(_,b) -> torepr' b) x)
->     unpackTuple x = lift $ throwE $ "expected tuple in make-variant, got " ++ torepr' x
+>     unpackTuple (VariantV "tuple" x) = throwInterp $ "value in list in make-variant, expected tuple of is-ref, name and val, got " ++ show (map (\(_,b) -> torepr' b) x)
+>     unpackTuple x = throwInterp $ "expected tuple in make-variant, got " ++ torepr' x
 
 ------------------------------------------------------------------------------
 
@@ -786,7 +887,7 @@ env, ffi boilerplate
 >
 > envLookup :: String -> Env -> Interpreter Value
 > envLookup nm env =
->     maybe (lift $ throwE $ "Identifier not found " ++ nm) pure
+>     maybe (throwInterp $ "Identifier not found " ++ nm) pure
 >     $ lookup nm (envEnv env)
 
 > addForeignFun :: String -> [String] -> ([Value] -> Interpreter Value) -> Env -> Either String Env
@@ -799,7 +900,7 @@ env, ffi boilerplate
 >     if | Just f <- lookup (nm,tys) $ envForeignFuns env -> pure f
 >        -- well dodgy "generic" functions, only works if all args are any
 >        | Just f <- lookup (nm, map (const "any") tys) $ envForeignFuns env -> pure f
->        | otherwise -> lift $ throwE $ "ffi function not found: " ++ nm ++ "(" ++ intercalate "," tys ++")"
+>        | otherwise -> throwInterp $ "ffi function not found: " ++ nm ++ "(" ++ intercalate "," tys ++")"
 
 
 
@@ -816,12 +917,12 @@ env, ffi boilerplate
 > _unwrapTuple :: (String, Value -> Interpreter [Value])
 > _unwrapTuple = ("tuple", \case
 >                           TupleV fs -> pure fs
->                           x -> lift $ throwE $ "type: expected tuple, got " ++ show x)
+>                           x -> throwInterp $ "type: expected tuple, got " ++ show x)
 
 > unwrapNum :: (String, Value -> Interpreter Scientific)
 > unwrapNum = ("number", \case
 >                           NumV n -> pure n
->                           x -> lift $ throwE $ "type: expected number, got " ++ show x)
+>                           x -> throwInterp $ "type: expected number, got " ++ show x)
 
 
 > wrapNum :: Scientific -> Interpreter Value
@@ -832,7 +933,7 @@ env, ffi boilerplate
 > _unwrapBool :: (String, Value -> Interpreter Bool)
 > _unwrapBool = ("boolean", \case
 >                           BoolV n -> pure n
->                           x -> lift $ throwE $ "type: expected boolean, got " ++ show x)
+>                           x -> throwInterp $ "type: expected boolean, got " ++ show x)
 
 > wrapBool :: Bool -> Interpreter Value
 > wrapBool n = pure $ BoolV n
@@ -841,7 +942,7 @@ env, ffi boilerplate
 > unwrapText :: (String, Value -> Interpreter String)
 > unwrapText = ("text", \case
 >                           TextV n -> pure n
->                           x -> lift $ throwE $ "type: expected text, got " ++ show x)
+>                           x -> throwInterp $ "type: expected text, got " ++ show x)
 
 > wrapText :: String -> Interpreter Value
 > wrapText n = pure $ TextV n
@@ -849,13 +950,13 @@ env, ffi boilerplate
 > variantIn :: (String, Value -> Interpreter Value)
 > variantIn = ("variant", \case
 >                           x@(VariantV {}) -> pure x
->                           x -> lift $ throwE $ "type: expected variant, got " ++ show x)
+>                           x -> throwInterp $ "type: expected variant, got " ++ show x)
 
 > unwrapList :: (String, Value -> Interpreter [Value])
 > unwrapList =
 >     ("list", \case
 >                  ListV vs -> pure vs
->                  x -> lift $ throwE $ "type: expected list, got: " ++ torepr' x)
+>                  x -> throwInterp $ "type: expected list, got: " ++ torepr' x)
   
 > anyIn :: (String, Value -> Interpreter Value)
 > anyIn = ("any", pure)
@@ -864,7 +965,7 @@ env, ffi boilerplate
 > functionIn = ("function", \case
 >                           x@(FunV {}) -> pure x
 >                           x@(ForeignFunV {}) -> pure x
->                           x -> lift $ throwE $ "type: expected function, got " ++ show x)
+>                           x -> throwInterp $ "type: expected function, got " ++ show x)
 
   
   
@@ -878,7 +979,7 @@ env, ffi boilerplate
 >                 [a] -> do
 >                     ax <- (snd unwrap0) a
 >                     wrap (f ax)
->                 _ -> lift $ throwE $ "wrong number of args to function, expected 1, got " ++ show (length as))
+>                 _ -> throwInterp $ "wrong number of args to function, expected 1, got " ++ show (length as))
 
 > nullaryOp :: (a -> Interpreter Value)
 >           -> a
@@ -887,7 +988,7 @@ env, ffi boilerplate
 >     ([] ,\as ->
 >             case as of
 >                 [] -> wrap f
->                 _ -> lift $ throwE $ "wrong number of args to function, expected 0, got " ++ show (length as))
+>                 _ -> throwInterp $ "wrong number of args to function, expected 0, got " ++ show (length as))
 
 
 
@@ -904,7 +1005,7 @@ env, ffi boilerplate
 >                     ax <- (snd unwrap0) a
 >                     bx <- (snd unwrap1) b
 >                     wrap (f ax bx)
->                 _ -> lift $ throwE $ "wrong number of args to function, expected 2, got " ++ show (length as))
+>                 _ -> throwInterp $ "wrong number of args to function, expected 2, got " ++ show (length as))
 
 > ternaryOp :: (String, Value -> Interpreter a)
 >           -> (String, Value -> Interpreter b)
@@ -921,7 +1022,7 @@ env, ffi boilerplate
 >                     bx <- (snd unwrap1) b
 >                     cx <- (snd unwrap2) c
 >                     wrap (f ax bx cx)
->                 _ -> lift $ throwE $ "wrong number of args to function, expected 4, got " ++ show (length as))
+>                 _ -> throwInterp $ "wrong number of args to function, expected 4, got " ++ show (length as))
 
 
 ------------------------------------------------------------------------------
@@ -1113,8 +1214,8 @@ pretty
 tests
 -----
 
-> simpleTestScript :: [(String,String)]
-> simpleTestScript = [("main", [r|
+> simpleTestScript :: String
+> simpleTestScript = [r|
 \begin{code} 
 
 check "basic tests":
@@ -1409,7 +1510,7 @@ end
 
 
 \end{code}
->    |])]
+>    |]
 
 
  
@@ -1679,29 +1780,41 @@ end
 
 \end{code}
 >  |]
-
+             
 >      ]
 
-      
+
+> {-simpleTestScript33 :: String
+> simpleTestScript33 = [r|
+\begin{code} 
+
+import a-module as a-module
+
+check "basic tests":
+  a-module.f(1) is 2
+end
+\end{code}
+>   |]-}
+
 > tests :: T.TestTree
-> tests = T.testGroup "imports3" [tests1,tests2]
-      
+> tests = T.testGroup "imports4" [tests1,tests2{-tests3-}]
+
+> {-tests3 :: T.TestTree
+> tests3 = T.makeTestsIO "imports4c" $ evaluate simpleTestScript33-}
+
+     
 > tests1 :: T.TestTree
-> tests1 =
->     let crs = either error id $ evaluateWithChecks simpleTestScript
->     in T.makeTests "imports3a" crs
+> tests1 = T.makeTestsIO "imports4a" $ evaluate simpleTestScript
 
 > tests2 :: T.TestTree
-> tests2 = --trace (either show (intercalate "\n" . map show) $ parseModules importsTestScript2) $
->     T.testGroup "imports3b" $ map makeTest importsTestScripts
+> tests2 = T.testGroup "imports4b" $ map makeTest importsTestScripts
 >   where
->     makeTest s = 
->       let ts = either error id $ parseModules s
->           crs = --trace (intercalate "\n" $ map show ts) $ 
->                 either error id $ evaluateWithChecks ts
->       in T.makeTests "imports3b" crs
+>     makeTest s =
+>       let ((_,src):ts) = reverse $ either error id $ parseModules s
+>           crs = evaluate' (makeFileSystemMock ts) src
+>       in T.makeTestsIO "imports4b" crs
 
----------------
+--------------- 
 
 quick hack to simulate a bunch of separate files to be able to test the module system
 
