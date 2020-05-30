@@ -30,6 +30,7 @@ Simplest import with file loader extended to support a repl
 > import Control.Monad.Trans.Except (Except, runExcept, throwE)
 > import Control.Monad.Trans.RWS (RWST, evalRWST, ask, local, get, gets, state, put, modify)
 > import Control.Exception.Safe (Exception, throwM)
+> import Control.Concurrent (threadDelay)
   
 > import Control.Monad (when)
 > import Data.Maybe (isJust, catMaybes)
@@ -817,6 +818,8 @@ ffi catalog
 
 >    ,("torepr", unaryOp anyIn pure torepr)
 >    ,("tostring", unaryOp anyIn pure tostring)
+>    ,("print", unaryOp anyIn id ffiprint)
+>    ,("sleep", unaryOp unwrapNum id ffisleep)
 
 >    ,("variant-field-get", binaryOp unwrapText variantIn id variantFieldGet)
 >    ,("variant-field-get-ord", binaryOp unwrapNum variantIn id variantFieldGetOrd)
@@ -873,9 +876,20 @@ ffi catalog
 > tostring x@(TextV {}) = x
 > tostring x = torepr x
 
+> ffiprint :: Value -> Interpreter Value
+> ffiprint v = do
+>     liftIO $ putStrLn $ case v of
+>                             TextV u -> u
+>                             _ -> torepr' v
+>     pure NothingV                              
 
 
+> ffisleep :: Scientific -> Interpreter Value
+> ffisleep v = do
+>     liftIO $ threadDelay (floor (v * 1000 * 1000))
+>     pure NothingV                              
 
+  
 > safeVariantName :: Value -> Value
 > safeVariantName (VariantV x _) = TextV $ dropQualifiers x
 > safeVariantName _ = NothingV
