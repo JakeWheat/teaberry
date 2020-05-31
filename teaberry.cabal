@@ -37,6 +37,7 @@ common shared-properties
 
   ghc-options:         -Wall
 
+-- this is the old version of the code that is in the process of being replaced
 library
   import:              shared-properties
   exposed-modules:     Syntax
@@ -51,17 +52,11 @@ library
                        Paths_teaberry
   autogen-modules:     Paths_teaberry
   hs-source-dirs:      src/lib
-
-
-executable teaberryold
-  import:              shared-properties
-  main-is:             TeaberryOld.lhs
-  build-depends:       teaberry
-  ghc-options:         -threaded
-  hs-source-dirs:      src/exe
-  other-modules:       Parserize
-
   
+-- this is the new experimental versions which will be used to create
+-- the new version of the code, and continue to be developed to
+-- keep feeding into the new version
+   
 common langs
   import:              shared-properties
   build-depends:       teaberry,
@@ -118,15 +113,6 @@ Test-Suite RunTests
   ghc-options:         -threaded
   hs-source-dirs:      src/tests
 
-
-  
--- Test-Suite Langs
---   import:              langs
---   type:                exitcode-stdio-1.0
---   ghc-options:         -threaded
---   hs-source-dirs:      src/langs
---   main-is:             Langs.lhs
-
 executable teaberry
   import:              langs
   main-is:             Teaberry.lhs
@@ -135,3 +121,12 @@ executable teaberry
                        optparse-applicative
   ghc-options:         -threaded
   hs-source-dirs:      src/langs,src/exe
+
+-- executable for the old lib code
+executable teaberryold
+  import:              shared-properties
+  main-is:             TeaberryOld.lhs
+  build-depends:       teaberry
+  ghc-options:         -threaded
+  hs-source-dirs:      src/exe
+  other-modules:       Parserize

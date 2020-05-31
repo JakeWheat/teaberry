@@ -119,11 +119,11 @@ and reads the starting source from disk here too
 >     getImp _ = Nothing
 >         
 
-> evaluate :: Env -> String -> IO (Value, Env, [T.CheckResult])
+> evaluate :: Maybe String -> Env -> String -> IO (Value, Env, [T.CheckResult])
 > evaluate = evaluate' makeRealFilesystemReader
 
-> evaluate' :: FileSystemWrapper -> Env -> String -> IO (Value, Env, [T.CheckResult])
-> evaluate' fsw env src =
+> evaluate' :: FileSystemWrapper -> Maybe String -> Env -> String -> IO (Value, Env, [T.CheckResult])
+> evaluate' fsw fnm env src =
 >     fst <$> evalRWST f env emptyInterpreterState
 >     --`catch` (\e -> pure $ Left $ interpreterExceptionToString e)
 >     --`catch` (\(e::SomeException) -> pure $ Left $ displayException e)
@@ -131,8 +131,8 @@ and reads the starting source from disk here too
 >     f :: Interpreter (Value, Env, [T.CheckResult])
 >     f = do
 >         (ast,srcs) <- loadSourceFiles fsw src
->         y <- either throwInterp pure $ runDesugar ast srcs
->         v <- {-trace (pretty y) $ -}interp y
+>         y <- either throwInterp pure $ runDesugar (maybe "toplevel.x" id fnm) ast srcs
+>         v <- {-trace (pretty y) $-} interp y
 >         t <- runAddedTests
 >         case v of
 >              TupleV [v', VariantV "record" e] -> pure (v',env {envEnv = e}, t)
@@ -159,6 +159,7 @@ include from X: a as a, b as b end
 
 > data Stmt = StExpr Expr
 >           | LetDecl String Expr
+>           | LetSplatDecl Expr
 >           | Check (Maybe String) [Stmt]
 >           | VarDecl String Expr
 >           | SetVar String Expr
@@ -184,10 +185,12 @@ include from X: a as a, b as b end
 >           | App Expr [Expr]
 >           | Lam [String] Expr
 >           | Let [(String,Expr)] Expr
+>           | LetSplat Expr Expr
 >           | Block [Stmt]
 >           | Seq Expr Expr
 >           | If [(Expr,Expr)] (Maybe Expr)
 >           | DotExpr Expr String
+>           | TupleGet Expr Int
 >           | Cases String Expr [(String, [String], Expr)] (Maybe Expr)
 >           | Box Expr
 >           | SetBox Expr Expr
@@ -208,11 +211,11 @@ embedded api
 >     x <- newIORef defaultEnv
 >     pure $ TeaberryHandle x
 
-> runScript :: TeaberryHandle -> [(String,Value)] -> String -> IO Value
-> runScript h lenv src = do
+> runScript :: TeaberryHandle -> Maybe String -> [(String,Value)] -> String -> IO Value
+> runScript h fnm lenv src = do
 >     enx <- readIORef (henv h)
 >     let en = extendEnv lenv enx
->     (v,en',t) <- evaluate en src
+>     (v,en',t) <- evaluate fnm en src
 >     case t of
 >         [] -> pure ()
 >         _ -> putStrLn $ T.renderCheckResults t
@@ -226,9 +229,9 @@ embedded api
 > runFunction h f as = do
 >     -- how to give the args unique names? or just use shadow?
 >     -- (and the function)
->     v <- runScript h [] f
+>     v <- runScript h Nothing [] f
 >     let as' = zipWith (\i x -> ("aaa-" ++ show i, x)) [(0::Int)..] as
->     runScript h (("fff", v):as') $ "fff(" ++ intercalate "," (map fst as') ++ ")"
+>     runScript h Nothing (("fff", v):as') $ "fff(" ++ intercalate "," (map fst as') ++ ")"
 
 > valueToString :: Value -> Maybe String
 > valueToString v = case v of
@@ -284,21 +287,25 @@ testing support in the desugarer monad
 
 desugaring code
 
-> runDesugar :: Module -> [(String,Module)] -> Either String Expr
-> runDesugar ast srcs = fst <$> runExcept (evalRWST go () startingDesugarState)
+> runDesugar :: String -> Module -> [(String,Module)] -> Either String Expr
+> runDesugar nm ast srcs = fst <$> runExcept (evalRWST go () startingDesugarState)
 >   where
 >     go = do
->          (mns,srcs') <- desugarEm [] [] srcs
->          ast' <- desugarTopLevelModule mns ast
->          let y = (combineEm srcs') ast'
+>          srcs' <- desugarEm [] (srcs ++ [(nm,ast)])
+>          -- for repl support, splat out the contents of the last module
+>          -- and return the last value of this module plus the env           
+>          sf <- desugarStmts [LetSplatDecl (tg 1)
+>                             ,StExpr $ TupleSel [tg 0, tg 1]]
+>          let y = (combineEm srcs') sf
 >          pure y
->     desugarEm mns desugaredModules [] = pure (mns, reverse desugaredModules)
+>     tg i = TupleGet (Iden ("module." ++ nm)) i
+>     desugarEm desugaredModules [] = pure $ reverse desugaredModules
 >     -- should learn how to use folds better
 >     -- would make the code more regular and
 >     -- quicker to understand/review?
->     desugarEm mns desugaredModules ((n,m):ms) = do
->         (unm, dsm) <- desugarImportedModule mns n m
->         desugarEm ((n ,unm) : mns) ((unm,dsm):desugaredModules) ms
+>     desugarEm desugaredModules ((n,m):ms) = do
+>         dsm <- desugarModule m
+>         desugarEm ((("module." ++ n), dsm):desugaredModules) ms
 >     combineEm [] = id
 >     combineEm ((n,e):es) = Let [(n,e)] <$> combineEm es
 
@@ -306,31 +313,14 @@ desugaring code
 desugar module:
 desugar the prelude
 
-add the last statement which is slightly different depending on
-whether this is the top level module:
-  it returns the last value and the env (for repl/embedded)
-or if if it's an imported module
-  it returns the env only
+add the last statement which returns the last value and the env, for
+  repl/embedded and for imports
 
-> desugarImportedModule :: [(String,String)] -> String -> Module -> Desugarer (String,Expr)
-> desugarImportedModule mns moduleName ast = do
->     stmts <- desugarModule False mns ast
->     umn <- makeUniqueVar moduleName
->     pure (umn, stmts)
-
-> desugarTopLevelModule :: [(String,String)] -> Module -> Desugarer Expr
-> desugarTopLevelModule mns ast = do
->     desugarModule True mns ast
-  
-> desugarModule :: Bool -> [(String,String)] -> Module -> Desugarer Expr
-> desugarModule isTopLevel otherModuleNames (Module ps stmts) = do
->     ps' <- concat <$> mapM (desugarPreludeStmt otherModuleNames) ps
+> desugarModule :: Module -> Desugarer Expr
+> desugarModule (Module ps stmts) = do
+>     ps' <- concat <$> mapM desugarPreludeStmt ps
 >     -- add the final value for repl/embedded and imported module support
->     stmts' <- if isTopLevel
->               then addTopRet stmts
->               else -- non top level module, return the env
->                    -- this will become the provides call
->                    pure $ stmts ++ [StExpr $ App (Iden "env-to-record") []]
+>     stmts' <- addTopRet stmts
 >     desugarStmts (ps' ++ stmts')
 >   where
 >     mk x = StExpr $ TupleSel [x, App (Iden "env-to-record") []]
@@ -341,16 +331,13 @@ or if if it's an imported module
 >     addTopRet (x:xs) = (x:) <$> addTopRet xs
 
   
-> desugarPreludeStmt :: [(String,String)] -> PreludeStmt -> Desugarer [Stmt]
-> desugarPreludeStmt mp (Import a b) = do
->     srcName <- maybe (lift $ throwE $ "module not found in module name list: " ++ a ++ "\n" ++ show mp)
->                pure $ lookup a mp
->     pure [LetDecl b (Iden srcName)]
+> desugarPreludeStmt :: PreludeStmt -> Desugarer [Stmt]
+> desugarPreludeStmt (Import a b) =
+>     pure [LetDecl b (TupleGet (Iden ("module." ++ a)) 1)]
 
-> desugarPreludeStmt mp (Include nm is) = do
->     srcName <- maybe (lift $ throwE $ "module not found in module name list: " ++ nm ++ "\n" ++ show mp)
->                pure $ lookup nm mp
->     pure $ flip map is $ \(n1,n2) -> LetDecl n2 (DotExpr (Iden srcName) n1)
+> desugarPreludeStmt (Include nm is) = do
+>     pure $ flip map is $ \(n1,n2) ->
+>         LetDecl n2 (DotExpr (TupleGet (Iden ("module." ++ nm)) 1) n1)
 
 > desugar :: Expr -> Desugarer Expr
 
@@ -399,6 +386,9 @@ or if if it's an imported module
 >     let f (n,v) = (n,) <$> desugar v
 >     Let <$> mapM f bs <*> desugar e
 
+> desugar (LetSplat re e) =
+>     LetSplat <$> desugar re <*> desugar e
+  
 > desugar (Seq a b) =
 >     Seq <$> desugar a <*> desugar b
 
@@ -437,6 +427,7 @@ no idea if this is good or not
 > desugar (UnboxRef e n) = desugar (Unbox (DotExpr e n))
 
 > desugar (Unbox x) = Unbox <$> desugar x
+> desugar (TupleGet e i) = TupleGet <$> desugar e <*> pure i
 
   
 > desugarStmts :: [Stmt] -> Desugarer Expr
@@ -460,13 +451,25 @@ no idea if this is good or not
 >     appI i as = App (Iden i) as
 
 > desugarStmts [] = lift $ throwE $ "empty block"
+
+testing hack
+  
+> desugarStmts (StExpr (App (Iden "letsplat") [re]) : xs) =
+>     desugarStmts (LetSplatDecl re : xs)
+  
 > desugarStmts [StExpr e] = desugar e
 > desugarStmts [x@(LetDecl {})] = desugarStmts [x, StExpr $ Iden "nothing"]
+> desugarStmts [x@(LetSplatDecl {})] = desugarStmts [x, StExpr $ Iden "nothing"]
 
 > desugarStmts (LetDecl n v : es) = do
 >     v' <- desugar v
 >     Let [(n,v')] <$> desugarStmts es
 
+
+> desugarStmts (LetSplatDecl re : es) = do
+>     LetSplat <$> desugar re <*> desugarStmts es
+
+  
 > desugarStmts (VarDecl n v : es) = do
 >     v' <- Box <$> desugar v
 >     desugarStmts (LetDecl n v' : es)
@@ -680,6 +683,25 @@ displayexception, which is less wrong
 >             local (extendEnv [(b,v)]) $ newEnv bs'
 >     newEnv bs
 
+take the fields in the record, and bind them to the current env:
+e.g.
+r = {a:1,b:2}
+expand-record(r)
+  ->
+a = r.a
+b = r.b
+
+> interp (LetSplat re e) = do
+>     x <- interp re
+>     case x of
+>         VariantV "record" bs ->
+>             local (extendEnv bs) $ interp e
+>         _ -> throwInterp $ "expected record in letsplat, got " ++ show x
+>     -- get value for r in env
+>     -- make sure it's a record
+>     -- extent the env with the record bindings
+
+  
 > interp (Block {}) = throwInterp $ "undesugared block passed to interpreter"
 > interp (Seq a b) = interp a *> interp b
 
@@ -699,6 +721,14 @@ displayexception, which is less wrong
 > interp e@(DotExpr {}) = throwInterp $ "interp: undesugared dotexpr " ++ show e
 > interp e@(Cases {}) = throwInterp $ "interp: undesugared cases " ++ show e
 
+> interp (TupleGet e i) = do
+>     t <- interp e
+>     case t of
+>         TupleV ts | i < length ts -> pure (ts !! i)
+>                   | otherwise -> throwInterp $ "tuple get " ++ show i ++ " on " ++ show ts
+>         _ -> throwInterp $ "tuple get on " ++ show t
+
+  
 > interp (Box e) = do
 >     v <- interp e
 >     box v
@@ -845,8 +875,9 @@ ffi catalog
 > envToRecord :: Interpreter Value
 > envToRecord = do
 >     rd <- ask
+>           
 >     pure $ VariantV "record" $ envEnv rd
-
+  
 > torepr :: Value -> Value
 > torepr x = TextV $ torepr' x
 
@@ -1237,7 +1268,8 @@ pretty
 > unconv (If bs e) = S.If (map f bs) (fmap unconv e)
 >   where
 >     f (c,t) = (unconv c, unconv t)
-> unconv (DotExpr e f) = S.DotExpr (unconv e) f  
+> unconv (DotExpr e f) = S.DotExpr (unconv e) f
+> unconv (TupleGet t i) = S.TupleGet (unconv t) i
 > unconv (Cases ty t bs els) =
 >     S.Cases ty (unconv t) (map f bs) (fmap unconv els)
 >   where
@@ -1248,12 +1280,14 @@ pretty
 
 > unconv (UnboxRef e n) = S.Unbox (unconv e) n
 > unconv (Unbox e) = S.App (S.Iden "unbox") [unconv e]
+> unconv (LetSplat re e) = S.App (S.Iden "letsplat") [unconv re, unconv e]
 
   
 > --unconv x = error $ "unconv: " ++ show x
 
 > unconvStmt :: Stmt -> S.Stmt
 > unconvStmt (LetDecl n e) = S.LetDecl (unconvBinding n e)
+> unconvStmt (LetSplatDecl re) = S.StExpr (S.App (S.Iden "letsplatdecl") [unconv re])
 > unconvStmt (StExpr e) = S.StExpr (unconv e)
 > unconvStmt (Check nm bs) = S.Check nm $ map unconvStmt bs
 > unconvStmt (VarDecl n e) = S.VarDecl (unconvBinding n e)
@@ -1840,6 +1874,12 @@ check:
   h(c) is 12
 end
 
+check:
+  r = { xx : 1, yy : 'a'}
+  letsplat(r)
+  xx is 1
+  yy is 'a'
+end
 
 
 
@@ -1869,14 +1909,14 @@ end
 
      
 > tests1 :: T.TestTree
-> tests1 = T.makeTestsIO "imports4repla" $ ((\(_,_,x) -> Right x) <$> evaluate defaultEnv simpleTestScript)
+> tests1 = T.makeTestsIO "imports4repla" $ ((\(_,_,x) -> Right x) <$> evaluate Nothing defaultEnv simpleTestScript)
 
 > tests2 :: T.TestTree
 > tests2 = T.testGroup "imports4replb" $ map makeTest importsTestScripts
 >   where
 >     makeTest s =
 >       let ((_,src):ts) = reverse $ either error id $ T.parseModules s
->           crs = evaluate' (makeFileSystemMock ts) defaultEnv src
+>           crs = evaluate' (makeFileSystemMock ts) Nothing defaultEnv src
 >       in T.makeTestsIO "imports4replb" ((\(_,_,x) -> Right x) <$> crs)
 
 
@@ -1892,25 +1932,25 @@ end
 >     ]
 
 > testSanityArith :: T.TestTree
-> testSanityArith = T.testCase "testSanityArith" $ do
+> testSanityArith = T.testCase "testSanityArith4" $ do
 >     h <- newTeaberryHandle
->     v <- runScript h [] "1 + 2"
+>     v <- runScript h Nothing [] "1 + 2"
 >     T.assertEqual "" (NumV 3) v
 
 
 > testEnvKept :: T.TestTree
 > testEnvKept = T.testCase "testEnvKept" $ do
 >     h <- newTeaberryHandle
->     _ <- runScript h [] "a = 1"
->     v <- runScript h [] "a"
+>     _ <- runScript h Nothing [] "a = 1"
+>     v <- runScript h Nothing [] "a"
 >     T.assertEqual "" (NumV 1) v
 
 > testEnvOverridden :: T.TestTree
 > testEnvOverridden = T.testCase "testEnvOverridden" $ do
 >     h <- newTeaberryHandle
->     _ <- runScript h [] "a = 1"
->     _ <- runScript h [] "a = 4"
->     v <- runScript h [] "a"
+>     _ <- runScript h Nothing [] "a = 1"
+>     _ <- runScript h Nothing [] "a = 4"
+>     v <- runScript h Nothing [] "a"
 >     T.assertEqual "" (NumV 4) v
 
 *****
@@ -1927,7 +1967,7 @@ a + b
 \end{code}
 >         |]
 >     h <- newTeaberryHandle
->     v <- runScript h [] script
+>     v <- runScript h Nothing [] script
 >     T.assertEqual "" (NumV 7) v
 
 todo: lots of boilerplate and abstraction details to work out
@@ -1946,7 +1986,8 @@ todo: lots of boilerplate and abstraction details to work out
 > testRunScriptWithValues :: T.TestTree
 > testRunScriptWithValues = T.testCase "testRunScriptWithValues" $ do
 >     h <- newTeaberryHandle
->     v <- runScript h [("a", NumV 3)
+>     v <- runScript h Nothing
+>                      [("a", NumV 3)
 >                      ,("b", NumV 11)] "a + b"
 >     T.assertEqual "" (NumV 14) v
 
@@ -1964,7 +2005,7 @@ should a stay in the env? not sure
 > testRunFunctionSimple :: T.TestTree
 > testRunFunctionSimple = T.testCase "testRunFunctionSimple" $ do
 >     h <- newTeaberryHandle
->     _ <- runScript h [] "f = lam(x,y): x + y end"
+>     _ <- runScript h Nothing [] "f = lam(x,y): x + y end"
 >     v <- runFunction h "f" [NumV 5, NumV 11]
 >     T.assertEqual "" (NumV 16) v
 

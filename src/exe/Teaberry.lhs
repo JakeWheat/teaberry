@@ -70,7 +70,7 @@ hacky engine to support multiple language implementations
 
 > data Backend h v = Backend
 >     {xNewHandle :: IO h
->     ,xRunScript :: h -> [(String,v)] -> String -> IO v
+>     ,xRunScript :: h -> Maybe String -> [(String,v)] -> String -> IO v
 >     ,xValueToString :: v -> Maybe String
 >     }
 
@@ -79,12 +79,12 @@ run file or script
 > runFile :: Backend ht vt -> FilePath -> IO ()
 > runFile be fp = do
 >     src <- readFile fp
->     runSrc be src
+>     runSrc be (Just fp) src
 
-> runSrc :: Backend ht vt -> String -> IO ()
-> runSrc be src = do
+> runSrc :: Backend ht vt -> (Maybe String) -> String -> IO ()
+> runSrc be fnm src = do
 >     h <- xNewHandle be
->     v <- (xRunScript be) h [] src
+>     v <- (xRunScript be) h fnm [] src
 >     case (xValueToString be) v of
 >         Nothing -> pure ()
 >         Just s -> putStrLn s
@@ -93,7 +93,7 @@ repl
 
 > process :: Backend h v -> h -> String -> IO ()
 > process be h src = (do
->     v <- (xRunScript be) h [] src
+>     v <- (xRunScript be) h Nothing [] src
 >     case (xValueToString be) v of
 >             Nothing -> pure ()
 >             Just s -> putStrLn s)
@@ -188,7 +188,7 @@ main
 >                               ,xRunScript = Import4Repl.runScript
 >                               ,xValueToString = Import4Repl.valueToString}
 >         records1Embedded = Backend {xNewHandle = Records1Embedded.newTeaberryHandle
->                                    ,xRunScript = \h e s ->
+>                                    ,xRunScript = \h _ e s ->
 >                                            either error id <$> Records1Embedded.runScript h e s
 >                                    ,xValueToString = Records1Embedded.valueToString}
 >     case backend os of
@@ -203,5 +203,5 @@ main
 >     case os of
 >         MyOpts {file = Just {}, script = Just {}} -> error "please pass either a file or code to run, not both"
 >         MyOpts {file = Just f} -> runFile be f
->         MyOpts {script = Just c} -> runSrc be c
+>         MyOpts {script = Just c} -> runSrc be Nothing c
 >         _ -> doRepl be
