@@ -15,6 +15,7 @@
 >                      ,testSourceFile
 >                      ,detailedSourceFileTests
 >                      ,testDetailedSourceFile)
+> import Langs (langTests)
 
 > main :: IO ()
 > main = do
@@ -32,4 +33,5 @@
 >         ,T.testGroup "interpret" $ map testInterpreter interpreterTests
 >         ,T.testGroup "test tests" $ map testDetailedSourceFile detailedSourceFileTests
 >         ,sourceFileTests
+>         ,langTests
 >         ]

@@ -1,4 +1,5 @@
 
+> module Langs (langTests) where
 
 > import qualified SimpleExpr
 > import qualified SimpleExprError
@@ -34,9 +35,8 @@
 
 > import qualified Test.Tasty as T
 
-> main :: IO ()
-> main =
->     T.defaultMain $ T.testGroup "all" $ 
+> langTests :: T.TestTree
+> langTests = T.testGroup "langs" $ 
 >        [SimpleExpr.tests
 >        ,SimpleExprError.tests
 >        ,SimpleExprReader.tests

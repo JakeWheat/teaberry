@@ -53,38 +53,24 @@ library
   hs-source-dirs:      src/lib
 
 
-executable teaberry
+executable teaberryold
   import:              shared-properties
-  main-is:             Teaberry.lhs
+  main-is:             TeaberryOld.lhs
   build-depends:       teaberry
   ghc-options:         -threaded
   hs-source-dirs:      src/exe
   other-modules:       Parserize
 
   
-Test-Suite RunTests
-  import:              shared-properties
-  type:                exitcode-stdio-1.0
-  main-is:             RunTests.lhs
-  other-modules:       DesugarTests
-                       InterpreterTests
-                       TeaberryTests
-                       ParseTests
-  build-depends:       teaberry,
-                       tasty >= 1.1 && < 1.4,
-                       tasty-hunit >= 0.10 && < 0.11
-  ghc-options:         -threaded
-  hs-source-dirs:      src/tests
-
 common langs
   import:              shared-properties
   build-depends:       teaberry,
                        tasty >= 1.1 && < 1.4,
                        tasty-hunit >= 0.10 && < 0.11,
-                       raw-strings-qq,
-                       haskeline
+                       raw-strings-qq
   hs-source-dirs:      src/langs
   other-modules:       TestUtils
+                       Langs
                        SimpleExpr
                        SimpleExprError
                        SimpleExprReader
@@ -117,25 +103,33 @@ common langs
                        Import4
                        Import4Repl
 
-  
-Test-Suite Langs
+Test-Suite RunTests
+  import:              shared-properties
   import:              langs
   type:                exitcode-stdio-1.0
-  ghc-options:         -threaded
-  hs-source-dirs:      src/langs
-  main-is:             Langs.lhs
-
-executable teaberry2
-  import:              langs
-  main-is:             Teaberry2.lhs
+  main-is:             RunTests.lhs
+  other-modules:       DesugarTests
+                       InterpreterTests
+                       TeaberryTests
+                       ParseTests
   build-depends:       teaberry,
-                       haskeline
+                       tasty >= 1.1 && < 1.4,
+                       tasty-hunit >= 0.10 && < 0.11
   ghc-options:         -threaded
-  hs-source-dirs:      src/langs
+  hs-source-dirs:      src/tests
 
-executable teaberry3
+
+  
+-- Test-Suite Langs
+--   import:              langs
+--   type:                exitcode-stdio-1.0
+--   ghc-options:         -threaded
+--   hs-source-dirs:      src/langs
+--   main-is:             Langs.lhs
+
+executable teaberry
   import:              langs
-  main-is:             Teaberry3.lhs
+  main-is:             Teaberry.lhs
   build-depends:       teaberry,
                        haskeline,
                        optparse-applicative
