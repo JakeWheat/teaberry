@@ -64,8 +64,10 @@ common langs
                        tasty-hunit >= 0.10 && < 0.11,
                        raw-strings-qq
   hs-source-dirs:      src/langs
+  autogen-modules:     Paths_teaberry
   other-modules:       TestUtils
                        Langs
+                       Paths_teaberry
                        SimpleExpr
                        SimpleExprError
                        SimpleExprReader

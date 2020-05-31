@@ -1,6 +1,20 @@
 
 Simplest import with file loader extended to support a repl
 
+supports build in modules from the build in module dir which is fixed
+and loading file modules relative to the cwd or uisng an absolute path name
+reusing a built in name as a filename might fail in weird ways
+
+future work: add a search path
+anomaly handling - especially duplicate module names
+add more namespacing for modules:
+  1. hierarchies like with haskell
+  2. modules also live in packages or something
+     -> this allows code to just work when two packages use the same module name
+  3. see if can come up with a sensible solution when not working with packages
+     like you combine two sets of source files and there are conflicts
+     want it to just work if possible, not to tell the user to jump
+      through a bunch of makework hoops
 
 
 > {-# LANGUAGE TupleSections #-}
@@ -47,10 +61,14 @@ Simplest import with file loader extended to support a repl
 
 > import Data.IORef (IORef, newIORef, readIORef, writeIORef)
 
+> import Paths_teaberry
+> import System.FilePath ((</>))
+
+  
 ------------------------------------------------------------------------------
 
-"fileloader"
-------------
+fileloader
+----------
 
 
 wrapper around evaluate which can follow the imports and load them
@@ -87,13 +105,8 @@ todo: write a version which only reads enough of each file to get the imports
 and only loads one file at a time and desugars it?
 is this worth it? wait until it becomes a performance issue
 
-todo: pass the top level name as a maybe, because at least some of the
-time, the caller of this code has a name for it
-and/or create a variation which is passed a filename instead of the source
-and reads the starting source from disk here too
-  
-> loadSourceFiles :: FileSystemWrapper -> String -> Interpreter (Module, [(String,Module)])
-> loadSourceFiles fsw src = do
+> loadSourceFiles :: FileSystemWrapper -> String -> String -> Interpreter (Module, [(String,Module)])
+> loadSourceFiles fsw buildInModDir src = do
 >     -- todo: memoize so loading a module twice doesn't read the
 >     -- file and parse it twice
 >     let (ast,rs) = parseMod src
@@ -101,7 +114,7 @@ and reads the starting source from disk here too
 >     -- nub it so it only includes each dependency once
 >     x <- (nubBy (\a b -> fst a == fst b) . reverse . concat)
 >          <$> mapM loadAndRecurse rs
->     pure $ (ast, x)             
+>     pure $ (ast, x)
 >   where
 >     -- parse the file, get the imports
 >     -- recurse on these imports, returning the filename and the
@@ -111,26 +124,44 @@ and reads the starting source from disk here too
 >                  in (ast, rs)
 >     f nm s = let (ast,rs) = parseMod s
 >              in (((nm,ast):) . concat) <$> mapM loadAndRecurse rs
->     loadAndRecurse fn = do
+>     -- todo: a bit confused
+>     -- what is the canonical name of a module?
+>     -- it's not exactly the same as the file path
+>     -- and it's definitely not the filepath of built in modules
+>     -- try to find a single place to have this resolution
+>     -- it's also used in the desugaring of prelude statements
+>     -- before packages, hierarchical names and builtins being
+>     -- in different namespaces, it should be the name of the built in
+>     -- used by the user (no .tea, no path)
+>     -- or the path used in import file(x), with any .tea removed
+>     -- and the directory removed if there is one      
+>     loadAndRecurse is = do
+>         let fn = case is of
+>                   ImportFile n -> n
+>                   ImportName n -> buildInModDir </> n ++ ".tea"
+>             mn = case is of
+>                   ImportFile n -> n
+>                   ImportName n -> n
 >         x <- liftIO $ (loadFile fsw) fn
->         f fn x
->         
+>         f mn x
 >     getImp (Import fn _) = Just fn
 >     getImp _ = Nothing
->         
 
+> getBuiltInModulesDir :: IO FilePath
+> getBuiltInModulesDir = getDataFileName "built-in-modules"
+ 
+  
 > evaluate :: Maybe String -> Env -> String -> IO (Value, Env, [T.CheckResult])
 > evaluate = evaluate' makeRealFilesystemReader
 
 > evaluate' :: FileSystemWrapper -> Maybe String -> Env -> String -> IO (Value, Env, [T.CheckResult])
-> evaluate' fsw fnm env src =
->     fst <$> evalRWST f env emptyInterpreterState
->     --`catch` (\e -> pure $ Left $ interpreterExceptionToString e)
->     --`catch` (\(e::SomeException) -> pure $ Left $ displayException e)
+> evaluate' fsw fnm env src = do
+>     d <- getBuiltInModulesDir      
+>     fst <$> evalRWST (f d) env emptyInterpreterState
 >   where
->     f :: Interpreter (Value, Env, [T.CheckResult])
->     f = do
->         (ast,srcs) <- loadSourceFiles fsw src
+>     f :: FilePath -> Interpreter (Value, Env, [T.CheckResult])
+>     f d = do
+>         (ast,srcs) <- loadSourceFiles fsw d src
 >         y <- either throwInterp pure $ runDesugar (maybe "toplevel.x" id fnm) ast srcs
 >         v <- {-trace (pretty y) $-} interp y
 >         t <- runAddedTests
@@ -150,10 +181,15 @@ syntax
 > data Module = Module [PreludeStmt] [Stmt]
 >             deriving (Eq, Show)
 
-> data PreludeStmt = Import String String
->                  | Include String [(String, String)]
+> data PreludeStmt = Import ImportSource String
+>                  | IncludeFrom String [(String, String)]
 >                  deriving (Eq, Show)
 
+> data ImportSource = ImportFile String
+>                   | ImportName String
+>                   deriving (Eq,Show) 
+
+  
 import a as b
 include from X: a as a, b as b end
 
@@ -203,14 +239,24 @@ include from X: a as a, b as b end
 embedded api
 ------------
 
-> data TeaberryHandle = TeaberryHandle
->     {henv :: IORef Env}
+> data TeaberryHandle = TeaberryHandle {henv :: IORef Env}
   
 > newTeaberryHandle :: IO TeaberryHandle
 > newTeaberryHandle = do
 >     x <- newIORef defaultEnv
 >     pure $ TeaberryHandle x
 
+todo:
+
+add load file
+and run script from file, where you only pass the filename
+the run script and runscript from file will print the value
+  of every top level statement
+load file won't
+there should be a way to turn the printing off
+maybe this should just be an option instead of differently named functions
+'it' support?
+  
 > runScript :: TeaberryHandle -> Maybe String -> [(String,Value)] -> String -> IO Value
 > runScript h fnm lenv src = do
 >     enx <- readIORef (henv h)
@@ -249,7 +295,7 @@ desugar
 >                                  ,nextUnusedCheckBlockID :: Int
 >                                  ,nextAnonymousBlockNumber :: Int
 >                                  ,currentCheckBlockIDName :: Maybe String}
-
+  
 > startingDesugarState :: DesugarState
 > startingDesugarState = DesugarState 0 0 0 Nothing
 
@@ -332,13 +378,17 @@ add the last statement which returns the last value and the env, for
 
   
 > desugarPreludeStmt :: PreludeStmt -> Desugarer [Stmt]
-> desugarPreludeStmt (Import a b) =
->     pure [LetDecl b (TupleGet (Iden ("module." ++ a)) 1)]
+> desugarPreludeStmt (Import is b) =
+>     pure [LetDecl b (TupleGet (Iden (importSourceName is)) 1)]
 
-> desugarPreludeStmt (Include nm is) = do
+> desugarPreludeStmt (IncludeFrom nm is) =
 >     pure $ flip map is $ \(n1,n2) ->
 >         LetDecl n2 (DotExpr (TupleGet (Iden ("module." ++ nm)) 1) n1)
 
+> importSourceName :: ImportSource -> String
+> importSourceName (ImportFile s) = "module." ++ s
+> importSourceName (ImportName n) = "module." ++ n  
+  
 > desugar :: Expr -> Desugarer Expr
 
 > desugar (Block sts) = desugarStmts sts
@@ -1143,10 +1193,11 @@ like a desugaring process.
 
 > convPrelude :: S.PreludeItem -> Either String PreludeStmt
 
-> convPrelude (S.Import (S.ImportName x) y) = pure $ Import x y
+> convPrelude (S.Import (S.ImportName x) y) = pure $ Import (ImportName x) y
+> convPrelude (S.Import (S.ImportSpecial "file" [fn]) y) = pure $ Import (ImportFile fn) y
 
 > convPrelude (S.IncludeFrom x as) | Just as' <- mapM f as =
->     pure $ Include x as'
+>     pure $ IncludeFrom x as'
 >   where
 >     f (S.ProvideAlias a b) = Just (a,b)
 >     f _ = Nothing          
@@ -1629,7 +1680,7 @@ end
 
 xmodule: main1
 
-import my-module as my-module
+import file('my-module') as my-module
 
 check:
   my-module.a is 1
@@ -1638,7 +1689,7 @@ end
 
 xmodule: main1-5
 
-import my-module as my-module1
+import file('my-module') as my-module1
 
 check:
   my-module1.a is 1
@@ -1647,7 +1698,7 @@ end
 
 xmodule: main2
 
-import my-module as my-module
+import file('my-module') as my-module
 include from my-module: a as a, b as b end
 
 check:
@@ -1658,7 +1709,7 @@ end
 
 xmodule: main3
 
-import my-module as my-2
+import file('my-module') as my-2
 check:
   my-2.a is 1
   my-2.b(5) is 6
@@ -1675,8 +1726,8 @@ end
 
 xmodule: main3
 
-import my-2 as my-module
-import my-module as my-2
+import file('my-2') as my-module
+import file('my-module') as my-2
 
 check:
   my-2.a is 1
@@ -1714,7 +1765,7 @@ xmodule: main2
 
 # include data type + cases demo
 
-import main1 as main1
+import file('main1') as main1
 include from main1: pt as pt, f as f, a as a end
 
 check:
@@ -1741,7 +1792,7 @@ xmodule: main3
 
 # import data type + cases use under qualifier demo
 
-import main1 as main1
+import file('main1') as main1
 
 check:
   main1.f(main1.a) is 1
@@ -1768,7 +1819,7 @@ xmodule: main3
 # shadow imported data type with local data type with same name and
 # same variant names, use both
 
-import main1 as main1
+import file('main1') as main1
 
 data Point:
   | pt(x, y)
@@ -1797,7 +1848,7 @@ xmodule: main3
 
 # import data type under different alias
 
-import main1 as xxx
+import file('main1') as xxx
 
 check:
   xxx.f(xxx.a) is 1
@@ -1839,8 +1890,8 @@ end
 
 xmodule: xmain4
 
-import main1 as main1alt
-import main1alt as main1
+import file('main1') as main1alt
+import file('main1alt') as main1
 
 data Point:
   | pt(x, y)
@@ -1893,7 +1944,7 @@ end
 > simpleTestScript33 = [r|
 \begin{code} 
 
-import a-module as a-module
+import file('a-module') as a-module
 
 check "basic tests":
   a-module.f(1) is 2
