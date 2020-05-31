@@ -4,13 +4,11 @@ New command line front end
 run script in file, passed on command line or get repl
 
 todo: implement test levels
-implement dump desugared
 
 todo: multiple -f, -c
 todo: ability to start the repl after doing -f, -c
 todo: more flexibility, logging, only run for some modules variations
 todo: ability to run the system tests via tasty (uses separate exe for now)
-todo: switch dump desugared on and off in the repl too
 todo: catch all non-asynchronous exceptions
   ctrl-c special handling for now: reset the repl input buffer on a new line
     future: ability to interrupt a running process and return to the repl prompt cleanly and quickly
@@ -131,8 +129,6 @@ starts repl if neither of these are specified
 --full-test-output (default?) run all the tests and output everything
 --hide-tests-successes run all the tests, only show the failures and the summary
 --one-line-test-summary run all the tests, only show one line with the number of successes and failures
---dump-desugared instead of running code, dump the pretty printed desugared stage
-  in the repl, it does this for each line you enter instead of running it
 --backend backend-name  choose a language backend to use instead of the latest one
   probably only useful for limited troubleshooting
 
@@ -140,7 +136,6 @@ starts repl if neither of these are specified
 >   { file :: Maybe String
 >   , script :: Maybe String
 >   , testLevel :: Int
->   , dumpDesugared :: Bool
 >   , backend :: Maybe String}
 >   deriving Show
 >               
@@ -160,9 +155,6 @@ starts repl if neither of these are specified
 >            <> value 1
 >            <> metavar "INT"
 >            <> help "test-level 0 = skip, 1= one line, 2 = show failures, 3 = show all")
->       <*> switch
->           (long "dump-desugared"
->            <> help "dump the desugared source instead of running")
 >       <*> optional (strOption
 >           (long "backend"
 >            <> metavar "LANGNAME"

@@ -27,9 +27,7 @@ common shared-properties
   build-depends:       base >= 4 && < 5,
                        megaparsec >= 8.0 && < 8.1,
                        scientific >= 0.3 && < 0.4,
-                       uniplate >= 1.6 && < 1.7,
                        pretty >= 1.1 && < 1.2,
-                       pretty-show >= 1.7 && < 1.11,
                        transformers >= 0.5 && < 0.6,
                        mtl >= 2.2 && < 2.3,
                        safe-exceptions >= 0.1 && < 0.2,
@@ -40,6 +38,8 @@ common shared-properties
 -- this is the old version of the code that is in the process of being replaced
 library
   import:              shared-properties
+  build-depends:       uniplate >= 1.6 && < 1.7,
+                       pretty-show >= 1.7 && < 1.11
   exposed-modules:     Syntax
                        Parse
                        Desugar
@@ -67,6 +67,7 @@ common langs
   autogen-modules:     Paths_teaberry
   other-modules:       TestUtils
                        Langs
+                       ParserExtra
                        Paths_teaberry
                        SimpleExpr
                        SimpleExprError

@@ -38,6 +38,7 @@ add more namespacing for modules:
 > import qualified Syntax as S
 > import qualified Pretty as Pr
 
+> import qualified ParserExtra as Px
 
 > import Control.Monad.Trans.Class (lift)
 > import Control.Monad.IO.Class (liftIO)
@@ -65,6 +66,72 @@ add more namespacing for modules:
 > import System.FilePath ((</>))
 
   
+
+------------------------------------------------------------------------------
+
+embedded api
+------------
+
+> data TeaberryHandle = TeaberryHandle
+>     {tbh :: IORef RuntimeState
+>     }
+
+> data RuntimeState = RuntimeState {
+>      henv :: Env
+>     ,executionStage :: ExecutionStage         
+>     }
+
+> defaultRuntimeState :: RuntimeState
+> defaultRuntimeState = RuntimeState {henv = defaultEnv, executionStage = FullExecution}
+  
+> data ExecutionStage = FullExecution
+>                     | DumpDesugar
+>                     deriving (Eq,Show)
+  
+> newTeaberryHandle :: IO TeaberryHandle
+> newTeaberryHandle = do
+>     x <- newIORef defaultRuntimeState
+>     pure $ TeaberryHandle x
+
+ 
+todo:
+
+add load file
+and run script from file, where you only pass the filename
+the run script and runscript from file will print the value
+  of every top level statement
+load file won't
+there should be a way to turn the printing off
+maybe this should just be an option instead of differently named functions
+'it' support?
+  
+> runScript :: TeaberryHandle -> Maybe String -> [(String,Value)] -> String -> IO Value
+> runScript h fnm lenv src = do
+>     ebs <- readIORef (tbh h)
+>     let ebs' = ebs {henv = extendEnv lenv $ henv ebs}
+>     (v,ebs'',t) <- evaluate fnm ebs' src
+>     case t of
+>         [] -> pure ()
+>         _ -> putStrLn $ T.renderCheckResults t
+>     -- if you press ctrl-c in between the start of
+>     -- writeioref and if finishing, or even at another time,
+>     -- can this write become corrupted?
+>     writeIORef (tbh h) ebs''
+>     pure v
+
+> runFunction :: TeaberryHandle -> String -> [Value] -> IO Value
+> runFunction h f as = do
+>     -- how to give the args unique names? or just use shadow?
+>     -- (and the function)
+>     v <- runScript h Nothing [] f
+>     let as' = zipWith (\i x -> ("aaa-" ++ show i, x)) [(0::Int)..] as
+>     runScript h Nothing (("fff", v):as') $ "fff(" ++ intercalate "," (map fst as') ++ ")"
+
+> valueToString :: Value -> Maybe String
+> valueToString v = case v of
+>     NothingV -> Nothing
+>     _ -> Just $ torepr' v
+
 ------------------------------------------------------------------------------
 
 fileloader
@@ -151,23 +218,42 @@ is this worth it? wait until it becomes a performance issue
 > getBuiltInModulesDir = getDataFileName "built-in-modules"
  
   
-> evaluate :: Maybe String -> Env -> String -> IO (Value, Env, [T.CheckResult])
+> evaluate :: Maybe String -> RuntimeState -> String -> IO (Value, RuntimeState, [T.CheckResult])
 > evaluate = evaluate' makeRealFilesystemReader
 
-> evaluate' :: FileSystemWrapper -> Maybe String -> Env -> String -> IO (Value, Env, [T.CheckResult])
-> evaluate' fsw fnm env src = do
->     d <- getBuiltInModulesDir      
->     fst <$> evalRWST (f d) env emptyInterpreterState
+> evaluate' :: FileSystemWrapper
+>           -> Maybe String
+>           -> RuntimeState
+>           -> String
+>           -> IO (Value, RuntimeState, [T.CheckResult])
+> evaluate' fsw fnm ebs src = do
+>     d <- getBuiltInModulesDir
+>     fst <$> evalRWST (f d) (henv ebs) emptyInterpreterState
 >   where
->     f :: FilePath -> Interpreter (Value, Env, [T.CheckResult])
->     f d = do
->         (ast,srcs) <- loadSourceFiles fsw d src
->         y <- either throwInterp pure $ runDesugar (maybe "toplevel.x" id fnm) ast srcs
->         v <- {-trace (pretty y) $-} interp y
->         t <- runAddedTests
->         case v of
->              TupleV [v', VariantV "record" e] -> pure (v',env {envEnv = e}, t)
->              _ -> throwInterp $ "expected 2 element tuple, second one record, got " ++ torepr' v
+>     f :: FilePath -> Interpreter (Value, RuntimeState, [T.CheckResult])
+>     f d =
+>         -- quick hack for set
+>         case Px.parseSet src of
+>             Right (k,v)
+>               | k == "dump-desugar" -> do
+>                 case v of
+>                      "t" -> pure (TextV "set dump desugar on", ebs {executionStage = DumpDesugar }, [])
+>                      "f" -> pure (TextV "set full execution on", ebs {executionStage = FullExecution }, [])
+>                      _ -> throwInterp $ "bad value for dump-desugar, expected t or f, got " ++ v
+>               | otherwise -> throwInterp $ "unrecognised set key: " ++ k
+>             Left _ -> do
+>                 (ast,srcs) <- loadSourceFiles fsw d src
+>                 y <- either throwInterp pure $ runDesugar (maybe "toplevel.x" id fnm) ast srcs
+>                 case executionStage ebs of
+>                     DumpDesugar -> pure (TextV $ "\n" ++ pretty y ++ "\n", ebs, [])
+>                     FullExecution -> do
+>                         v <- {-trace (pretty y) $-} interp y
+>                         t <- runAddedTests
+>                         case v of
+>                             TupleV [v', VariantV "record" e] ->
+>                                 let ne = (henv ebs) {envEnv = e}
+>                                 in pure (v',ebs {henv = ne}, t)
+>                             _ -> throwInterp $ "expected 2 element tuple, second one record, got " ++ torepr' v
 
 todo: this record is for preserving the env between calls from the embedded api
 combine it with the implementation for provides?
@@ -233,56 +319,6 @@ include from X: a as a, b as b end
 >           | UnboxRef Expr String
 >           | Unbox Expr
 >           deriving (Eq, Show)
-
-------------------------------------------------------------------------------
-
-embedded api
-------------
-
-> data TeaberryHandle = TeaberryHandle {henv :: IORef Env}
-  
-> newTeaberryHandle :: IO TeaberryHandle
-> newTeaberryHandle = do
->     x <- newIORef defaultEnv
->     pure $ TeaberryHandle x
-
-todo:
-
-add load file
-and run script from file, where you only pass the filename
-the run script and runscript from file will print the value
-  of every top level statement
-load file won't
-there should be a way to turn the printing off
-maybe this should just be an option instead of differently named functions
-'it' support?
-  
-> runScript :: TeaberryHandle -> Maybe String -> [(String,Value)] -> String -> IO Value
-> runScript h fnm lenv src = do
->     enx <- readIORef (henv h)
->     let en = extendEnv lenv enx
->     (v,en',t) <- evaluate fnm en src
->     case t of
->         [] -> pure ()
->         _ -> putStrLn $ T.renderCheckResults t
->     -- if you press ctrl-c in between the start of
->     -- writeioref and if finishing, or even at another time,
->     -- can this write become corrupted?
->     writeIORef (henv h) en'
->     pure v
-
-> runFunction :: TeaberryHandle -> String -> [Value] -> IO Value
-> runFunction h f as = do
->     -- how to give the args unique names? or just use shadow?
->     -- (and the function)
->     v <- runScript h Nothing [] f
->     let as' = zipWith (\i x -> ("aaa-" ++ show i, x)) [(0::Int)..] as
->     runScript h Nothing (("fff", v):as') $ "fff(" ++ intercalate "," (map fst as') ++ ")"
-
-> valueToString :: Value -> Maybe String
-> valueToString v = case v of
->     NothingV -> Nothing
->     _ -> Just $ torepr' v
 
 ------------------------------------------------------------------------------
 
@@ -1960,14 +1996,14 @@ end
 
      
 > tests1 :: T.TestTree
-> tests1 = T.makeTestsIO "imports4repla" $ ((\(_,_,x) -> Right x) <$> evaluate Nothing defaultEnv simpleTestScript)
+> tests1 = T.makeTestsIO "imports4repla" $ ((\(_,_,x) -> Right x) <$> evaluate Nothing defaultRuntimeState simpleTestScript)
 
 > tests2 :: T.TestTree
 > tests2 = T.testGroup "imports4replb" $ map makeTest importsTestScripts
 >   where
 >     makeTest s =
 >       let ((_,src):ts) = reverse $ either error id $ T.parseModules s
->           crs = evaluate' (makeFileSystemMock ts) Nothing defaultEnv src
+>           crs = evaluate' (makeFileSystemMock ts) Nothing defaultRuntimeState src
 >       in T.makeTestsIO "imports4replb" ((\(_,_,x) -> Right x) <$> crs)
 
 
