@@ -5,9 +5,6 @@ run script in file, passed on command line or get repl
 
 todo: implement test levels
 implement dump desugared
-test adding a backend
-
-
 
 todo: multiple -f, -c
 todo: ability to start the repl after doing -f, -c
@@ -25,9 +22,6 @@ todo: config files, init files, etc.
 
 ------------------------------------------------------------------------------
 
-> {-# LANGUAGE MultiParamTypeClasses #-}
-> {-# LANGUAGE FunctionalDependencies #-}
-> {-# LANGUAGE ExistentialQuantification #-}
 > {-# LANGUAGE ScopedTypeVariables #-}
 
 > import Control.Monad.Trans
@@ -36,13 +30,16 @@ todo: config files, init files, etc.
 > import Control.Exception.Safe (catch, SomeException, displayException)
 
 >
-> import qualified Import4Repl as D (TeaberryHandle
->                                   ,newTeaberryHandle
->                                   ,runScript
->                                   ,valueToString
->                                   ,Value
->                                   )
+> import qualified Import4Repl ({-TeaberryHandle
+>                              ,-}newTeaberryHandle
+>                              ,runScript
+>                              ,valueToString
+>                              --,Value
+>                              )
 
+> import qualified Records1Embedded (newTeaberryHandle
+>                                   ,runScript
+>                                   ,valueToString)
 
 > import Options.Applicative (Parser
 >                            ,strOption
@@ -69,157 +66,59 @@ todo: config files, init files, etc.
 
 ------------------------------------------------------------------------------
 
+hacky engine to support multiple language implementations
+
+> data Backend h v = Backend
+>     {xNewHandle :: IO h
+>     ,xRunScript :: h -> [(String,v)] -> String -> IO v
+>     ,xValueToString :: v -> Maybe String
+>     }
+
 run file or script
 
-> runFile :: FilePath -> IO ()
-> runFile fp = do
+> runFile :: Backend ht vt -> FilePath -> IO ()
+> runFile be fp = do
 >     src <- readFile fp
->     runSrc src
+>     runSrc be src
 
-> runSrc :: String -> IO ()
-> runSrc src = do
->     h <- D.newTeaberryHandle
->     v <- D.runScript h [] src
->     case D.valueToString v of
+> runSrc :: Backend ht vt -> String -> IO ()
+> runSrc be src = do
+>     h <- xNewHandle be
+>     v <- (xRunScript be) h [] src
+>     case (xValueToString be) v of
 >         Nothing -> pure ()
 >         Just s -> putStrLn s
 
-------------------------------------------------------------------------------
-
 repl
 
-> process :: D.TeaberryHandle -> String -> IO ()
-> process h src = (do
->     v <- D.runScript h [] src
->     case D.valueToString v of
+> process :: Backend h v -> h -> String -> IO ()
+> process be h src = (do
+>     v <- (xRunScript be) h [] src
+>     case (xValueToString be) v of
 >             Nothing -> pure ()
 >             Just s -> putStrLn s)
 >     `catch` (\(e::SomeException) -> putStrLn $ "Error: " ++ displayException e)
 
-> repl :: D.TeaberryHandle -> InputT IO ()
-> repl h = go
+> repl :: Backend h v -> h -> InputT IO ()
+> repl be h = go
 >   where
 >     go = withInterrupt (do
 >         minput <- getInputLine "t > "
 >         case minput of
 >             Nothing -> pure ()
 >             Just input -> do
->                 liftIO $ process h input
+>                 liftIO $ process be h input
 >                 go)
 >         -- ctrl-c resets to the prompt, doesn't exit the repl
 >         `catch` (\(_::Interrupt) -> liftIO (putStr "^C") >> go)
 
 
-> doRepl :: IO ()
-> doRepl = do
->     h <- D.newTeaberryHandle
->     runInputT st (repl h)
+> doRepl :: Backend h v -> IO ()
+> doRepl be = do
+>     h <- (xNewHandle be)
+>     runInputT st (repl be h)
 >   where
 >     st = defaultSettings {historyFile = (Just ".teaberryreplhistory")}
-
-------------------------------------------------------------------------------
-
-run file or script
-
-> {-runFile :: FilePath -> IO ()
-> runFile fp = do
->     src <- readFile fp
->     runSrc src-}
-
-> {-runSrcX :: Backend h v -> String -> IO ()
-> runSrcX be src = do
->     h <- newHandle be
->     x <- (runScript be) h [] src
->     case x of
->         Left e -> error e
->         Right v -> case (valueToString be) v of
->             Nothing -> pure ()
->             Just s -> putStrLn s-}
-
-------------------------------------------------------------------------------
-
-repl
-
-> {-process :: D.TeaberryHandle -> String -> IO ()
-> process h src = do
->     x <- D.runScript h [] src
->     case x of
->         Left y -> putStrLn $ "error: " ++ y
->         Right v -> case D.valueToString v of
->             Nothing -> pure ()
->             Just s -> putStrLn s
-
-> repl :: D.TeaberryHandle -> InputT IO ()
-> repl h = go
->   where
->     go = do
->         minput <- getInputLine "t > "
->         case minput of
->             Nothing -> pure ()
->             Just input -> do
->                 liftIO $ process h input
->                 go
-
-> doRepl :: IO ()
-> doRepl = do
->     h <- D.newTeaberryHandle
->     runInputT st (repl h)
->   where
->     st = defaultSettings {historyFile = (Just ".teaberryreplhistory")}  -}
-
-
-------------------------------------------------------------------------------
-
-backends
-
- > class Backend h v | h -> v, v -> h where
- >     newHandle :: IO h
- >     runScript :: h -> [(String,v)] -> String -> IO (Either String v)
- >     valueToString :: v -> Maybe String
- >
- > data AnyBackend = forall a b. (Backend a b) => AnyBackend a b
- >
- > instance Backend AnyBackend where
- >     newHandle = newHandle
- >     runScript  :: h -> [(String,v)] -> String -> IO (Either String v)
- >     valueToString :: v -> Maybe String
-
-class Renderable a where
- boundingSphere :: a -> Sphere
- hit :: a -> [Fragment] -- returns the "fragments" of all hits with ray
-
- > defaultBackend :: Backend
- > defaultBackend = Backend D.TeaberryHandle D.Value
-
- > instance Backed BackendC 
-
- data AnyRenderable = forall a. Renderable a => AnyRenderable a
-
-  instance Renderable AnyRenderable where
-      boundingSphere (AnyRenderable a) = boundingSphere a
-      hit (AnyRenderable a) = hit a
-  {-      ... -}
-
-Now, create lists with type [AnyRenderable], for example,
-
-    [ AnyRenderable x
-    , AnyRenderable y
-    , AnyRenderable z ]
-
-
-> {-instance Backend D.TeaberryHandle D.Value where
->     newHandle = D.newTeaberryHandle
->     runScript = D.runScript
->     valueToString = D.valueToString-}
->
-> {-data Backend h v = Backend
->     {newHandle :: IO h
->     ,runScript :: h -> [(String,v)] -> String -> IO (Either String v)
->     ,valueToString :: v -> Maybe String}
-
-> defaultBackend = Backend {newHandle = D.newTeaberryHandle
->                          ,runScript = D.runScript
->                          ,valueToString = D.valueToString}-}
 
 ------------------------------------------------------------------------------
 
@@ -283,10 +182,26 @@ main
 
 > main :: IO ()
 > main = do
->     x <- execParser myOptsPlus
->     -- putStrLn $ show x
->     case x of
+>     os <- execParser myOptsPlus
+>     let defaultBackend = import4Repl
+>         import4Repl = Backend {xNewHandle = Import4Repl.newTeaberryHandle
+>                               ,xRunScript = Import4Repl.runScript
+>                               ,xValueToString = Import4Repl.valueToString}
+>         records1Embedded = Backend {xNewHandle = Records1Embedded.newTeaberryHandle
+>                                    ,xRunScript = \h e s ->
+>                                            either error id <$> Records1Embedded.runScript h e s
+>                                    ,xValueToString = Records1Embedded.valueToString}
+>     case backend os of
+>         Nothing -> runWithBackend os defaultBackend
+>         Just "default" -> runWithBackend os defaultBackend
+>         Just "Import4Repl" -> runWithBackend os import4Repl
+>         Just "Records1Embedded" -> runWithBackend os records1Embedded
+>         Just x -> error $ "backend not recognised: " ++ x
+
+> runWithBackend :: MyOpts -> Backend h v -> IO ()
+> runWithBackend os be =
+>     case os of
 >         MyOpts {file = Just {}, script = Just {}} -> error "please pass either a file or code to run, not both"
->         MyOpts {file = Just f} -> runFile f
->         MyOpts {script = Just c} -> runSrc c
->         _ -> doRepl
+>         MyOpts {file = Just f} -> runFile be f
+>         MyOpts {script = Just c} -> runSrc be c
+>         _ -> doRepl be
