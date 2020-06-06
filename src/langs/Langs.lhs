@@ -35,6 +35,8 @@
 > import qualified DumpDesugared
 > import qualified Expr1Letrec
 > import qualified Expr1Letrecstar
+> import qualified Statements1FunRec1
+> import qualified Statements1FunRec2
 > import qualified Front
 
 > import qualified Test.Tasty as T
@@ -75,5 +77,7 @@
 >        ,DumpDesugared.tests
 >        ,Expr1Letrec.tests
 >        ,Expr1Letrecstar.tests
+>        ,Statements1FunRec1.tests
+>        ,Statements1FunRec2.tests
 >        ,Front.tests
 >        ]

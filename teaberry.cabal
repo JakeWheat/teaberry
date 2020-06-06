@@ -105,6 +105,8 @@ common langs
                        DumpDesugared
                        Expr1Letrec
                        Expr1Letrecstar
+                       Statements1FunRec1
+                       Statements1FunRec2
 
 Test-Suite RunTests
   import:              shared-properties
