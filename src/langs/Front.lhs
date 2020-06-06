@@ -42,7 +42,7 @@ todo: how to write the tests for this
 > import Control.Monad.IO.Class (liftIO)
 > import Control.Monad.Trans.Except (Except, runExcept, throwE)
 > import Control.Monad.Trans.RWS (RWST, evalRWST, ask, local, get, gets, state, put, modify)
-> import Control.Exception.Safe (Exception, throwM)
+> import Control.Exception.Safe (Exception, throwM, catch)
 > import Control.Concurrent (threadDelay)
 
 > import Data.Generics.Uniplate.Data (transformBi)
@@ -126,6 +126,7 @@ syntax
 >           | SetBox Expr Expr
 >           | UnboxRef Expr String
 >           | Unbox Expr
+>           | Catch Expr Expr
 >           deriving (Eq, Show, Data)
 
 
@@ -373,14 +374,9 @@ store holds the values of variables
 > emptyInterpreterState :: InterpreterState
 > emptyInterpreterState = InterpreterState [] [] emptyStore
 
-> newtype InterpreterException = InterpreterException String
-
-annoying, work around to getting the error message out as wanted is to
-override show, which is wrong, instead of being able to override
-displayexception, which is less wrong
-  
-> instance Show InterpreterException where
->    show (InterpreterException msg) = msg
+> data InterpreterException = InterpreterException String
+>                           | ValueException Value
+>                           deriving Show
 
 > instance Exception InterpreterException where
 >   --  displayException (InterpreterException msg) = msg
@@ -476,6 +472,7 @@ ffi catalog
 >    ,("link", binaryOp anyIn anyIn pure listLink)
 >    ,("call-construct-make", binaryOp variantIn variantIn id callConstructMake)
 
+>    ,("raise", unaryOp anyIn id raise)
 
 >    ,("add-tests", unaryOp functionIn id addTests)
 >    ,("log-check-block", binaryOp unwrapNum unwrapText id logCheckBlock)
@@ -493,7 +490,11 @@ ffi catalog
 >     rd <- ask
 >           
 >     pure $ VariantV "record" $ envEnv rd
-  
+
+> raise :: Value -> Interpreter Value
+> raise v = throwM $ ValueException v
+
+
 > torepr :: Value -> Value
 > torepr x = TextV $ torepr' x
 
@@ -737,6 +738,14 @@ todo: combine
 >                   fetchStore i (isStore st)
 >         _ -> throwInterp $ "attemped to unbox non box value: " ++ torepr' b'
 
+> interp (Catch e c) = interp e `catch` (\case
+>     ValueException v -> do
+>         cf <- interp c
+>         app cf [v]
+>     -- is rethrowing an exception like this bad in haskell?
+>     s -> throwM s)
+
+
 > interp (UnboxRef {}) = throwInterp "undesugared unboxref"
 > interp x@(LetRec {}) = throwInterp $ "undesugared letrec in interp " ++ show x
 > interp e@(DotExpr {}) = throwInterp $ "interp: undesugared dotexpr " ++ show e
@@ -904,7 +913,11 @@ add the last statement which returns the last value and the env, for
 
 > desugar (App (Iden "and") [a,b]) = do
 >     desugar (If [(a, b)] (Just $ Iden "false"))
-> 
+
+> desugar (App (Iden "catch") [a,b]) = desugar (Catch a b)
+
+> desugar (Catch a b) = Catch <$> desugar a <*> desugar b
+
 
 > desugar (App f as) = App <$> desugar f <*> mapM desugar as
 > desugar (Lam ns e) = Lam ns <$> desugar e
@@ -1502,7 +1515,7 @@ pretty
 >   where
 >     f (a,b) = (a,unconv b)
 > unconv (Iden s) = S.Iden s
->
+> unconv (Catch e t) = unconv (App (Iden "catch") [e,t])
 > unconv (App (Iden e) [a,b]) | isOp e = S.BinOp (unconv a) e (unconv b)
 >   where isOp x = not $ any (\z -> isAlphaNum z || z `elem` "_") x
 > 
@@ -1580,7 +1593,7 @@ tests
 >     ,"blocks.tea"
 >     ,"boolean.tea"
 >     --,"built-in-functions.tea" raises
->     --,"catch.tea"  catch
+>     ,"catch.tea"
 >
 >     ,"check_block_closures.tea"
 >     ,"check_closure.tea"
