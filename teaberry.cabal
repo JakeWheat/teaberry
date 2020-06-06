@@ -69,6 +69,7 @@ common langs
                        Langs
                        ParserExtra
                        Paths_teaberry
+                       Front
                        SimpleExpr
                        SimpleExprError
                        SimpleExprReader

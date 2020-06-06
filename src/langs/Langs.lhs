@@ -33,6 +33,7 @@
 > import qualified Import4
 > import qualified Import4Repl
 > import qualified DumpDesugared
+> import qualified Front
 
 > import qualified Test.Tasty as T
 
@@ -70,4 +71,5 @@
 >        ,Import4.tests
 >        ,Import4Repl.tests
 >        ,DumpDesugared.tests
+>        ,Front.tests
 >        ]

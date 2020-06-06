@@ -45,6 +45,11 @@ todo: config files, init files, etc.
 >                                   ,runScript
 >                                   ,valueToString)
 
+> import qualified Front (newTeaberryHandle
+>                        ,runScript
+>                        ,valueToString)
+
+
 > import Options.Applicative (Parser
 >                            ,strOption
 >                            ,long
@@ -181,7 +186,10 @@ main
 > main :: IO ()
 > main = do
 >     os <- execParser myOptsPlus
->     let defaultBackend = dumpDesugared
+>     let defaultBackend = front
+>         front = Backend {xNewHandle = Front.newTeaberryHandle
+>                         ,xRunScript = Front.runScript
+>                         ,xValueToString = Front.valueToString}
 >         dumpDesugared = Backend {xNewHandle = DumpDesugared.newTeaberryHandle
 >                                 ,xRunScript = DumpDesugared.runScript
 >                                 ,xValueToString = DumpDesugared.valueToString}
@@ -195,6 +203,7 @@ main
 >     case backend os of
 >         Nothing -> runWithBackend os defaultBackend
 >         Just "default" -> runWithBackend os defaultBackend
+>         Just "Front" -> runWithBackend os front
 >         Just "Import4Repl" -> runWithBackend os import4Repl
 >         Just "DumpDesugared" -> runWithBackend os dumpDesugared
 >         Just "Records1Embedded" -> runWithBackend os records1Embedded

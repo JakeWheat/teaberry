@@ -20,13 +20,13 @@ what if it's just a function? why have new syntax?
 > {-# LANGUAGE MultiWayIf #-}
 
 > module DumpDesugared (tests
->                    ,TeaberryHandle
->                    ,newTeaberryHandle
->                    ,runScript
->                    ,runFunction
->                    ,Value
->                    ,valueToString
->                    ) where
+>                      ,TeaberryHandle
+>                      ,newTeaberryHandle
+>                      ,runScript
+>                      ,runFunction
+>                      ,Value
+>                      ,valueToString
+>                      ) where
 
 > import Text.RawString.QQ
 
@@ -69,16 +69,15 @@ embedded api
 ------------
 
 > data TeaberryHandle = TeaberryHandle
->     {tbh :: IORef RuntimeState
->     }
+>     {tbh :: IORef RuntimeState}
 
 > data RuntimeState = RuntimeState {
 >      henv :: Env
->     ,executionStage :: ExecutionStage         
->     }
+>     ,executionStage :: ExecutionStage}
 
 > defaultRuntimeState :: RuntimeState
-> defaultRuntimeState = RuntimeState {henv = defaultEnv, executionStage = FullExecution}
+> defaultRuntimeState = RuntimeState {henv = defaultEnv
+>                                    ,executionStage = FullExecution}
   
 > data ExecutionStage = FullExecution
 >                     | DumpDesugar
@@ -138,6 +137,11 @@ wrapper around evaluate which can follow the imports and load them
 
 has a numpty little mock system, so you can write a set of files in
 one place here in the testing, as well as load from disk
+
+todo: build the mock into the system better
+  add modules as proper syntax, read about ocaml for inspiration
+  use special import source for these things
+  make it an official part of the user api
 
 > data FileSystemWrapper = FileSystemWrapper {
 >     loadFile :: FilePath -> IO String
