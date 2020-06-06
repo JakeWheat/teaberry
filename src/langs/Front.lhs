@@ -91,6 +91,7 @@ syntax
 >           | SetVar String Expr
 >           | DataDecl String [VariantDecl] (Maybe [Stmt])
 >           | SetRef Expr [(String,Expr)]
+>           | When Expr Expr
 >           deriving (Eq, Show, Data)
 
 > data VariantDecl = VariantDecl String [(Ref,String)]
@@ -117,6 +118,7 @@ syntax
 >           | Block [Stmt]
 >           | Seq Expr Expr
 >           | If [(Expr,Expr)] (Maybe Expr)
+>           | Ask [(Expr,Expr)] (Maybe Expr)
 >           | DotExpr Expr String
 >           | TupleGet Expr Int
 >           | Cases String Expr [(String, [String], Expr)] (Maybe Expr)
@@ -743,6 +745,7 @@ todo: combine
 > interp e@(RecordSel {}) = throwInterp $ "interp: undesugared recordsel " ++ show e
 > interp e@(TupleSel {}) = throwInterp $ "interp: undesugared tuplesel " ++ show e
 > interp e@(TupleGet {}) = throwInterp $ "interp: undesugared tupleget " ++ show e
+> interp e@(Ask {}) = throwInterp $ "interp: undesugared ask " ++ show e
 
   
 > app :: Value -> [Value] -> Interpreter Value
@@ -936,6 +939,9 @@ add the last statement which returns the last value and the env, for
 > desugar (Seq a b) =
 >     Seq <$> desugar a <*> desugar b
 
+
+> desugar (Ask bs e) = desugar (If bs e)
+
 > desugar (If bs e) =
 >     If <$> mapM f bs <*> case e of
 >                              Nothing -> pure Nothing
@@ -1058,6 +1064,13 @@ testing hack
 
 > desugarStmts (StExpr e : es) =
 >     Seq <$> desugar e <*> desugarStmts es
+
+> desugarStmts (When c t : es) =
+>     let e = (If [(c, Block [StExpr t
+>                            ,StExpr $ Iden "nothing"])]
+>                     (Just (Iden "nothing")))
+>     in Seq <$> desugar e <*> desugarStmts es
+
 
 > desugarStmts (SetVar n v : es) = do
 >     desugarStmts (StExpr (SetBox (Iden n) v) : es)
@@ -1402,6 +1415,12 @@ parse
 >   where
 >     f (c,t) = (,) <$> convExpr c <*> convExpr t
 
+> convExpr (S.Ask bs e) = do
+>     Ask <$> mapM f bs <*> maybe (pure Nothing) ((Just <$>) . convExpr) e
+>   where
+>     f (c,t) = (,) <$> convExpr c <*> convExpr t
+
+
 > convExpr (S.DotExpr e f) =
 >     flip DotExpr f <$> convExpr e
 > convExpr (S.TupleGet e i) = TupleGet <$> convExpr e <*> pure i
@@ -1427,6 +1446,7 @@ parse
 
 > convSt :: S.Stmt -> Either String Stmt
 > convSt (S.StExpr e) = StExpr <$> convExpr e
+> convSt (S.When c t) = When <$> convExpr c <*> convExpr t
 > convSt (S.LetDecl (S.Binding (S.IdenP _ (S.PatName nm)) v)) = LetDecl nm <$> convExpr v
 > convSt (S.RecDecl (S.Binding (S.IdenP _ (S.PatName nm)) v)) = RecDecl nm <$> convExpr v
 > convSt (S.FunDecl nm ps bdy whr) = do
@@ -1495,6 +1515,9 @@ pretty
 > unconv (If bs e) = S.If (map f bs) (fmap unconv e)
 >   where
 >     f (c,t) = (unconv c, unconv t)
+> unconv (Ask bs e) = S.Ask (map f bs) (fmap unconv e)
+>   where
+>     f (c,t) = (unconv c, unconv t)
 > unconv (DotExpr e f) = S.DotExpr (unconv e) f
 > unconv (TupleGet t i) = S.TupleGet (unconv t) i
 > unconv (Cases ty t bs els) =
@@ -1519,6 +1542,7 @@ pretty
 > unconvStmt (FunDecl nm ps bdy w) =
 >     S.FunDecl nm (map unconvPattern ps) (unconv bdy) (fmap (map unconvStmt) w)
 > unconvStmt (StExpr e) = S.StExpr (unconv e)
+> unconvStmt (When c t) = S.When (unconv c) (unconv t)
 > unconvStmt (Check nm bs) = S.Check nm $ map unconvStmt bs
 > unconvStmt (VarDecl n e) = S.VarDecl (unconvBinding n e)
 > unconvStmt (SetVar n e) = S.SetVar n (unconv e)
@@ -1567,7 +1591,7 @@ tests
 >     ,"empty.tea"
 >     ,"functions.tea"
 >     ,"identifiers.tea"
->     --,"if_ask.tea" ask
+>     ,"if_ask.tea"
 >     ,"let.tea"
 >     ,"lists-basics.tea"
 >     --,"lists.tea" provides
@@ -1587,12 +1611,12 @@ tests
 >     ,"records.tea"
 >     ,"recursive.tea"
 >     ,"ref.tea"
->     --,"tour.tea" first issue is ask
+>     --,"tour.tea" -- next issue is provide
 >     ,"trivial_is.tea"
 >     --,"tuples.tea" tuple binding
 >     ,"two_same_name_check.tea"
 >     ,"vars.tea"
->     --,"when.tea" when
+>     ,"when.tea"
 >     --,"where.tea" issue with where desugaring and nested functions
 >     ]
 
