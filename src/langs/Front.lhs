@@ -386,6 +386,10 @@ store holds the values of variables
 >     {envEnv :: [(String,Value)]
 >     ,envForeignFuns :: [((String,[String]), [Value] -> Interpreter Value)]}
 
+> _showEnvNames :: Env -> String
+> _showEnvNames e = unlines (map fst (envEnv e)
+>                          ++ map (show . fst) (envForeignFuns e))
+
 > emptyEnv :: Env
 > emptyEnv = Env
 >     {envEnv = []
@@ -396,7 +400,7 @@ store holds the values of variables
 >
 > envLookup :: String -> Env -> Interpreter Value
 > envLookup nm env =
->     maybe (throwInterp $ "Identifier not found " ++ nm) pure
+>     maybe (throwInterp $ "Identifier not found: " ++ nm {-++ "\n" ++ showEnvNames env-}) pure
 >     $ lookup nm (envEnv env)
 
 > addForeignFun :: String -> [String] -> ([Value] -> Interpreter Value) -> Env -> Either String Env
@@ -472,15 +476,25 @@ ffi catalog
 >    ,("link", binaryOp anyIn anyIn pure listLink)
 >    ,("call-construct-make", binaryOp variantIn variantIn id callConstructMake)
 
+>    -- another mystery
+>    --,("tostring-equals", binaryOp unwrapText anyIn wrapBool tostringEquals)
+>    ,("tostring-equals", binaryOp anyIn anyIn wrapBool tostringEqualsx)
+
 >    ,("raise", unaryOp anyIn id raise)
+
+>    ,("is-boolean", unaryOp anyIn wrapBool isBoolean)
+>    ,("is-number", unaryOp anyIn wrapBool isNumber)
+>    ,("is-string", unaryOp anyIn wrapBool isString)
+>    ,("is-function", unaryOp anyIn wrapBool isFunction)
+>    ,("is-tuple", unaryOp anyIn wrapBool isTuple)
+>    ,("is-record", unaryOp anyIn wrapBool isRecord)
 
 >    ,("add-tests", unaryOp functionIn id addTests)
 >    ,("log-check-block", binaryOp unwrapNum unwrapText id logCheckBlock)
 >    ,("log-test-pass", binaryOp unwrapNum unwrapText id logTestPass)
 >    ,("log-test-fail", ternaryOp unwrapNum unwrapText unwrapText id logTestFail)
 
->    ]
->     ++ [])
+>    ])
 >    $ emptyEnv {envEnv = [("true", BoolV True)
 >                         ,("false", BoolV False)
 >                         ,("empty", VariantV "empty" [])]}
@@ -493,6 +507,37 @@ ffi catalog
 
 > raise :: Value -> Interpreter Value
 > raise v = throwM $ ValueException v
+
+ > tostringEquals :: String -> Value -> Bool
+ > tostringEquals e0 e1 = TextV e0 == tostring e1
+
+> tostringEqualsx :: Value -> Value -> Bool
+> tostringEqualsx e0 e1 = e0 == tostring e1
+
+> isBoolean :: Value -> Bool
+> isBoolean (BoolV {}) = True
+> isBoolean _ = False
+
+> isNumber :: Value -> Bool
+> isNumber (NumV {}) = True
+> isNumber _ = False
+
+> isString :: Value -> Bool
+> isString (TextV {}) = True
+> isString _ = False
+
+> isFunction :: Value -> Bool
+> isFunction (FunV {}) = True
+> isFunction (ForeignFunV {}) = True
+> isFunction _ = False
+
+> isTuple :: Value -> Bool
+> isTuple (VariantV "tuple" _) = True
+> isTuple _ = False
+
+> isRecord :: Value -> Bool
+> isRecord (VariantV "record" _) = True
+> isRecord _ = False
 
 
 > torepr :: Value -> Value
@@ -849,7 +894,7 @@ add the last statement which returns the last value and the env, for
 >                else [Import (ImportName "built-ins") "built-ins"
 >                     ,IncludeFrom "built-ins" (map (\a -> (a,a)) bs)]
 >     -- temp before * is supported
->     bs = ["is-empty","is-link", "empty", "link", "is-List", "is-Nothing", "is-nothing", "nothing"]
+>     bs = ["is-empty","is-link", "empty", "link", "is-List", "nothing", "is-Nothing", "is-nothing"]
 
   
 > desugarPreludeStmt :: PreludeStmt -> Desugarer [Stmt]
@@ -907,6 +952,15 @@ add the last statement which returns the last value and the env, for
 >     plus c d = appI "+" [c, d]
 >     eqIdens c d = appI "==" [Iden c, Iden d]
 >     appI i es = App (Iden i) es
+
+> desugar (App (Iden "raises") [e0, e1]) = do
+>   desugar (App (Iden "raises-satisfies") [e0, Lam ["a"] $ App (Iden "tostring-equals") [e1, Iden "a"]])
+
+> desugar x@(App (Iden "raises-satisfies") [e0,e1]) = do
+>   let p = pretty x
+>   y <- desugarRaises p e0 e1
+>   desugar y
+
 
 > desugar (App (Iden "or") [a,b]) =
 >     desugar (If [(a, Iden "true")] (Just b))
@@ -1149,6 +1203,61 @@ setbox(a.b, 2)
 >     let sts = LetDecl enm e
 >         refSets = flip map fs $ \(n,v) -> SetBox (DotExpr (Iden enm) n) v
 >     desugarStmts (sts : (map StExpr refSets ++ es))
+
+
+
+aexpr raises-satisfies bexpr
+desugars to
+
+haskell:
+failmsg = "The test operation raise-satisfies failed for the test " ++ pretty bexpr
+
+it could show the value it actually got?
+
+catch(
+  block:
+    aexpr
+    log-test-fail(checkblockid, name, "No exception raised: " + $src)
+  end,
+  lam(shadow a):
+    shadow v1 = bexpr
+    if v1(a):
+      log-test-pass(checkblockid, name)
+    else:
+      shadow src = pretty something
+      log-test-fail(checkblockid, name, $failmsg)
+    end
+  end)
+
+> desugarRaises :: String -> Expr -> Expr -> Desugarer Expr
+> desugarRaises syn e e1 = do
+>     let failMsg = "The test operation raises-satisfies failed for the test "
+>                   ++ pretty e1
+>     checkBlockIDName <- (maybe (lift $ throwE "'is' test outside check block") pure)
+>                         =<< (gets currentCheckBlockIDName)
+>     
+>     nameit <- makeUniqueVar "isname"
+>     v1 <- makeUniqueVar "isv1"
+>     pure $ Catch
+>         (Block [StExpr e
+>                ,LetDecl nameit $ Text syn
+>                ,StExpr $ appx "log-test-fail" [Iden checkBlockIDName
+>                                              ,Iden nameit
+>                                              ,Text "No exception raised"]])
+>         (Lam ["a"] $ Block
+>          [LetDecl v1 e1
+>          ,LetDecl nameit $ Text syn
+>          ,StExpr $ If [(appx v1 [Iden "a"]
+>                        ,appx "log-test-pass" [Iden checkBlockIDName, Iden nameit])]
+>                    $ Just $ appx "log-test-fail"
+>                             [Iden checkBlockIDName
+>                             ,Iden nameit
+>                             ,Text failMsg `plus`
+>                              Text ", value was " `plus`
+>                              appx "torepr" [Iden "a"]]])
+>   where
+>       plus a b = appx "+" [a,b]
+>       appx nm es = App (Iden nm) es
 
 
 --------------------------------------
@@ -1592,12 +1701,12 @@ tests
 >     --,"binding.tea"  tuple binding
 >     ,"blocks.tea"
 >     ,"boolean.tea"
->     --,"built-in-functions.tea" raises
+>     ,"built-in-functions.tea"
 >     ,"catch.tea"
 >
 >     ,"check_block_closures.tea"
 >     ,"check_closure.tea"
->     --,"check.tea" raises
+>     ,"check.tea"
 >     ,"comparisons.tea"
 >     ,"construct.tea"
 >     ,"empty_check.tea"
