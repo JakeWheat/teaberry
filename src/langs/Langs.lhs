@@ -39,8 +39,9 @@
 > import qualified Statements1FunRec2
 > import qualified Tuples1
 > import qualified Lists2
-> import qualified Construct
 > import qualified Records2
+> import qualified Construct
+> import qualified Variants2
 > import qualified Front
 
 > import qualified Test.Tasty as T
@@ -87,5 +88,6 @@
 >        ,Lists2.tests
 >        ,Records2.tests
 >        ,Construct.tests
+>        ,Variants2.tests
 >        ,Front.tests
 >        ]
