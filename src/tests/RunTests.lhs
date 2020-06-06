@@ -8,13 +8,13 @@
 >                   ,parseStmtExamples
 >                   ,testParseProgram
 >                   ,parseProgramExamples)
-> import DesugarTests (testDesugarExpr
+> {-import DesugarTests (testDesugarExpr
 >                     ,desugarExprExamples)
 > import InterpreterTests (testInterpreter,interpreterTests)
 > import TeaberryTests (sourceFiles
 >                      ,testSourceFile
 >                      ,detailedSourceFileTests
->                      ,testDetailedSourceFile)
+>                      ,testDetailedSourceFile)-}
 > import Langs (langTests)
 
 > main :: IO ()
@@ -23,15 +23,15 @@
 >     -- which is very bad
 >     -- this should be fixed in the test desugaring, it should be able to catch
 >     -- an exception and log a failure
->     sourceFileTests <- T.testGroup "source file tests" <$> mapM testSourceFile sourceFiles
+>     --sourceFileTests <- T.testGroup "source file tests" <$> mapM testSourceFile sourceFiles
 >     T.defaultMain $ T.testGroup "all"
 >         [T.testGroup "parse"
 >             [T.testGroup "parseExpr" $ map testParseExpr parseExprExamples
 >             ,T.testGroup "parseStmt" $ map testParseStmt parseStmtExamples
 >             ,T.testGroup "parseProgram" $ map testParseProgram parseProgramExamples]
->         ,T.testGroup "desugarExpr" $ map testDesugarExpr desugarExprExamples
->         ,T.testGroup "interpret" $ map testInterpreter interpreterTests
->         ,T.testGroup "test tests" $ map testDetailedSourceFile detailedSourceFileTests
->         ,sourceFileTests
+>         --,T.testGroup "desugarExpr" $ map testDesugarExpr desugarExprExamples
+>         --,T.testGroup "interpret" $ map testInterpreter interpreterTests
+>         --,T.testGroup "test tests" $ map testDetailedSourceFile detailedSourceFileTests
+>         --,sourceFileTests
 >         ,langTests
 >         ]

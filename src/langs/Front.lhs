@@ -214,10 +214,11 @@ hacky top level evaluate. not really sure if it will pay its way once
 >             Left _ -> do
 >                 (ast,srcs) <- loadSourceFiles d src
 >                 y <- either throwInterp pure $ runDesugar (maybe "toplevel.x" id fnm) ast srcs
+>                 let z = simplify y
 >                 case executionStage ebs of
->                     DumpDesugar -> pure (TextV $ "\n" ++ pretty y ++ "\n", ebs, [])
+>                     DumpDesugar -> pure (TextV $ "\n" ++ pretty z ++ "\n", ebs, [])
 >                     FullExecution -> do
->                         v <- {-trace (pretty y) $-} interp y
+>                         v <- {-trace (pretty z) $-} interp z
 >                         t <- runAddedTests
 >                         case v of
 >                             VariantV "tuple" [("0", v'), ("1", VariantV "record" e)] ->
@@ -277,6 +278,14 @@ recursively load all the referenced modules in the source given
 > getBuiltInModulesDir :: IO FilePath
 > getBuiltInModulesDir = getDataFileName "built-in-modules"
 
+---------------------------------------
+
+simplify
+
+> simplify :: Expr -> Expr
+> simplify = transformBi $ \case
+>     Let bs (Let bs' x) -> Let (bs ++ bs') x
+>     x1 -> x1
 
 
 ---------------------------------------
@@ -439,6 +448,13 @@ ffi catalog
 >    ,("<=", binaryOp anyIn anyIn id lte)
 >    ,(">=", binaryOp anyIn anyIn id gte)
 >    ,("<>", binaryOp anyIn anyIn id neq)
+
+>    -- todo: why doesn't this work?
+>    --,("^", binaryOp anyIn functionIn id (\a f -> app f [a]))
+>    ,("^", binaryOp anyIn anyIn id (\a f -> app f [a]))
+>    ,("|>", binaryOp anyIn anyIn id (\f a -> app f [a]))
+
+
 >    ,("not", unaryOp unwrapBool wrapBool not)
 
 >    ,("torepr", unaryOp anyIn pure torepr)
@@ -894,21 +910,21 @@ add the last statement which returns the last value and the env, for
 >     Let <$> mapM f bs <*> desugar e
 
 > desugar (LetRec bs e) = do
->     desugar (Let (map convLam bs ++ mapMaybe createBind bs) e)
+>     desugar (Let (mapMaybe convLam bs ++ map createBind bs) e)
 >   where
 >     newName = (++"'")
 >     bindNames = map fst bs
 >     bindNames' = map newName bindNames
 >     -- fX = lam (asX): bdyX end -> fX' = lam (f0,f1,...,*asX): bdyX' end
 >     convLam (n,Lam as bdy) =
->         (newName n, Lam (bindNames ++ as) $ patchBody bdy)
+>         Just (newName n, Lam (bindNames ++ as) $ patchBody bdy)
 >     -- fX = bdyX (something not a lam) -> fX = bdyX'
 >     -- not sure about this one
->     convLam (n,x) = (newName n, patchBody x)
+>     convLam _ = Nothing --(newName n, patchBody x)
 >     -- fX = lam (asX): bdyX end -> fX = lam(asX): fX'(f0',f1',...,*asX) end
 >     createBind (n,Lam as _bdy) =
->         Just (n, Lam as $ App (Iden $ newName n) (map Iden (bindNames' ++ as)))
->     createBind _ = Nothing
+>         (n, Lam as $ App (Iden $ newName n) (map Iden (bindNames' ++ as)))
+>     createBind (n,x) = (n, patchBody x)
 >     --bdyN with fN(as) replaced with fN(f0,...fX,*as)
 >     patchBody = transformBi $ \case
 >         App (Iden f) args | f `elem` bindNames -> App (Iden f) (map Iden bindNames ++ args)
@@ -1388,6 +1404,7 @@ parse
 
 > convExpr (S.DotExpr e f) =
 >     flip DotExpr f <$> convExpr e
+> convExpr (S.TupleGet e i) = TupleGet <$> convExpr e <*> pure i
 
 > convExpr (S.Cases ty e bs els) =
 >     Cases ty <$> convExpr e <*> mapM f bs <*> maybe (pure Nothing) ((Just <$>) .  convExpr) els
@@ -1402,6 +1419,9 @@ parse
 >     unpat x = Left $ "parse: unsupported pattern: " ++ show x
 
 > convExpr (S.Unbox e n) = flip UnboxRef n <$> convExpr e
+
+> convExpr (S.Construct e es) = Construct <$> convExpr e <*> mapM convExpr es
+
 
 > convExpr x = Left $ "parse: unsupported expression " ++ show x
 
@@ -1532,29 +1552,30 @@ tests
 >     ["agdt.tea"
 >     ,"ahoy.tea"
 >     ,"arithmetic.tea"
->     --,"binding.tea"
+>     --,"binding.tea"  tuple binding
 >     ,"blocks.tea"
 >     ,"boolean.tea"
->     --,"built-in-functions.tea"
->     --,"catch.tea"
->     --,"check_block_closures.tea"
->     --,"check_closure.tea"
->     --,"check.tea"
->     --,"comparisons.tea"
->     --,"construct.tea"
->     --,"empty_check.tea"
->     --,"empty.tea"
->     --,"functions.tea"
->     --,"identifiers.tea"
->     --,"if_ask.tea"
->     --,"let.tea"
->     --,"lists-basics.tea"
->     --,"lists.tea"
+>     --,"built-in-functions.tea" raises
+>     --,"catch.tea"  catch
+>
+>     ,"check_block_closures.tea"
+>     ,"check_closure.tea"
+>     --,"check.tea" raises
+>     ,"comparisons.tea"
+>     ,"construct.tea"
+>     ,"empty_check.tea"
+>     ,"empty.tea"
+>     ,"functions.tea"
+>     ,"identifiers.tea"
+>     --,"if_ask.tea" ask
+>     ,"let.tea"
+>     ,"lists-basics.tea"
+>     --,"lists.tea" provides
 >     --,"my-module-provide-all.tea"
 >     --,"my-module-provide-x.tea"
 >     --,"my-module.tea"
 >     --,"my-module-two-provides.tea"
->     --,"nested_comment.tea"
+>     ,"nested_comment.tea"
 >     --,"prelude-built-in-module.tea"
 >     --,"prelude-combine-provides.tea"
 >     --,"prelude-import-from.tea"
@@ -1562,17 +1583,17 @@ tests
 >     --,"prelude-local-module.tea"
 >     --,"prelude-provide-all.tea"
 >     --,"prelude-provide-x.tea"
->     --,"random.tea"
->     --,"records.tea"
+>     --,"random.tea" -- change in letrec desugaring, possibly bug
+>     ,"records.tea"
 >     ,"recursive.tea"
->     --,"ref.tea"
->     --,"tour.tea"
->     --,"trivial_is.tea"
->     --,"tuples.tea"
->     --,"two_same_name_check.tea"
->     --,"vars.tea"
->     --,"when.tea"
->     --,"where.tea"
+>     ,"ref.tea"
+>     --,"tour.tea" first issue is ask
+>     ,"trivial_is.tea"
+>     --,"tuples.tea" tuple binding
+>     ,"two_same_name_check.tea"
+>     ,"vars.tea"
+>     --,"when.tea" when
+>     --,"where.tea" issue with where desugaring and nested functions
 >     ]
 
 > tests1 :: T.TestTree

@@ -23,8 +23,8 @@ check:
   is-link(mt) is false
   is-link(l1) is true
 
-  is-list(l1) is true
-  is-list(mt) is true
+  is-List(l1) is true
+  is-List(mt) is true
 end
 
 check:
@@ -49,10 +49,12 @@ check:
   link(empty, link(empty, [list: ])) is [list: [list:],[list:]]
 end
 
+#|
 check:
   x = [list: 1,2,3]
   # -> link(1, link(2, link (3,empty)))
   # test variant binding
+  
   link(a,b) = x
   a is 1
   link(_,link(c,d)) = x
@@ -67,6 +69,7 @@ check:
   # todo: do a raises test with this
   nothing
 end
+   |#
 
 check:
   x = [list:1]
