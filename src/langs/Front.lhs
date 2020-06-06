@@ -20,6 +20,7 @@ todo: how to write the tests for this
 > {-# LANGUAGE LambdaCase #-}
 > {-# LANGUAGE ScopedTypeVariables #-}
 > {-# LANGUAGE MultiWayIf #-}
+> {-# LANGUAGE DeriveDataTypeable #-}
 
 > module Front (tests
 >              ,TeaberryHandle
@@ -43,7 +44,10 @@ todo: how to write the tests for this
 > import Control.Monad.Trans.RWS (RWST, evalRWST, ask, local, get, gets, state, put, modify)
 > import Control.Exception.Safe (Exception, throwM)
 > import Control.Concurrent (threadDelay)
-  
+
+> import Data.Generics.Uniplate.Data (transformBi)
+> import Data.Data (Data)
+
 > import Control.Monad (when)
 > import Data.Maybe (isJust, mapMaybe)
 >
@@ -69,31 +73,33 @@ syntax
 ======
 
 > data Module = Module [PreludeStmt] [Stmt]
->             deriving (Eq, Show)
+>             deriving (Eq, Show, Data)
 
 > data PreludeStmt = Import ImportSource String
 >                  | IncludeFrom String [(String, String)]
->                  deriving (Eq, Show)
+>                  deriving (Eq, Show, Data)
 
 > data ImportSource = ImportFile String
 >                   | ImportName String
->                   deriving (Eq,Show) 
+>                   deriving (Eq,Show, Data) 
 
 > data Stmt = StExpr Expr
 >           | LetDecl String Expr
 >           | LetSplatDecl Expr
 >           | Check (Maybe String) [Stmt]
 >           | VarDecl String Expr
+>           | RecDecl String Expr
+>           | FunDecl String [String] Expr (Maybe [Stmt])
 >           | SetVar String Expr
 >           | DataDecl String [VariantDecl]
 >           | SetRef Expr [(String,Expr)]
->           deriving (Eq, Show)
+>           deriving (Eq, Show, Data)
 
 > data VariantDecl = VariantDecl String [(Ref,String)]
->                  deriving (Eq,Show) 
+>                  deriving (Eq,Show, Data)
 
 > data Ref = Ref | Con
->          deriving (Eq,Show) 
+>          deriving (Eq,Show, Data)
 
   
 > data Expr = -- selectors
@@ -107,6 +113,7 @@ syntax
 >           | App Expr [Expr]
 >           | Lam [String] Expr
 >           | Let [(String,Expr)] Expr
+>           | LetRec [(String,Expr)] Expr
 >           | LetSplat Expr Expr
 >           | Block [Stmt]
 >           | Seq Expr Expr
@@ -118,7 +125,7 @@ syntax
 >           | SetBox Expr Expr
 >           | UnboxRef Expr String
 >           | Unbox Expr
->           deriving (Eq, Show)
+>           deriving (Eq, Show, Data)
 
 
 todo: interpreter syntax goes here
@@ -673,6 +680,7 @@ todo: combine
 >         _ -> throwInterp $ "attemped to unbox non box value: " ++ torepr' b'
 
 > interp (UnboxRef {}) = throwInterp "undesugared unboxref"
+> interp x@(LetRec {}) = throwInterp $ "undesugared letrec in interp " ++ show x
 
   
 > app :: Value -> [Value] -> Interpreter Value
@@ -827,6 +835,27 @@ add the last statement which returns the last value and the env, for
 >     let f (n,v) = (n,) <$> desugar v
 >     Let <$> mapM f bs <*> desugar e
 
+> desugar (LetRec bs e) = do
+>     desugar (Let (map convLam bs ++ mapMaybe createBind bs) e)
+>   where
+>     newName = (++"'")
+>     bindNames = map fst bs
+>     bindNames' = map newName bindNames
+>     -- fX = lam (asX): bdyX end -> fX' = lam (f0,f1,...,*asX): bdyX' end
+>     convLam (n,Lam as bdy) =
+>         (newName n, Lam (bindNames ++ as) $ patchBody bdy)
+>     -- fX = bdyX (something not a lam) -> fX = bdyX'
+>     -- not sure about this one
+>     convLam (n,x) = (newName n, patchBody x)
+>     -- fX = lam (asX): bdyX end -> fX = lam(asX): fX'(f0',f1',...,*asX) end
+>     createBind (n,Lam as _bdy) =
+>         Just (n, Lam as $ App (Iden $ newName n) (map Iden (bindNames' ++ as)))
+>     createBind _ = Nothing
+>     --bdyN with fN(as) replaced with fN(f0,...fX,*as)
+>     patchBody = transformBi $ \case
+>         App (Iden f) args | f `elem` bindNames -> App (Iden f) (map Iden bindNames ++ args)
+>         x -> x
+
 > desugar (LetSplat re e) =
 >     LetSplat <$> desugar re <*> desugar e
   
@@ -901,16 +930,35 @@ testing hack
 > desugarStmts [StExpr e] = desugar e
 > desugarStmts [x@(LetDecl {})] = desugarStmts [x, StExpr $ Iden "nothing"]
 > desugarStmts [x@(LetSplatDecl {})] = desugarStmts [x, StExpr $ Iden "nothing"]
+> desugarStmts [x@(FunDecl {})] = desugarStmts [x, StExpr $ Iden "nothing"]
+> desugarStmts [x@(RecDecl {})] = desugarStmts [x, StExpr $ Iden "nothing"]
 
-> desugarStmts (LetDecl n v : es) = do
->     v' <- desugar v
->     Let [(n,v')] <$> desugarStmts es
+> desugarStmts (LetDecl n v : es) = desugar (Let [(n,v)] (Block es))
 
 
 > desugarStmts (LetSplatDecl re : es) = do
 >     LetSplat <$> desugar re <*> desugarStmts es
 
-  
+> desugarStmts es@(st : _) | isRecOrFun st = do
+>     (recs,es') <- getRecs es [] []
+>     desugar (LetRec recs (Block es'))
+>   where
+>     getRecs :: [Stmt] -> [(String,Expr)] -> [Stmt] -> Desugarer ([(String,Expr)], [Stmt])
+>     getRecs (RecDecl nm bdy : es') recs whrs =
+>         getRecs es' ((nm,bdy) : recs) whrs
+>     getRecs (FunDecl nm ps bdy whr : es') recs whrs =
+>         let bnd = (nm, (Lam ps bdy))
+>             whrs' = case whr of
+>                   Nothing -> whrs
+>                   Just b -> Check (Just nm) b : whrs
+>         in getRecs es' (bnd : recs) whrs'
+>     getRecs sts recs whrs  = pure (reverse recs,reverse whrs ++ sts)
+>     isRecOrFun RecDecl {} = True
+>     isRecOrFun FunDecl {} = True
+>     isRecOrFun _ = False      
+
+
+
 > desugarStmts (VarDecl n v : es) = do
 >     v' <- Box <$> desugar v
 >     desugarStmts (LetDecl n v' : es)
@@ -1227,6 +1275,14 @@ parse
 >         bf (S.Binding (S.IdenP _ (S.PatName x)) ex) =
 >             (x,) <$> convExpr ex
 >         bf x = Left $ "parse: unsupported binding " ++ show x
+> convExpr (S.LetRec bs e) = do
+>         bs' <- mapM bf bs
+>         e' <- convExpr e
+>         Right $ LetRec bs' e'
+>       where
+>         bf (S.Binding (S.IdenP _ (S.PatName x)) ex) =
+>             (x,) <$> convExpr ex
+>         bf x = Left $ "unsupported binding " ++ show x
 
 > convExpr (S.Block sts) = Block <$> mapM convSt sts
 
@@ -1257,6 +1313,15 @@ parse
 > convSt :: S.Stmt -> Either String Stmt
 > convSt (S.StExpr e) = StExpr <$> convExpr e
 > convSt (S.LetDecl (S.Binding (S.IdenP _ (S.PatName nm)) v)) = LetDecl nm <$> convExpr v
+> convSt (S.RecDecl (S.Binding (S.IdenP _ (S.PatName nm)) v)) = RecDecl nm <$> convExpr v
+> convSt (S.FunDecl nm ps bdy whr) = do
+>     whr' <- case whr of
+>                 Nothing -> pure Nothing
+>                 Just w -> Just <$> mapM convSt w
+>     FunDecl nm <$> mapM pf ps <*> convExpr bdy <*> pure whr'
+>   where 
+>     pf (S.IdenP _ (S.PatName x)) = Right x
+>     pf x = Left $ "unsupported pattern " ++ show x
 > convSt (S.Check nm bdy) = Check nm <$> mapM convSt bdy
 > convSt (S.VarDecl (S.Binding (S.IdenP _ (S.PatName nm)) v)) = VarDecl nm <$> convExpr v
 > convSt (S.SetVar n e) = SetVar n <$> convExpr e
@@ -1302,6 +1367,7 @@ pretty
 > unconv (App e fs) = S.App (unconv e) $ map unconv fs
 > unconv (Lam ns e) = S.Lam (map unconvPattern ns) $ unconv e
 > unconv (Let bs e) = S.Let (map (uncurry unconvBinding) bs) (unconv e)
+> unconv (LetRec bs e) = S.LetRec (map (uncurry unconvBinding) bs) (unconv e)
 > unconv (Block sts) = S.Block $ map unconvStmt sts
 > unconv (Seq a b) = S.Block $ map unconvStmt [StExpr a, StExpr b]
 > unconv (If bs e) = S.If (map f bs) (fmap unconv e)
@@ -1326,7 +1392,10 @@ pretty
 
 > unconvStmt :: Stmt -> S.Stmt
 > unconvStmt (LetDecl n e) = S.LetDecl (unconvBinding n e)
+> unconvStmt (RecDecl n e) = S.RecDecl (unconvBinding n e)
 > unconvStmt (LetSplatDecl re) = S.StExpr (S.App (S.Iden "letsplatdecl") [unconv re])
+> unconvStmt (FunDecl nm ps bdy w) =
+>     S.FunDecl nm (map unconvPattern ps) (unconv bdy) (fmap (map unconvStmt) w)
 > unconvStmt (StExpr e) = S.StExpr (unconv e)
 > unconvStmt (Check nm bs) = S.Check nm $ map unconvStmt bs
 > unconvStmt (VarDecl n e) = S.VarDecl (unconvBinding n e)
@@ -1393,6 +1462,7 @@ tests
 >     --,"prelude-provide-x.tea"
 >     --,"random.tea"
 >     --,"records.tea"
+>     ,"recursive.tea"
 >     --,"ref.tea"
 >     --,"tour.tea"
 >     --,"trivial_is.tea"

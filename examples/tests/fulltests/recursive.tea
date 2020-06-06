@@ -1,0 +1,61 @@
+check "letrec":
+  letrec fac = lam(x): if x == 0: 1 else: x * fac(x - 1) end end:
+    {fac(4);fac(5);fac(1)} end
+    is {24;120;1}
+
+  letrec
+    addeven = lam(x): if x == 0: 0 else: x + addodd(x - 1) end end,
+    addodd = lam(x):  if x == 0: 0 else: x + addeven(x - 1) end end:
+    {addeven(2);addodd(2);addodd(5)}
+  end is {3;3;15}
+
+end
+
+fun fact(x):
+  if x == 0: 1
+  else: x * fact(x - 1)
+  end
+end
+
+check "fun":
+
+  fact(5) is 120
+  fact(4) is 24
+end
+
+fun fact2(x):
+  if x == 0: 1
+  else: x * fact2(x - 1)
+  end
+where:
+  fact2(5) is 120
+  fact2(4) is 24
+end
+
+check "recdecl":
+
+  block:
+    fun addeven(x): if x == 0: 0 else: x + addodd(x - 1) end end
+    fun addodd(x):  if x == 0: 0 else: x + addeven(x - 1) end end
+    addeven(6) is 21
+  end
+
+  block:
+    rec addeven = lam(x): if x == 0: 0 else: x + addodd(x - 1) end end
+    rec addodd = lam(x): if x == 0: 0 else: x + addeven(x - 1) end end
+    addeven(6) is 21
+  end
+
+  block:
+    fun addeven(x): if x == 0: 0 else: x + addodd(x - 1) end end
+    rec addodd = lam(x): if x == 0: 0 else: x + addeven(x - 1) end end
+    addeven(6) is 21
+  end
+
+  block:
+    rec addeven = lam(x) : if x == 0: 0 else: x + addodd(x - 1) end end
+    fun addodd(x): if x == 0: 0 else: x + addeven(x - 1) end end
+    addeven(6) is 21
+  end
+
+end
