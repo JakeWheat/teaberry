@@ -5,7 +5,7 @@ Simple expressions with recursive functions
 > {-# LANGUAGE LambdaCase #-}
 > {-# LANGUAGE DeriveDataTypeable #-}
 
-> module Expr1Letrec (tests) where
+> module Expr1Letrecstar (tests) where
 
 > import qualified Parse as P
 > import qualified Syntax as S
@@ -25,6 +25,7 @@ Simple expressions with recursive functions
 > import Scientific (Scientific)
 > import Data.List (intercalate)
 > import Debug.Trace (trace)
+> import Data.Maybe (mapMaybe)
 
 ------------------------------------------------------------------------------
 
@@ -113,28 +114,52 @@ desugar
 
 only thing it does is convert letrec to let
 
-letrec f = lam (a): bdy end
+letrec f0 = lam (as0): bdy0 end
+       f1 = lam (as1): bdy1 end
+       ...
 ->
 
-bdy' = bdy with f(a) replaced with f(f,a)
+bdyN' = bdyN with fN(as) replaced with fN'(f0',...fX',*as)
 
-let f' = lam (f,a): bdy' end
-    f = lam(a): f'(f',a) end
+let f0' = lam (f0,f1,...,*as): bdy0' end
+    f1' = lam (f0,f1,...,*as): bdy1' end
+    ...
+    f0 = lam(as): f0'(f0',f1',...,*as) end
+    f1 = lam(as): f1'(f0',f1',...,*as) end
+    ...
+
+there is also a tuple method to try - put all the functions in a
+ tuple, is this really different? less names to generate
+and also try the fix method
 
 > desugar :: Expr -> Either String Expr
-> desugar (LetRec [(n, Lam as bdy)] e) = do
->     let n' = n ++ "'"
->     desugar $ Let [(n', Lam (n:as) (patchBody bdy))
->                   ,(n, Lam as (App (Iden n') (map Iden (n' : as))))]
->                   e
+> desugar (LetRec bs e) = do
+>     desugar (Let (map convLam bs ++ mapMaybe createBind bs) e)
 >   where
->      patchBody = transformBi $ \case
->          App (Iden fx) args | fx == n -> App (Iden n) (Iden n : args)
->          x -> x
-
-
->  
-> desugar x@(LetRec {}) = Left $ "unsupported letrec: " ++ show x
+>     newName = (++"'")
+>     bindNames = map fst bs
+>     bindNames' = map newName bindNames
+>     --nmMap = zip bindNames bindNames'
+>     -- fX = lam (asX): bdyX end
+>     -- ->
+>     -- fX' = lam (f0,f1,...,*asX): bdyX' end
+>     convLam (n,Lam as bdy) =
+>         (newName n, Lam (bindNames ++ as) $ patchBody bdy)
+>     -- fX = bdyX (something not a lam)
+>     -- ->
+>     -- fX = bdyX'
+>     -- not sure about this one
+>     convLam (n,x) = (newName n, patchBody x)
+>     -- fX = lam (asX): bdyX end
+>     -- ->
+>     -- fX = lam(asX): fX'(f0',f1',...,*asX) end
+>     createBind (n,Lam as _bdy) =
+>         Just (n, Lam as $ App (Iden $ newName n) (map Iden (bindNames' ++ as)))
+>     createBind _ = Nothing -- undefined
+>     --bdyN' = bdyN with fN(as) replaced with fN(f0,...fX,*as)
+>     patchBody = transformBi $ \case
+>         App (Iden f) args | f `elem` bindNames -> App (Iden f) (map Iden bindNames ++ args)
+>         x -> x
 
 > desugar (TupleSel fs) = TupleSel <$> mapM desugar fs
 > desugar x@(Num {}) = pure x
@@ -386,12 +411,16 @@ tests
 > interpreterExamples :: [(String, String)]
 > interpreterExamples =
 >     simpleInterpreterExamples ++
->     [("'three'", "'three'")
->     ,("'three' + 'four'", "'threefour'")
->     ,("true", "true")
->     ,("letrec fac = lam(x): if x == 0: 1 else: x * fac(x - 1) end end:\n\
+>     [("letrec fac = lam(x): if x == 0: 1 else: x * fac(x - 1) end end:\n\
 >      \{fac(4);fac(5);fac(1)} end", "{24;120;1}")
+
+>     ,("letrec\n\
+>       \    addeven = lam(x): if x == 0: 0 else: x + addodd(x - 1) end end,\n\
+>       \    addodd = lam(x):  if x == 0: 0 else: x + addeven(x - 1) end end:\n\
+>       \    {addeven(2);addodd(2);addodd(5)}\n\
+>       \end"
+>      ,"{3;3;15}")
 >     ]
 
 > tests :: TestTree
-> tests = makeSimpleTests "expr1letrec" interpreterExamples evaluate
+> tests = makeSimpleTests "expr1letrecstar" interpreterExamples evaluate

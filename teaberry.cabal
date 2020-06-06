@@ -104,6 +104,7 @@ common langs
                        Import4Repl
                        DumpDesugared
                        Expr1Letrec
+                       Expr1Letrecstar
 
 Test-Suite RunTests
   import:              shared-properties

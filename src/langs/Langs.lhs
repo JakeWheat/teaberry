@@ -34,6 +34,7 @@
 > import qualified Import4Repl
 > import qualified DumpDesugared
 > import qualified Expr1Letrec
+> import qualified Expr1Letrecstar
 > import qualified Front
 
 > import qualified Test.Tasty as T
@@ -73,5 +74,6 @@
 >        ,Import4Repl.tests
 >        ,DumpDesugared.tests
 >        ,Expr1Letrec.tests
+>        ,Expr1Letrecstar.tests
 >        ,Front.tests
 >        ]
