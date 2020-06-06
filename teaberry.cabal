@@ -62,7 +62,8 @@ common langs
   build-depends:       teaberry,
                        tasty >= 1.1 && < 1.4,
                        tasty-hunit >= 0.10 && < 0.11,
-                       raw-strings-qq
+                       raw-strings-qq,
+                       uniplate >= 1.6 && < 1.7
   hs-source-dirs:      src/langs
   autogen-modules:     Paths_teaberry
   other-modules:       TestUtils
@@ -102,6 +103,7 @@ common langs
                        Import4
                        Import4Repl
                        DumpDesugared
+                       Expr1Letrec
 
 Test-Suite RunTests
   import:              shared-properties

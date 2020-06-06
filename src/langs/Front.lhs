@@ -788,7 +788,6 @@ add the last statement which returns the last value and the env, for
 >     f (a,b) = (a,) <$> desugar b
 > desugar (Iden i) = pure $ Iden i
 
-
 > desugar (App (Iden "is") [a,b]) = do
 >     uniqueV0 <- makeUniqueVar "is-v0"
 >     uniqueV1 <- makeUniqueVar "is-v1"
@@ -817,6 +816,10 @@ add the last statement which returns the last value and the env, for
 
 > desugar (App (Iden "or") [a,b]) =
 >     desugar (If [(a, Iden "true")] (Just b))
+
+> desugar (App (Iden "and") [a,b]) = do
+>     desugar (If [(a, b)] (Just $ Iden "false"))
+> 
 
 > desugar (App f as) = App <$> desugar f <*> mapM desugar as
 > desugar (Lam ns e) = Lam ns <$> desugar e
@@ -1359,7 +1362,7 @@ tests
 >     "ahoy.tea"
 >     --,"arithmetic.tea"
 >     --,"binding.tea"
->     --,"blocks.tea"
+>     ,"blocks.tea"
 >     --,"boolean.tea"
 >     --,"built-in-functions.tea"
 >     --,"catch.tea"
