@@ -100,6 +100,7 @@ common langs
                        Import2IO
                        Import4
                        Import4Repl
+                       DumpDesugared
 
 Test-Suite RunTests
   import:              shared-properties

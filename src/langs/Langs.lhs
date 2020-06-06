@@ -32,6 +32,7 @@
 > import qualified Import2IO
 > import qualified Import4
 > import qualified Import4Repl
+> import qualified DumpDesugared
 
 > import qualified Test.Tasty as T
 
@@ -68,4 +69,5 @@
 >        ,Import2IO.tests
 >        ,Import4.tests
 >        ,Import4Repl.tests
+>        ,DumpDesugared.tests
 >        ]

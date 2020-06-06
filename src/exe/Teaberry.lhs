@@ -35,6 +35,12 @@ todo: config files, init files, etc.
 >                              --,Value
 >                              )
 
+> import qualified DumpDesugared (newTeaberryHandle
+>                                ,runScript
+>                                ,valueToString
+>                                )
+
+
 > import qualified Records1Embedded (newTeaberryHandle
 >                                   ,runScript
 >                                   ,valueToString)
@@ -175,7 +181,10 @@ main
 > main :: IO ()
 > main = do
 >     os <- execParser myOptsPlus
->     let defaultBackend = import4Repl
+>     let defaultBackend = dumpDesugared
+>         dumpDesugared = Backend {xNewHandle = DumpDesugared.newTeaberryHandle
+>                                 ,xRunScript = DumpDesugared.runScript
+>                                 ,xValueToString = DumpDesugared.valueToString}
 >         import4Repl = Backend {xNewHandle = Import4Repl.newTeaberryHandle
 >                               ,xRunScript = Import4Repl.runScript
 >                               ,xValueToString = Import4Repl.valueToString}
@@ -187,6 +196,7 @@ main
 >         Nothing -> runWithBackend os defaultBackend
 >         Just "default" -> runWithBackend os defaultBackend
 >         Just "Import4Repl" -> runWithBackend os import4Repl
+>         Just "DumpDesugared" -> runWithBackend os dumpDesugared
 >         Just "Records1Embedded" -> runWithBackend os records1Embedded
 >         Just x -> error $ "backend not recognised: " ++ x
 
