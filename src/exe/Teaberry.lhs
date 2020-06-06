@@ -47,7 +47,7 @@ todo: config files, init files, etc.
 >                            ,short
 >                            ,option
 >                            --,showDefault
->                            ,switch
+>                            --,switch
 >                            ,auto
 >                            ,value
 >                            ,execParser
