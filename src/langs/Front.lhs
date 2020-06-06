@@ -91,7 +91,7 @@ syntax
 >           | RecDecl String Expr
 >           | FunDecl String [String] Expr (Maybe [Stmt])
 >           | SetVar String Expr
->           | DataDecl String [VariantDecl]
+>           | DataDecl String [VariantDecl] (Maybe [Stmt])
 >           | SetRef Expr [(String,Expr)]
 >           deriving (Eq, Show, Data)
 
@@ -971,10 +971,14 @@ testing hack
 >     desugarStmts (StExpr (SetBox (Iden n) v) : es)
 
 
-> desugarStmts (DataDecl nm varnts  : es) = do
+> desugarStmts (DataDecl nm varnts w : es) = do
 >     x <- (\a b -> a ++ [b]) <$> mapM makeIsVar varntNms <*> makeIsDat
 >     y <- mapM makeVarnt varnts
->     desugarStmts (x ++ y ++ es)
+>     let w' = case w of
+>                 Nothing -> []
+>                 Just b -> [Check (Just nm) b]
+
+>     desugarStmts (x ++ y ++ w' ++ es)
 >  where
 >    varntNms = map (\(VariantDecl vnm _) -> vnm) varnts
 >    makeIsVar vnm = do
@@ -1330,8 +1334,11 @@ parse
 >      f (a,b) = (a,) <$> convExpr b
 
 
-> convSt (S.DataDecl nm fs Nothing) =
->     DataDecl nm <$> mapM convVarDecl fs
+> convSt (S.DataDecl nm fs whr) = do
+>     whr' <- case whr of
+>                 Nothing -> pure Nothing
+>                 Just w -> Just <$> mapM convSt w
+>     DataDecl nm <$> mapM convVarDecl fs <*> pure whr'
 
 > convSt x = Left $ "parse: unsupported statement " ++ show x
 
@@ -1404,8 +1411,8 @@ pretty
 >   where
 >     f (a,b) = (a,unconv b)
 
-> unconvStmt (DataDecl nm vs) =
->      S.DataDecl nm (map f vs) Nothing
+> unconvStmt (DataDecl nm vs w) =
+>      S.DataDecl nm (map f vs) (fmap (map unconvStmt) w)
 >    where
 >      f (VariantDecl vnm fs) = S.VariantDecl vnm $ map uf fs
 >      uf (Ref,x) = (S.Ref,x)
@@ -1427,8 +1434,8 @@ tests
 
 > testFiles :: [FilePath]
 > testFiles =
->     [--"agdt.tea"
->     "ahoy.tea"
+>     ["agdt.tea"
+>     ,"ahoy.tea"
 >     --,"arithmetic.tea"
 >     --,"binding.tea"
 >     ,"blocks.tea"
