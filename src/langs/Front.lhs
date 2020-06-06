@@ -436,6 +436,7 @@ ffi catalog
 >    ,("*", binaryOp unwrapNum unwrapNum wrapNum (*))
 >    ,("/", binaryOp unwrapNum unwrapNum wrapNum divideScientific)
 >    ,("-", binaryOp unwrapNum unwrapNum wrapNum (-))
+>    ,("-", unaryOp unwrapNum wrapNum (\a -> -a))
 >    ,("+", binaryOp unwrapText unwrapText wrapText (++))
 >    ,("==", binaryOp anyIn anyIn wrapBool (==))
 
@@ -1264,6 +1265,9 @@ parse
 >     a <- convExpr e
 >     b <- convExpr e1
 >     pure $ App (Iden f) [a,b]
+> convExpr (S.UnaryMinus e) = do
+>     a <- convExpr e
+>     pure $ App (Iden "-") [a]
 > convExpr (S.Lam ps e) = do
 >         ps' <- mapM pf ps
 >         e' <- convExpr e
@@ -1436,7 +1440,7 @@ tests
 > testFiles =
 >     ["agdt.tea"
 >     ,"ahoy.tea"
->     --,"arithmetic.tea"
+>     ,"arithmetic.tea"
 >     --,"binding.tea"
 >     ,"blocks.tea"
 >     --,"boolean.tea"
