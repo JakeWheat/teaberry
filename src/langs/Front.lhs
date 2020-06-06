@@ -792,6 +792,7 @@ add the last statement which returns the last value and the env, for
 > desugar (Num i) = pure $ Num i
 > desugar (Text i) = pure $ Text i
 > desugar (TupleSel fs) = TupleSel <$> mapM desugar fs
+> --todo: this should desugar to make variant
 > desugar (RecordSel fs) = RecordSel <$> mapM f fs
 >   where
 >     f (a,b) = (a,) <$> desugar b
