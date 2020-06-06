@@ -85,7 +85,7 @@ run file or script
 >     src <- readFile fp
 >     runSrc be (Just fp) src
 
-> runSrc :: Backend ht vt -> (Maybe String) -> String -> IO ()
+> runSrc :: Backend ht vt -> Maybe String -> String -> IO ()
 > runSrc be fnm src = do
 >     h <- xNewHandle be
 >     v <- (xRunScript be) h fnm [] src
@@ -122,7 +122,7 @@ repl
 >     h <- (xNewHandle be)
 >     runInputT st (repl be h)
 >   where
->     st = defaultSettings {historyFile = (Just ".teaberryreplhistory")}
+>     st = defaultSettings {historyFile = Just ".teaberryreplhistory"}
 
 ------------------------------------------------------------------------------
 

@@ -73,7 +73,7 @@ possibly run tests quietly and exit more noisily if there is a failure
 >           case v of
 >               Left e -> error e -- todo exit with error code
 >               Right NothingV -> pure ()
->               Right v' -> putStrLn $ show v'
+>               Right v' -> print v'
 >       runt fn cmd = do
 >           v <- runChecks fn cmd
 >           case v of

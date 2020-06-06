@@ -1,5 +1,4 @@
 
-> {-# LANGUAGE LambdaCase #-}
 > module Parserize (parserize) where
 > 
 > import Parse (parseProgram)
