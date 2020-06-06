@@ -112,6 +112,7 @@ common langs
                        Records2
                        Construct
                        Variants2
+                       Expr1Catch
 
 Test-Suite RunTests
   import:              shared-properties

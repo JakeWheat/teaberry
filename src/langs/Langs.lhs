@@ -42,6 +42,7 @@
 > import qualified Records2
 > import qualified Construct
 > import qualified Variants2
+> import qualified Expr1Catch
 > import qualified Front
 
 > import qualified Test.Tasty as T
@@ -89,5 +90,6 @@
 >        ,Records2.tests
 >        ,Construct.tests
 >        ,Variants2.tests
+>        ,Expr1Catch.tests
 >        ,Front.tests
 >        ]
