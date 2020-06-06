@@ -86,6 +86,6 @@
 >        ,Tuples1.tests
 >        ,Lists2.tests
 >        ,Records2.tests
->        --,Construct.tests
+>        ,Construct.tests
 >        ,Front.tests
 >        ]

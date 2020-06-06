@@ -27,7 +27,7 @@ Implement generic construct expressions
 > import Data.Char (isAlphaNum)
 
 > import Scientific (Scientific, extractInt)
-> import Data.List (intercalate)
+> import Data.List (intercalate, sortOn)
 >
 > --import Debug.Trace (trace)
 
@@ -52,6 +52,7 @@ syntax
 >             Num Scientific
 >           | Text String
 >           | TupleSel [Expr]
+>           | RecordSel [(String,Expr)]
 >           | Construct Expr [Expr]
 >             -- other things
 >           | Iden String
@@ -184,8 +185,25 @@ on the literal list, instead of working for any list value here
 >     f [] = Iden "empty"
 >     f (v:vs) = App (Iden "link") [v,f vs]
 
-> desugar (Construct x _) = lift $ throwE $ "non list construct not supported " ++ show x
+general construct:
 
+all constructs desugar to the same thing:
+
+[xxx: <elements>]
+->
+xxx.make([list: <elements>])
+
+
+> desugar (Construct rc es) =
+>     desugar (App (Iden "call-construct-make")
+>                 [rc,Construct (Iden "list") es])
+
+
+> desugar (RecordSel fs) =
+>     desugar (App (Iden "make-variant")
+>              [Text "record", Construct (Iden "list") $ map f fs])
+>   where
+>     f (n,v) = TupleSel [Text n, v]
 
   cases(List) l:
 -> assert typeof l is List
@@ -351,6 +369,8 @@ values
 >     TextV a == TextV b = a == b
 >     BoolV a == BoolV b = a == b
 >     TupleV fs == TupleV gs = fs == gs
+>     VariantV "record" as == VariantV "record" bs =
+>         sortOn fst as == sortOn fst bs
 >     VariantV nm fs == VariantV lm gs = (nm,fs) == (lm,gs)
 >     NothingV == NothingV = True
 >     _ == _ = False
@@ -420,7 +440,8 @@ values
 
 > interp e@(DotExpr {}) = throwInterp $ "interp: undesugared dotexpr " ++ show e
 > interp e@(Cases {}) = throwInterp $ "interp: undesugared cases " ++ show e
-> interp e@(Construct  {}) = throwInterp $ "interp: undesugared construct " ++ show e
+> interp e@(Construct {}) = throwInterp $ "interp: undesugared construct " ++ show e
+> interp e@(RecordSel {}) = throwInterp $ "interp: undesugared recordsel " ++ show e
 
   
 > app :: Value -> [Value] -> Interpreter Value
@@ -512,6 +533,7 @@ ffi catalog
 >    ,("safe-variant-name", unaryOp anyIn pure (const $ NothingV))
 >    ,("make-variant", binaryOp unwrapText unwrapList id makeVariant)
 >    ,("link", binaryOp anyIn anyIn pure listLink)
+>    ,("call-construct-make", binaryOp variantIn variantIn id callConstructMake)
      
 >    ,("torepr", unaryOp anyIn pure torepr)
 >    ,("tostring", unaryOp anyIn pure tostring)
@@ -589,6 +611,21 @@ ffi catalog
 >     unpackTuple (VariantV "tuple" x) = throwInterp $ "value in list in make-variant, expected tuple of is-ref, name and val, got " ++ show (map (\(_,b) -> torepr' b) x)
 >     unpackTuple x = throwInterp $ "expected tuple in make-variant, got " ++ torepr' x
 
+
+algo: if there is a matching makeN in the record, use it, else if
+ there is a make, use that, else error
+
+> callConstructMake :: Value -> Value -> Interpreter Value
+> callConstructMake f as = case f of
+>     VariantV "record" ts | Just args' <- listToHaskell as -> do
+>           let makeN = "make" ++ show (length args')
+>           case () of
+>               _ | Just g <- lookup makeN ts -> app g args'
+>                 | Just g <- lookup "make" ts -> app g [as]
+>                 | otherwise -> throwInterp "The left side was not a defined convenience constructor."
+>         | otherwise -> throwInterp $ "construct make called on non list: " ++ torepr' as
+>     _ -> throwInterp "The left side was not a defined convenience constructor."
+  
 ------------------------------------------------------------------------------
 
 env, ffi boilerplate
@@ -677,20 +714,20 @@ env, ffi boilerplate
 
 > unwrapList :: (String, Value -> Interpreter [Value])
 > unwrapList = ("variant", listToHaskellI)
->   where
->     listToHaskellI :: Value -> Interpreter [Value]
->     listToHaskellI x =
+
+> listToHaskellI :: Value -> Interpreter [Value]
+> listToHaskellI x =
 >         maybe (throwInterp $ "bad list value " ++ show x) pure $ listToHaskell x
 
->     listToHaskell :: Value -> Maybe [Value]
+> listToHaskell :: Value -> Maybe [Value]
 >     -- hardcoded understanding of the list data type
 >     -- to improve this, find some way to link the ffi boilerplate
 >     -- to the list source code
 >     -- can look into this again once do the error handling
 >     -- or even wait until have types
->     listToHaskell (VariantV "empty" []) = pure []
->     listToHaskell (VariantV "link" [("first", v), ("rest", vs)]) = (v:) <$> listToHaskell vs
->     listToHaskell _ = Nothing
+> listToHaskell (VariantV "empty" []) = pure []
+> listToHaskell (VariantV "link" [("first", v), ("rest", vs)]) = (v:) <$> listToHaskell vs
+> listToHaskell _ = Nothing
 
   
 > anyIn :: (String, Value -> Interpreter Value)
@@ -800,6 +837,10 @@ like a desugaring process.
 >             (x,) <$> convExpr ex
 >         bf x = Left $ "parse: unsupported binding " ++ show x
 
+> convExpr (S.Sel (S.Record fs)) = RecordSel <$> mapM f fs
+>   where
+>     f (a,b) = (a,) <$> convExpr b
+
 > convExpr (S.Block sts) = Block <$> mapM convSt sts
 
 > convExpr (S.If bs e) = do
@@ -869,6 +910,10 @@ pretty
 >     f (n,fs,e) = (S.VariantP (S.PatName n) (map unconvPattern fs), unconv e)
 >
 > unconv (Construct e es) = S.Construct (unconv e) (map unconv es)  
+> unconv (RecordSel fs) = S.Sel (S.Record (map f fs))
+>   where
+>     f (a,b) = (a,unconv b)
+
 > --unconv x = error $ "unconv: " ++ show x
 
 > unconvStmt :: Stmt -> S.Stmt
