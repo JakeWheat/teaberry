@@ -81,16 +81,16 @@ syntax
 >                   deriving (Eq,Show, Data) 
 
 > data Stmt = StExpr Expr
+>           | When Expr Expr
 >           | LetDecl String Expr
->           | LetSplatDecl Expr
->           | Check (Maybe String) [Stmt]
->           | VarDecl String Expr
 >           | RecDecl String Expr
 >           | FunDecl String [String] Expr (Maybe [Stmt])
+>           | VarDecl String Expr
 >           | SetVar String Expr
->           | DataDecl String [VariantDecl] (Maybe [Stmt])
 >           | SetRef Expr [(String,Expr)]
->           | When Expr Expr
+>           | DataDecl String [VariantDecl] (Maybe [Stmt])
+>           | Check (Maybe String) [Stmt]
+>           | LetSplatDecl Expr
 >           deriving (Eq, Show, Data)
 
 > data VariantDecl = VariantDecl String [(Ref,String)]
@@ -99,7 +99,23 @@ syntax
 > data Ref = Ref | Con
 >          deriving (Eq,Show, Data)
 
-  
+
+> data Binding = Binding Pat Expr
+>           deriving (Eq,Show,Data) 
+
+> data Pat = IdenP PatName
+>          | VariantP (Maybe String) String [Pat]
+>          | TupleP [Pat]
+>          | AsP Pat PatName
+>           deriving (Eq,Show,Data) 
+
+> data PatName = PatName Shadow String
+>              deriving (Eq,Show,Data) 
+
+> data Shadow = NoShadow | Shadow
+>           deriving (Eq,Show,Data) 
+
+
 > data Expr = -- selectors
 >             Num Scientific
 >           | Text String
@@ -107,24 +123,27 @@ syntax
 >           | RecordSel [(String,Expr)]
 >           -- todo: see if can remove this
 >           | VariantSel String [(String,Expr)]
->           | Construct Expr [Expr]
->             -- other things
 >           | Iden String
+>           --  | Parens Expr
+>           | TupleGet Expr Int
+>           | Construct Expr [Expr]
+>           | DotExpr Expr String
+>           | If [(Expr,Expr)] (Maybe Expr)
+>           | Ask [(Expr,Expr)] (Maybe Expr)
+>           | Cases String Expr [(String, [String], Expr)] (Maybe Expr)
 >           | App Expr [Expr]
+>           --  | UnaryMinus Expr
+>           --  | BinOp Expr String Expr
 >           | Lam [String] Expr
 >           | Let [(String,Expr)] Expr
 >           | LetRec [(String,Expr)] Expr
 >           | Block [Stmt]
+>           | UnboxRef Expr String
+
+>           -- todo: see if can remove the following - they should be part of the interpreter syntax
 >           | Seq Expr Expr
->           | If [(Expr,Expr)] (Maybe Expr)
->           | Ask [(Expr,Expr)] (Maybe Expr)
->           | DotExpr Expr String
->           | TupleGet Expr Int
->           | Cases String Expr [(String, [String], Expr)] (Maybe Expr)
->           -- todo: see if can remove the following
 >           | Box Expr
 >           | SetBox Expr Expr
->           | UnboxRef Expr String
 >           | Unbox Expr
 >           | Catch Expr Expr
 >           deriving (Eq, Show, Data)
@@ -1599,7 +1618,7 @@ parse
 >     unpat (S.IdenP (S.PatName _ x)) = pure x
 >     unpat x = Left $ "parse: unsupported pattern: " ++ show x
 
-> convExpr (S.Unbox e n) = flip UnboxRef n <$> convExpr e
+> convExpr (S.UnboxRef e n) = flip UnboxRef n <$> convExpr e
 
 > convExpr (S.Construct e es) = Construct <$> convExpr e <*> mapM convExpr es
 
@@ -1689,7 +1708,7 @@ pretty
 > unconv (Box e) = S.App (S.Iden "box") [unconv e]
 > unconv (SetBox e f) = S.App (S.Iden "setbox") [unconv e, unconv f]
 
-> unconv (UnboxRef e n) = S.Unbox (unconv e) n
+> unconv (UnboxRef e n) = S.UnboxRef (unconv e) n
 > unconv (Unbox e) = S.App (S.Iden "unbox") [unconv e]
 
   

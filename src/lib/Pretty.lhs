@@ -102,7 +102,7 @@
 >   where
 >     mf (p, e1) = text "|" <+> pat p <+> text "=>" <+> expr e1
 
-> expr (Unbox e f) = expr e <> text "!" <> text f
+> expr (UnboxRef e f) = expr e <> text "!" <> text f
 
 > binding :: Binding -> Doc
 > binding (Binding n e) =

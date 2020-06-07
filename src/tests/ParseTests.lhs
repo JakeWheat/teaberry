@@ -108,11 +108,11 @@ todo: review all the whitespace rules that are being ignored
 
 
 >     ,("ex1!x"
->      ,Unbox (Iden "ex1") "x")
+>      ,UnboxRef (Iden "ex1") "x")
 >     ,("ex2!x!y"
->      ,Unbox (Unbox (Iden "ex2") "x") "y")
+>      ,UnboxRef (UnboxRef (Iden "ex2") "x") "y")
 >     ,("ex2.y!x"
->      ,Unbox (DotExpr (Iden "ex2") "y") "x")
+>      ,UnboxRef (DotExpr (Iden "ex2") "y") "x")
 > 
 >     ,("f()", App (Iden "f") [])
 
@@ -341,7 +341,7 @@ todo: review all the whitespace rules that are being ignored
 >     ,("ex1!{x: 42, y:43}"
 >      ,SetRef (Iden "ex1") [("x", num 42), ("y", num 43)])
 >     ,("ex1!a!{x: 42}"
->      ,SetRef (Unbox (Iden "ex1") "a") [("x", num 42)])
+>      ,SetRef (UnboxRef (Iden "ex1") "a") [("x", num 42)])
 
 >     ,("ex1.a!{x: 42}"
 >      ,SetRef (DotExpr (Iden "ex1") "a") [("x", num 42)])

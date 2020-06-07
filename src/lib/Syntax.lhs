@@ -2,7 +2,8 @@
 
 The high level syntax which the parser produces
 
-> {-# LANGUAGE DeriveDataTypeable,DeriveGeneric, ScopedTypeVariables #-}
+> {-# LANGUAGE DeriveDataTypeable #-}
+> {-# LANGUAGE ScopedTypeVariables #-}
 > module Syntax (Stmt(..)
 >               ,Shadow(..)
 >               ,Binding(..)
@@ -19,21 +20,20 @@ The high level syntax which the parser produces
 >               ,extractInt
 >               ) where
 
-> import Data.Data (Data,Typeable)
+> import Data.Data (Data)
 > import Scientific (Scientific,extractInt)
-> import GHC.Generics (Generic)
 
 ------------------------------------------------------------------------------
 
 > data Module = Module [PreludeStmt] [Stmt]
->              deriving (Eq,Show,Data,Typeable,Generic) 
+>              deriving (Eq,Show,Data)
 
 > data PreludeStmt = Provide [ProvideItem]
 >                  | Import ImportSource String
 >                  | Include ImportSource
 >                  | IncludeFrom String [ProvideItem]
 >                  | ImportNames [String] ImportSource
->                  deriving (Eq,Show,Data,Typeable,Generic)
+>                  deriving (Eq,Show,Data)
 
 import n1, n2, ... from <import-source>
 so:
@@ -46,11 +46,11 @@ import * from <import-source>
 > data ProvideItem = ProvideAll
 >                  | ProvideAlias String String
 >                  | ProvideName String
->                  deriving (Eq,Show,Data,Typeable,Generic) 
+>                  deriving (Eq,Show,Data) 
 
 > data ImportSource = ImportSpecial String [String]
 >                   | ImportName String
->                   deriving (Eq,Show,Data,Typeable,Generic) 
+>                   deriving (Eq,Show,Data) 
 
 todo: change pattern in fundecl
 
@@ -88,22 +88,28 @@ is it worth having different syntaxes for these?
 >           | TPred Expr String Expr Expr -- is%, is-not%
 >           | TPostfixOp Expr String --- does-not-raise
 >           | Check (Maybe String) [Stmt]
->           deriving (Eq,Show,Data,Typeable,Generic) 
+>           deriving (Eq,Show,Data) 
+
+> data VariantDecl = VariantDecl String [(Ref,String)]
+>                  deriving (Eq,Show,Data) 
+
+> data Ref = Ref | Con
+>          deriving (Eq,Show,Data) 
 
 > data Binding = Binding Pat Expr
->           deriving (Eq,Show,Data,Typeable,Generic) 
+>           deriving (Eq,Show,Data) 
 
 > data Pat = IdenP PatName
 >          | VariantP (Maybe String) String [Pat]
 >          | TupleP [Pat]
 >          | AsP Pat PatName
->           deriving (Eq,Show,Data,Typeable,Generic) 
+>           deriving (Eq,Show,Data) 
 
 > data PatName = PatName Shadow String
->              deriving (Eq,Show,Data,Typeable,Generic) 
+>              deriving (Eq,Show,Data) 
 
 > data Shadow = NoShadow | Shadow
->           deriving (Eq,Show,Data,Typeable,Generic) 
+>           deriving (Eq,Show,Data) 
 
 
 > data Expr = Sel Selector
@@ -122,8 +128,8 @@ is it worth having different syntaxes for these?
 >           | Let [Binding] Expr
 >           | LetRec [Binding] Expr
 >           | Block [Stmt]
->           | Unbox Expr String
->           deriving (Eq,Show,Data,Typeable,Generic) 
+>           | UnboxRef Expr String
+>           deriving (Eq,Show,Data) 
 
 todo: merge this into expr
 have to fix the pattern or expression parser first
@@ -132,11 +138,5 @@ have to fix the pattern or expression parser first
 >               | Text String
 >               | TupleSel [Expr]
 >               | RecordSel [(String,Expr)]
->               deriving (Eq,Show,Data,Typeable,Generic) 
-
-> data VariantDecl = VariantDecl String [(Ref,String)]
->                  deriving (Eq,Show,Data,Typeable,Generic) 
-
-> data Ref = Ref | Con
->          deriving (Eq,Show,Data,Typeable,Generic) 
+>               deriving (Eq,Show,Data) 
 

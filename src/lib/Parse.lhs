@@ -538,7 +538,7 @@ y <- getexpression x
   and there is a getpattern also
 
 > unboxSuffix :: Parser (Expr -> Expr)
-> unboxSuffix = flip Unbox <$> (try (symbol_ "!" *> identifier))
+> unboxSuffix = flip UnboxRef <$> (try (symbol_ "!" *> identifier))
 
 
 put all the parsers which start with a keyword first
