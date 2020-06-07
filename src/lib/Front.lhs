@@ -114,7 +114,6 @@ syntax
 >           | Lam [String] Expr
 >           | Let [(String,Expr)] Expr
 >           | LetRec [(String,Expr)] Expr
->           --  | LetSplat Expr Expr
 >           | Block [Stmt]
 >           | Seq Expr Expr
 >           | If [(Expr,Expr)] (Maybe Expr)
@@ -137,6 +136,7 @@ interpreter syntax
 >     = INum Scientific
 >     | IText String
 >      -- why does this exist? it's just app isn't it?
+>      -- currently used to bootstrap tuple, record, nothing
 >     | IVariantSel String [(String,IExpr)]
 >     | IIden String
 >     | IApp IExpr [IExpr]
@@ -288,12 +288,10 @@ recursively load all the referenced modules in the source given
 >     -- or the path used in import file(x), with any .tea removed
 >     -- and the directory removed if there is one      
 >     loadAndRecurse is = do
->         let fn = case is of
->                   ImportSpecial "file" [n]  -> n
->                   ImportName n -> buildInModDir </> n ++ ".tea"
->             mn = case is of
->                   ImportSpecial "file" [n]  -> n
->                   ImportName n -> n
+>         (fn,mn) <- case is of
+>                   ImportSpecial "file" [n] -> pure (n,n)
+>                   ImportSpecial x _ -> throwInterp $ "import special with " ++ x ++ " not supported"
+>                   ImportName n -> pure (buildInModDir </> n ++ ".tea", n)
 >         x <- liftIO $ readFile fn
 >         f mn x
 >     getImp (Import fn _) = Just fn
@@ -938,16 +936,18 @@ add the last statement which returns the last value and the env, for
 
   
 > desugarPreludeStmt :: PreludeStmt -> Desugarer [Stmt]
-> desugarPreludeStmt (Import is b) =
->     pure [LetDecl b (TupleGet (Iden (importSourceName is)) 1)]
+> desugarPreludeStmt (Import is b) = do
+>     n <- importSourceName is
+>     pure [LetDecl b (TupleGet (Iden n) 1)]
 
 > desugarPreludeStmt (IncludeFrom nm is) =
 >     pure $ flip map is $ \(ProvideAlias n1 n2) ->
 >         LetDecl n2 (DotExpr (TupleGet (Iden ("module." ++ nm)) 1) n1)
 
-> importSourceName :: ImportSource -> String
-> importSourceName (ImportSpecial "file" [s]) = "module." ++ s
-> importSourceName (ImportName n) = "module." ++ n  
+> importSourceName :: ImportSource -> Desugarer String
+> importSourceName (ImportSpecial "file" [s]) = pure $ "module." ++ s
+> importSourceName (ImportSpecial x _ ) = lift $ throwE $ "import special with " ++ x ++ " not supported"
+> importSourceName (ImportName n) = pure $ "module." ++ n  
   
 > desugar :: Expr -> Desugarer IExpr
 

@@ -237,9 +237,13 @@ when you see a rec or fun
 >     isRecOrFun RecDecl {} = True
 >     isRecOrFun FunDecl {} = True
 >     isRecOrFun _ = False      
-  
+
+> desugarStmts (FunDecl {}: _) = lift $ throwE $ "Internal: I had a bet with ghc that fundecl pattern was always matched in desugarstmts, and now ghc has won that bet"
+> desugarStmts (RecDecl {}: _) = lift $ throwE $ "Internal: I had a bet with ghc that recdecl pattern was always matched in desugarstmts, and now ghc has won that bet"
+
 > desugarStmts (StExpr e : es) =
 >     Seq <$> desugar e <*> desugarStmts es
+
 
 ------------------------------------------------------------------------------
 
