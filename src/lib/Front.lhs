@@ -127,7 +127,7 @@ syntax
 >           | DotExpr Expr String
 >           | If [(Expr,Expr)] (Maybe Expr)
 >           | Ask [(Expr,Expr)] (Maybe Expr)
->           | Cases String Expr [(String, [String], Expr)] (Maybe Expr)
+>           | Cases String Expr [(Pat, Expr)] (Maybe Expr)
 >           | App Expr [Expr]
 >           | UnaryMinus Expr
 >           | BinOp Expr String Expr
@@ -1116,11 +1116,17 @@ xxx.make([list: <elements>])
 >     bs' <- mapM (f tv) bs
 >     desugar $ Let [(tv, t)] $ If bs' els
 >   where
->     f tv (vnm, fnms, e) =
->         let tst = appI "safe-variant-name" [Iden tv] `equals` Sel (Text (dropQualifiers vnm))
+>     f tv (VariantP _q vnm fnms, e) | Just fnms' <- mapM getPn fnms =
+>         let tst = appI "safe-variant-name" [Iden tv] `equals` (Sel $ Text vnm)
 >             thn = zipWith (\fnm n -> LetDecl fnm (appI "variant-field-get-ord" [Sel $ Num $ fromIntegral n, Iden tv]))
->                           fnms [(0::Int)..]
+>                           fnms' [(0::Int)..]
 >         in pure (tst, Block (thn ++ [StExpr e]))
+>     f tv (IdenP (PatName NoShadow vnm), e) =
+>         let tst = appI "safe-variant-name" [Iden tv] `equals` (Sel $ Text vnm)
+>         in pure (tst, Block [StExpr e])
+>     f _ x = lift $ throwE $ "unsupported pattern in cases: " ++ show x
+>     getPn (IdenP (PatName _ x)) = Just x
+>     getPn _ = Nothing
 >     appI i as = App (Iden i) as
 >     equals a b = App (Iden "==") [a,b]
 
@@ -1612,19 +1618,27 @@ parse
 > convExpr (S.Cases ty e bs els) =
 >     Cases ty <$> convExpr e <*> mapM f bs <*> maybe (pure Nothing) ((Just <$>) .  convExpr) els
 >   where
->     f (S.VariantP x vnm ps, ve)
->         | Right ps' <- mapM unpat ps =
->               let vnm' = maybe vnm (\y -> y ++ "." ++ vnm) x
->               in (vnm', ps',) <$> convExpr ve
->     f (S.IdenP (S.PatName _ vnm), ve) = (vnm, [],) <$> convExpr ve
->     f x = Left $ "parse: unsupported pattern: " ++ show x
->     unpat (S.IdenP (S.PatName _ x)) = pure x
->     unpat x = Left $ "parse: unsupported pattern: " ++ show x
+>     f (p, ve) = do
+>         p' <- convPat p
+>         ve' <- convExpr ve
+>         pure (p',ve')
 
 > convExpr (S.UnboxRef e n) = flip UnboxRef n <$> convExpr e
 
 > convExpr (S.Construct e es) = Construct <$> convExpr e <*> mapM convExpr es
 
+> convPat :: S.Pat -> Either String Pat
+> convPat (S.IdenP nm) = IdenP <$> convPatName nm
+> convPat (S.VariantP q nm ps) = VariantP q nm <$> mapM convPat ps
+> convPat (S.TupleP ps) = TupleP <$> mapM convPat ps
+> convPat (S.AsP p pn) = AsP <$> convPat p <*> convPatName pn
+
+> convPatName :: S.PatName -> Either String PatName
+> convPatName (S.PatName sh n) = pure $ PatName sh' n
+>   where
+>     sh' | sh == S.Shadow = Shadow
+>         | sh == S.NoShadow = NoShadow
+>         | otherwise = error "convpatname: how can it get here?"
 
 > -- convExpr x = Left $ "parse: unsupported expression " ++ show x
 
@@ -1706,7 +1720,7 @@ pretty
 > unconv (Cases ty t bs els) =
 >     S.Cases ty (unconv t) (map f bs) (fmap unconv els)
 >   where
->     f (n,fs,e) = (S.VariantP Nothing n (map unconvPattern fs), unconv e)
+>     f (p,e) = (unconvPat p, unconv e)
 >
 > unconv (Box e) = S.App (S.Iden "box") [unconv e]
 > unconv (SetBox e f) = S.App (S.Iden "setbox") [unconv e, unconv f]
@@ -1719,6 +1733,19 @@ pretty
 > unconv (UnaryMinus e) = S.UnaryMinus (unconv e)
   
 > --unconv x = error $ "unconv: " ++ show x
+
+> unconvPat :: Pat -> S.Pat
+> unconvPat (IdenP pn) = S.IdenP (unconvPatName pn)
+> unconvPat (VariantP q nm ps) = S.VariantP q nm (map unconvPat ps)
+> unconvPat (TupleP ps) = S.TupleP (map unconvPat ps)
+> unconvPat (AsP p pn) = S.AsP (unconvPat p) (unconvPatName pn)
+
+> unconvPatName :: PatName -> S.PatName
+> unconvPatName (PatName sh n) = S.PatName sh' n
+>   where
+>     sh' | sh == Shadow = S.Shadow
+>         | sh == NoShadow = S.NoShadow
+>         | otherwise = error "unconvpatname: how can it get here?"
 
 > unconvStmt :: Stmt -> S.Stmt
 > unconvStmt (LetDecl n e) = S.LetDecl (unconvBinding n e)
