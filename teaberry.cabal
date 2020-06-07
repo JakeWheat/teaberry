@@ -22,6 +22,7 @@ source-repository head
   type:                git
   location:            https://github.com/JakeWheat/teaberry.git
 
+
 common shared-properties
   default-language:    Haskell2010
   build-depends:       base >= 4 && < 5,
@@ -31,46 +32,20 @@ common shared-properties
                        transformers >= 0.5 && < 0.6,
                        mtl >= 2.2 && < 2.3,
                        safe-exceptions >= 0.1 && < 0.2,
-                       filepath >= 1.4 && < 1.5
-
-  ghc-options:         -Wall
-
--- this is the old version of the code that is in the process of being replaced
-library
-  import:              shared-properties
-  build-depends:       uniplate >= 1.6 && < 1.7,
-                       pretty-show >= 1.7 && < 1.11
-  exposed-modules:     Syntax
-                       Parse
-                       Desugar
-                       InterpreterSyntax
-                       Interpreter
-                       Pretty
-                       PrettyInterpreter
-                       Engine
-                       Scientific
-                       Paths_teaberry
-  autogen-modules:     Paths_teaberry
-  hs-source-dirs:      src/lib
-  
--- this is the new experimental versions which will be used to create
--- the new version of the code, and continue to be developed to
--- keep feeding into the new version
-   
-common langs
-  import:              shared-properties
-  build-depends:       teaberry,
+                       filepath >= 1.4 && < 1.5,
                        tasty >= 1.1 && < 1.4,
                        tasty-hunit >= 0.10 && < 0.11,
                        raw-strings-qq,
                        uniplate >= 1.6 && < 1.7
-  hs-source-dirs:      src/langs
+  ghc-options:         -Wall
+
+common libfiles
   autogen-modules:     Paths_teaberry
+  hs-source-dirs:      src/langs, src/lib, src/tests
+
   other-modules:       TestUtils
                        Langs
                        ParserExtra
-                       Paths_teaberry
-                       Front
                        SimpleExpr
                        SimpleExprError
                        SimpleExprReader
@@ -113,36 +88,37 @@ common langs
                        Construct
                        Variants2
                        Expr1Catch
+                       Paths_teaberry
+                       ParseTests
+
+-- this is the old version of the code that is in the process of being replaced
+library
+  import:              shared-properties, libfiles
+  exposed-modules:     Syntax
+                       Parse
+                       Pretty
+                       Scientific
+                       Front
+  hs-source-dirs:      src/lib
+  
+-- this is the new experimental versions which will be used to create
+-- the new version of the code, and continue to be developed to
+-- keep feeding into the new version
+   
 
 Test-Suite RunTests
-  import:              shared-properties
-  import:              langs
+  import:              shared-properties, libfiles
   type:                exitcode-stdio-1.0
   main-is:             RunTests.lhs
-  other-modules:       DesugarTests
-                       InterpreterTests
-                       TeaberryTests
-                       ParseTests
-  build-depends:       teaberry,
-                       tasty >= 1.1 && < 1.4,
-                       tasty-hunit >= 0.10 && < 0.11
+  other-modules:       
+  build-depends:       teaberry
   ghc-options:         -threaded
   hs-source-dirs:      src/tests
 
 executable teaberry
-  import:              langs
+  import:              shared-properties, libfiles
   main-is:             Teaberry.lhs
-  build-depends:       teaberry,
-                       haskeline,
+  build-depends:       haskeline,
                        optparse-applicative
   ghc-options:         -threaded
-  hs-source-dirs:      src/langs,src/exe
-
--- executable for the old lib code
-executable teaberryold
-  import:              shared-properties
-  main-is:             TeaberryOld.lhs
-  build-depends:       teaberry
-  ghc-options:         -threaded
   hs-source-dirs:      src/exe
-  other-modules:       Parserize

@@ -2,19 +2,14 @@
 
 Represents the combination of all the ideas that made it
 
-has:
-  cases, var, data decl, embedded, ffi,
-  if, and, or, n way if
-  records, refs
-  check, seq
+cleanups:
+parser extra:
+  make an explicit module syntax to put multiple modules in one file
+  change the set syntax to be in language
 
-then use this to demonstrate separated interpreter syntax
+think about how to split this file:
+syntax, interpreter, desugarer, tests
 
-figure out what order the code should be in
-and make all the langs present the code in this order
-
-
-todo: how to write the tests for this
 
 > {-# LANGUAGE TupleSections #-}
 > {-# LANGUAGE LambdaCase #-}
