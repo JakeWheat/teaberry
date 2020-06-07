@@ -200,7 +200,7 @@ hacky top level evaluate. not really sure if it will pay its way once
 >           -> IO (Value, RuntimeState, [T.CheckResult])
 > evaluate fnm ebs src = do
 >     d <- getBuiltInModulesDir
->     fst <$> evalRWST (f d) (henv ebs) emptyInterpreterState
+>     fst <$> evalRWST (f d) (makeInterpreterEnv $ henv ebs) emptyInterpreterState
 >   where
 >     f :: FilePath -> Interpreter (Value, RuntimeState, [T.CheckResult])
 >     f d =
@@ -426,9 +426,15 @@ store holds the values of variables
 >     env' <- addForeignFun' x y env
 >     addForeignFuns' xs env'
 
+> data InterpreterEnv = InterpreterEnv
+>     {ieEnv :: Env}
 
+not sure if it should do this, or keep the rest of the env in the state
+
+> makeInterpreterEnv :: Env -> InterpreterEnv
+> makeInterpreterEnv = InterpreterEnv
   
-> type Interpreter = RWST Env () InterpreterState IO
+> type Interpreter = RWST InterpreterEnv () InterpreterState IO
 
 
 ---------------------------------------
@@ -503,7 +509,7 @@ ffi catalog
 > envToRecord = do
 >     rd <- ask
 >           
->     pure $ VariantV "record" $ envEnv rd
+>     pure $ VariantV "record" $ envEnv $ ieEnv rd
 
 > raise :: Value -> Interpreter Value
 > raise v = throwM $ ValueException v
@@ -694,7 +700,7 @@ interp
 
 > interp (Iden a) = do
 >     env <- ask
->     x <- envLookup a env
+>     x <- envLookup a $ ieEnv env
 >     case x of
 >         BoxV i -> do
 >                   st <- get
@@ -707,12 +713,12 @@ interp
 >     app fv vs
 > interp (Lam ps e) = do
 >     env <- ask
->     pure $ FunV ps e env
+>     pure $ FunV ps e $ ieEnv env
 > interp (Let bs e) = do
 >     let newEnv [] = interp e
 >         newEnv ((b,ex):bs') = do
 >             v <- interp ex
->             local (extendEnv [(b,v)]) $ newEnv bs'
+>             local (\x -> x {ieEnv = extendEnv [(b,v)] $ ieEnv x}) $ newEnv bs'
 >     newEnv bs
 
 take the fields in the record, and bind them to the current env:
@@ -727,7 +733,7 @@ b = r.b
 >     x <- interp re
 >     case x of
 >         VariantV "record" bs ->
->             local (extendEnv bs) $ interp e
+>             local (\x -> x {ieEnv = extendEnv bs $ ieEnv x}) $ interp e
 >         _ -> throwInterp $ "expected record in letsplat, got " ++ show x
 >     -- get value for r in env
 >     -- make sure it's a record
@@ -757,7 +763,7 @@ todo: combine
 
 > interp (SetBox (Iden b) v) = do
 >     env <- ask
->     b' <- envLookup b env
+>     b' <- envLookup b $ ieEnv env
 >     v' <- interp v
 >     i <- case b' of
 >              BoxV i -> pure i
@@ -808,11 +814,11 @@ todo: combine
 >         FunV ps bdy env' -> do
 >             as <- safeZip ps vs
 >             let env'' = extendEnv as env'
->             local (const env'') $ interp bdy
+>             local (\x -> x {ieEnv = env''}) $ interp bdy
 >         ForeignFunV nm -> do
 >             let tys = map valueTypeName vs
 >             env <- ask
->             hf <- lookupForeignFun nm tys env
+>             hf <- lookupForeignFun nm tys $ ieEnv env
 >             hf vs
 >         _ -> throwInterp "non function value in app position"
 >   where
