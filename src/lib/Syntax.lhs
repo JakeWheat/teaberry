@@ -108,8 +108,6 @@ is it worth having different syntaxes for these?
 
 
 > data Expr = Sel Selector
-
-
 >           | Iden String
 >           | Parens Expr
 >           | TupleGet Expr Int
@@ -128,6 +126,8 @@ is it worth having different syntaxes for these?
 >           | Unbox Expr String
 >           deriving (Eq,Show,Data,Typeable,Generic) 
 
+todo: merge this into expr
+have to fix the pattern or expression parser first
 
 > data Selector = Num Scientific
 >               | Text String

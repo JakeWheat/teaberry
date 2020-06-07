@@ -72,7 +72,7 @@ syntax
 >                  | IncludeFrom String [(String, String)]
 >                  deriving (Eq, Show, Data)
 
-> data ImportSource = ImportFile String
+> data ImportSource = ImportSpecial String [String]
 >                   | ImportName String
 >                   deriving (Eq,Show, Data) 
 
@@ -263,10 +263,10 @@ recursively load all the referenced modules in the source given
 >     -- and the directory removed if there is one      
 >     loadAndRecurse is = do
 >         let fn = case is of
->                   ImportFile n -> n
+>                   ImportSpecial "file" [n]  -> n
 >                   ImportName n -> buildInModDir </> n ++ ".tea"
 >             mn = case is of
->                   ImportFile n -> n
+>                   ImportSpecial "file" [n]  -> n
 >                   ImportName n -> n
 >         x <- liftIO $ readFile fn
 >         f mn x
@@ -902,7 +902,7 @@ add the last statement which returns the last value and the env, for
 >         LetDecl n2 (DotExpr (TupleGet (Iden ("module." ++ nm)) 1) n1)
 
 > importSourceName :: ImportSource -> String
-> importSourceName (ImportFile s) = "module." ++ s
+> importSourceName (ImportSpecial "file" [s]) = "module." ++ s
 > importSourceName (ImportName n) = "module." ++ n  
   
 > desugar :: Expr -> Desugarer Expr
@@ -1468,7 +1468,8 @@ parse
 > convPrelude :: S.PreludeStmt -> Either String PreludeStmt
 
 > convPrelude (S.Import (S.ImportName x) y) = pure $ Import (ImportName x) y
-> convPrelude (S.Import (S.ImportSpecial "file" [fn]) y) = pure $ Import (ImportFile fn) y
+> convPrelude (S.Import (S.ImportSpecial nm as) y) =
+>     pure $ Import (ImportSpecial nm as) y
 
 > convPrelude (S.IncludeFrom x as) | Just as' <- mapM f as =
 >     pure $ IncludeFrom x as'
