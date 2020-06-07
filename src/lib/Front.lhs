@@ -51,7 +51,7 @@ syntax, interpreter, desugarer, tests
 > import Scientific (Scientific, extractInt, divideScientific)
 > import Data.List (intercalate, nubBy, sortOn)
 
-> import Debug.Trace (trace)
+> import Debug.Trace (trace, traceStack)
 > import qualified TestUtils as T
 
 > import Data.IORef (IORef, newIORef, readIORef, writeIORef)
@@ -399,9 +399,10 @@ store holds the values of variables
 >
 > envLookup :: String -> Env -> Interpreter Value
 > envLookup nm env =
->     maybe (throwInterp $ "Identifier not found: " ++ nm {-++ "\n" ++ showEnvNames env-}) pure
->     -- $ trace ("\n----------\n" ++ _showEnvNames env ++"\n-----------\n")
->     $ lookup nm (envEnv env)
+>     maybe
+>       (--traceStack  "" -- \n----------\n" ++ _showEnvNames env ++"\n-----------\n"
+>       throwInterp $ "Identifier not found: " ++ nm {-++ "\n" ++ showEnvNames env-})
+>       pure $ lookup nm (envEnv env)
 
 > addForeignFun :: String -> [String] -> ([Value] -> Interpreter Value) -> Env -> Either String Env
 > addForeignFun nm tys f env =
@@ -427,14 +428,24 @@ store holds the values of variables
 >     addForeignFuns' xs env'
 
 > data InterpreterEnv = InterpreterEnv
->     {ieEnv :: Env}
+>     {ieEnv :: Env
+>     ,traceLevel :: Int
+>     }
 
 not sure if it should do this, or keep the rest of the env in the state
 
 > makeInterpreterEnv :: Env -> InterpreterEnv
-> makeInterpreterEnv = InterpreterEnv
+> makeInterpreterEnv x = InterpreterEnv x 0
   
 > type Interpreter = RWST InterpreterEnv () InterpreterState IO
+
+
+trace the string if the tracel level is >= i
+
+> traceIt :: Int -> String -> Interpreter ()
+> traceIt i msg = do
+>     l <- traceLevel <$> ask
+>     when (l >= i) $ liftIO $ putStrLn msg
 
 
 ---------------------------------------
@@ -476,7 +487,7 @@ ffi catalog
 >    ,("variant-field-get-ord", binaryOp unwrapNum variantIn id variantFieldGetOrd)
 >    ,("safe-variant-name", unaryOp variantIn id safeVariantName)
 >    -- hack to make it work for any data type     
->    ,("safe-variant-name", unaryOp anyIn id (const $ interp (Iden "nothing")))
+>    ,("safe-variant-name", unaryOp anyIn pure (const $ nothingLiteralHack))
 >    ,("make-variant", binaryOp unwrapText unwrapList id makeVariant)
 >    ,("env-to-record", nullaryOp id envToRecord)
 >    ,("link", binaryOp anyIn anyIn pure listLink)
@@ -504,6 +515,14 @@ ffi catalog
 >    $ emptyEnv {envEnv = [("true", BoolV True)
 >                         ,("false", BoolV False)
 >                         ,("empty", VariantV "empty" [])]}
+
+hardcoded nothing. There is also a syntax version. even though nothing
+is defined in built in, it needs bootstrapping like list because a
+bunch of the language machinery needs nothing before it's been
+created
+
+> nothingLiteralHack :: Value
+> nothingLiteralHack = VariantV "nothing" []
 
 > envToRecord :: Interpreter Value
 > envToRecord = do
@@ -609,13 +628,13 @@ ffi catalog
 >     liftIO $ putStrLn $ case v of
 >                             TextV u -> u
 >                             _ -> torepr' v
->     interp (Iden "nothing")
+>     pure nothingLiteralHack
 
 
 > ffisleep :: Scientific -> Interpreter Value
 > ffisleep v = do
 >     liftIO $ threadDelay (floor (v * 1000 * 1000))
->     interp (Iden "nothing")
+>     pure nothingLiteralHack
 
 > listLink :: Value -> Value -> Value
 > listLink a b = VariantV "link" [("first",a),("rest",b)]
@@ -623,7 +642,7 @@ ffi catalog
   
 > safeVariantName :: Value -> Interpreter Value
 > safeVariantName (VariantV x _) = pure $ TextV $ dropQualifiers x
-> safeVariantName _ = interp (Iden "nothing")
+> safeVariantName _ = pure $ nothingLiteralHack
 
 > dropQualifiers :: String -> String
 > dropQualifiers = reverse . takeWhile (/='.') . reverse
@@ -717,7 +736,9 @@ interp
 > interp (Let bs e) = do
 >     let newEnv [] = interp e
 >         newEnv ((b,ex):bs') = do
+>             traceIt 1 $ "let " ++ b ++ " = " ++ pretty ex
 >             v <- interp ex
+>             traceIt 1 $ "let " ++ b ++ " = " ++ torepr' v
 >             local (\x -> x {ieEnv = extendEnv [(b,v)] $ ieEnv x}) $ newEnv bs'
 >     newEnv bs
 
@@ -882,6 +903,9 @@ desugar the prelude
 add the last statement which returns the last value and the env, for
   repl/embedded and for imports
 
+> nothingSyntaxHack :: Expr
+> nothingSyntaxHack = VariantSel "nothing" []
+
 > desugarModule :: Bool -> Module -> Desugarer Expr
 > desugarModule skipBuiltins (Module ps stmts) = do
 >     ps' <- concat <$> mapM desugarPreludeStmt (builtins ++ ps)
@@ -890,7 +914,7 @@ add the last statement which returns the last value and the env, for
 >     desugarStmts (ps' ++ stmts')
 >   where
 >     mk x = StExpr $ TupleSel [x, App (Iden "env-to-record") []]
->     addTopRet [] = pure [mk $ Iden "nothing"]
+>     addTopRet [] = pure [mk nothingSyntaxHack]
 >     addTopRet [StExpr x] = do
 >         z <- makeUniqueVar "z"
 >         pure [LetDecl z x, mk $ Iden z]
@@ -1101,10 +1125,10 @@ testing hack
 >     desugarStmts (LetSplatDecl re : xs)
   
 > desugarStmts [StExpr e] = desugar e
-> desugarStmts [x@(LetDecl {})] = desugarStmts [x, StExpr $ Iden "nothing"]
-> desugarStmts [x@(LetSplatDecl {})] = desugarStmts [x, StExpr $ Iden "nothing"]
-> desugarStmts [x@(FunDecl {})] = desugarStmts [x, StExpr $ Iden "nothing"]
-> desugarStmts [x@(RecDecl {})] = desugarStmts [x, StExpr $ Iden "nothing"]
+> desugarStmts [x@(LetDecl {})] = desugarStmts [x, StExpr nothingSyntaxHack]
+> desugarStmts [x@(LetSplatDecl {})] = desugarStmts [x, StExpr nothingSyntaxHack]
+> desugarStmts [x@(FunDecl {})] = desugarStmts [x, StExpr nothingSyntaxHack]
+> desugarStmts [x@(RecDecl {})] = desugarStmts [x, StExpr nothingSyntaxHack]
 
 > desugarStmts (LetDecl n v : es) = desugar (Let [(n,v)] (Block es))
 
@@ -1140,8 +1164,8 @@ testing hack
 
 > desugarStmts (When c t : es) =
 >     let e = (If [(c, Block [StExpr t
->                            ,StExpr $ Iden "nothing"])]
->                     (Just (Iden "nothing")))
+>                            ,StExpr nothingSyntaxHack])]
+>                     (Just nothingSyntaxHack))
 >     in Seq <$> desugar e <*> desugarStmts es
 
 
@@ -1340,7 +1364,7 @@ ffi boilerplate
 
 
 > nothingWrapper :: (InterpreterState -> InterpreterState) -> Interpreter Value
-> nothingWrapper f = modify f *> interp (Iden "nothing")
+> nothingWrapper f = modify f *> pure nothingLiteralHack
 
 > _unwrapTuple :: (String, Value -> Interpreter [Value])
 > _unwrapTuple = ("tuple", \case

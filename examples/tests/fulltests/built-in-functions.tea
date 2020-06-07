@@ -19,13 +19,7 @@ check:
   is-boolean(1) is false
   is-number(true) is false
   is-number(1) is true
-  # weird bug?
-  # if you do this at the prompt, it also fails
-  # repeatedly
-  # but if you do is-nothing(nothing)
-  # then do it, it works
-  # why is it even looking up nothing?
-  #is-nothing(1) is false
+  is-nothing(1) is false
   is-nothing(nothing) is true
   is-string(1) is false
   is-string("test") is true
