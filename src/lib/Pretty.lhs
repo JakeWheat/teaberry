@@ -18,7 +18,6 @@
 >               ,Pat(..)
 >               ,PatName(..)
 >               ,Stmt(..)
->               ,Binding(..)
 >               ,Shadow(..)
 >               ,Module(..)
 >               ,PreludeStmt(..)
@@ -80,10 +79,10 @@
 >          ,nest 2 (expr e)
 >          ,text "end"]
 >   where
->     bs' | [b] <- bs = binding b
->         | otherwise = vcommaSep $ map binding bs
+>     bs' | [(n,v)] <- bs = binding n v
+>         | otherwise = vcommaSep $ map (uncurry binding) bs
 > expr (LetRec bs e) = vcat
->     [text "letrec" <+> nest 2 (commaSep $ map binding bs) <> text ":"
+>     [text "letrec" <+> nest 2 (commaSep $ map (uncurry binding) bs) <> text ":"
 >     ,nest 2 (expr e)
 >     ,text "end"]
 > expr (Block ss) = vcat [text "block:", nest 2 (stmts ss), text "end"]
@@ -104,8 +103,8 @@
 
 > expr (UnboxRef e f) = expr e <> text "!" <> text f
 
-> binding :: Binding -> Doc
-> binding (Binding n e) =
+> binding :: Pat -> Expr -> Doc
+> binding n e =
 >     pat n <+> text "=" <+> nest 2 (expr e)
 
 
@@ -126,15 +125,15 @@
 > stmt (StExpr e) = expr e
 > stmt (When c t) = text "when" <+> expr c <> text ":" <+> nest 2 (expr t) <+> text "end"
 
-> stmt (LetDecl b) = binding b
+> stmt (LetDecl n e) = binding n e
 
-> stmt (VarDecl b) = text "var" <+> binding b
+> stmt (VarDecl pn e) = text "var" <+> pat pn <+> text "=" <+> expr e
 > stmt (SetVar n e) = text n <+> text ":=" <+> nest 2 (expr e)
 > stmt (SetRef e fs) = expr e <> text "!{" <> commaSep (map f fs) <> text "}"
 >   where
 >     f (n,v) = text n <> text ":" <+> expr v
 
-> stmt (RecDecl b) = text "rec" <+> binding b
+> stmt (RecDecl n e) = text "rec" <+> binding n e
 > stmt (FunDecl pn as e w) = vcat
 >      [text "fun" <+> patName pn <+> parens (commaSep $ map pat as) <> text ":"
 >      ,nest 2 (expr e)

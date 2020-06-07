@@ -107,7 +107,6 @@ for things like expressions, patterns, terms, etc.
 >               ,Selector(..)
 >               ,VariantDecl(..)
 >               ,Shadow(..)
->               ,Binding(..)
 >               ,Pat(..)
 >               ,PatName(..)
 >               ,Ref(..)
@@ -364,12 +363,12 @@ todo: remove the trys by implementing a proper lexer or a lexer style
 > expressionLet :: Parser Expr
 > expressionLet = keyword_ "let" *> letBody Let
 >
-> letBody :: ([Binding] -> Expr -> Expr) -> Parser Expr
+> letBody :: ([(Pat,Expr)] -> Expr -> Expr) -> Parser Expr
 > letBody ctor = ctor <$> commaSep1 binding
->                    <*> (symbol_ ":" *> expr <* keyword_ "end")
+>                     <*> (symbol_ ":" *> expr <* keyword_ "end")
 
-> binding :: Parser Binding
-> binding = Binding <$> pat
+> binding :: Parser (Pat,Expr)
+> binding = (,) <$> pat
 >                        <*> (symbol_ "=" *> expr)
 
 > expressionLetRec :: Parser Expr
@@ -672,7 +671,7 @@ shadow
 >         ,do
 >          Just p <- pure $ epExprToPat ex
 >          e <- ((symbol_ "=" <?> "") *> expr)
->          pure $ LetDecl (Binding p e)
+>          pure $ LetDecl p e
 >         ,do
 >          Just ex' <- pure $ epExprToExpr ex
 >          bchoice
@@ -822,7 +821,7 @@ should just say expression
 >            <*> (symbol_ ":" *> expr <* keyword_ "end")
 
 > varDecl :: Parser Stmt
-> varDecl = VarDecl <$> (keyword_ "var" *> binding)
+> varDecl = uncurry VarDecl <$> (keyword_ "var" *> binding)
 
 > checkBlock :: Parser Stmt
 > checkBlock = Check
@@ -847,7 +846,7 @@ should just say expression
 >       unwrapSingle x = x
 
 > recDecl :: Parser Stmt
-> recDecl = RecDecl <$> (keyword_ "rec" *> binding)
+> recDecl = uncurry RecDecl <$> (keyword_ "rec" *> binding)
 
 > dataDecl :: Parser Stmt
 > dataDecl = DataDecl

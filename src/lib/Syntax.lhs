@@ -6,7 +6,6 @@ The high level syntax which the parser produces
 > {-# LANGUAGE ScopedTypeVariables #-}
 > module Syntax (Stmt(..)
 >               ,Shadow(..)
->               ,Binding(..)
 >               ,Expr(..)
 >               ,Selector(..)
 >               ,VariantDecl(..)
@@ -52,36 +51,16 @@ import * from <import-source>
 >                   | ImportName String
 >                   deriving (Eq,Show,Data) 
 
-todo: change pattern in fundecl
-
-there are several kinds of patterns in the language and they all
-support partial things
-let, letdecl variations:
-  letdecl, rec, fun, var, let, lterec
-
-lam, fun args
-cases branches
-
-patterns:
-iden with optional shadow
-  (is there anywhere that supports an iden and not a shadow?)
-variant patterns
-variant and iden names can be optionally qualified
-tuple patterns
-as patterns (can these only go with tuple patterns?)
-
-is it worth having different syntaxes for these?
-
 
 > data Stmt = StExpr Expr
 >           | When Expr Expr
->           | LetDecl Binding
->           | RecDecl Binding
+>           | LetDecl Pat Expr
+>           | RecDecl Pat Expr
 >           | FunDecl PatName -- name
 >                     [Pat] -- args
 >                     Expr -- body
 >                     (Maybe [Stmt]) -- test block
->           | VarDecl Binding
+>           | VarDecl Pat Expr -- todo: make patname
 >           | SetVar String Expr
 >           | SetRef Expr [(String,Expr)]
 >           | DataDecl String [VariantDecl] (Maybe [Stmt])
@@ -96,8 +75,17 @@ is it worth having different syntaxes for these?
 > data Ref = Ref | Con
 >          deriving (Eq,Show,Data) 
 
-> data Binding = Binding Pat Expr
->           deriving (Eq,Show,Data) 
+revisit patterns again?
+recdecl, vardecl: patname only
+letdecl: do patname only
+  and do another let for tuple binding?
+same with let
+would this make things simpler?
+cases has a different pattern
+  it doesn't support tuple, but supports the rest
+the problem with these sort of changes is you end up in the mess
+that is parse expression or pattern
+this needs a good rethink first
 
 > data Pat = IdenP PatName
 >          | VariantP (Maybe String) String [Pat]
@@ -125,8 +113,8 @@ is it worth having different syntaxes for these?
 >           | UnaryMinus Expr
 >           | BinOp Expr String Expr
 >           | Lam [Pat] Expr
->           | Let [Binding] Expr
->           | LetRec [Binding] Expr
+>           | Let [(Pat,Expr)] Expr
+>           | LetRec [(Pat,Expr)] Expr
 >           | Block [Stmt]
 >           | UnboxRef Expr String
 >           deriving (Eq,Show,Data) 
