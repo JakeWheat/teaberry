@@ -1461,11 +1461,11 @@ parse
 
 > parse :: String -> Either String Module
 > parse src =
->     case P.parseProgram "" src of
->       Right (S.Program ps sts) -> Module <$> mapM convPrelude ps <*> convStmts sts
+>     case P.parseModule "" src of
+>       Right (S.Module ps sts) -> Module <$> mapM convPrelude ps <*> convStmts sts
 >       Left e -> Left e
 
-> convPrelude :: S.PreludeItem -> Either String PreludeStmt
+> convPrelude :: S.PreludeStmt -> Either String PreludeStmt
 
 > convPrelude (S.Import (S.ImportName x) y) = pure $ Import (ImportName x) y
 > convPrelude (S.Import (S.ImportSpecial "file" [fn]) y) = pure $ Import (ImportFile fn) y

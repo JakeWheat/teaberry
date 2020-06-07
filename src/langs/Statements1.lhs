@@ -318,9 +318,9 @@ parse
 
 > parse :: String -> Either String Expr
 > parse src =
->     case P.parseProgram "" src of
->       Right (S.Program [] sts) -> convExpr (S.Block sts)
->       Right (S.Program x _) -> Left $ "prelude not supported " ++ show x
+>     case P.parseModule "" src of
+>       Right (S.Module [] sts) -> convExpr (S.Block sts)
+>       Right (S.Module x _) -> Left $ "prelude not supported " ++ show x
 >       Left e -> Left e
 
 

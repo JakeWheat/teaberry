@@ -6,8 +6,8 @@
 >                   ,parseExprExamples
 >                   ,testParseStmt
 >                   ,parseStmtExamples
->                   ,testParseProgram
->                   ,parseProgramExamples)
+>                   ,testParseModule
+>                   ,parseModuleExamples)
 > {-import DesugarTests (testDesugarExpr
 >                     ,desugarExprExamples)
 > import InterpreterTests (testInterpreter,interpreterTests)
@@ -28,7 +28,7 @@
 >         [T.testGroup "parse"
 >             [T.testGroup "parseExpr" $ map testParseExpr parseExprExamples
 >             ,T.testGroup "parseStmt" $ map testParseStmt parseStmtExamples
->             ,T.testGroup "parseProgram" $ map testParseProgram parseProgramExamples]
+>             ,T.testGroup "parseProgram" $ map testParseModule parseModuleExamples]
 >         --,T.testGroup "desugarExpr" $ map testDesugarExpr desugarExprExamples
 >         --,T.testGroup "interpret" $ map testInterpreter interpreterTests
 >         --,T.testGroup "test tests" $ map testDetailedSourceFile detailedSourceFileTests

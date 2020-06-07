@@ -3,8 +3,8 @@
 >                   ,testParseExpr
 >                   ,parseStmtExamples
 >                   ,testParseStmt
->                   ,parseProgramExamples
->                   ,testParseProgram
+>                   ,parseModuleExamples
+>                   ,testParseModule
 >                   ) where
 >
 > import qualified Test.Tasty as T
@@ -19,14 +19,14 @@
 >               ,Shadow(..)
 >               ,Binding(..)
 >               ,Ref(..)
->               ,Program(..)
->               ,PreludeItem(..)
+>               ,Module(..)
+>               ,PreludeStmt(..)
 >               ,ProvideItem(..)
 >               ,ImportSource(..)
 >               )
 
-> import Parse (parseExpr, parseStmt, parseProgram)
-> import Pretty (prettyExpr, prettyStmts, prettyProgram)
+> import Parse (parseExpr, parseStmt, parseModule)
+> import Pretty (prettyExpr, prettyStmts, prettyModule)
 
 > parseExprExamples :: [(String, Expr)]
 > parseExprExamples =
@@ -435,67 +435,67 @@ end
 >    idenPat = IdenP NoShadow . PatName
 >    idenPatShadow = IdenP Shadow . PatName
 
-> parseProgramExamples :: [(String,Program)]
-> parseProgramExamples =
+> parseModuleExamples :: [(String,Module)]
+> parseModuleExamples =
 >     [("\"hello\""
->      ,Program [] [StExpr $ Sel $ Str "hello"])
+>      ,Module [] [StExpr $ Sel $ Str "hello"])
 
 >     ,("provide: * end\n\
 >       \1"
->      ,Program [Provide [ProvideAll]] [StExpr $ Sel $ Num 1])
+>      ,Module [Provide [ProvideAll]] [StExpr $ Sel $ Num 1])
 
 
 >     ,("provide: a end\n\
 >       \1"
->      ,Program [Provide [ProvideName "a"]] [StExpr $ Sel $ Num 1])
+>      ,Module [Provide [ProvideName "a"]] [StExpr $ Sel $ Num 1])
 
 >     ,("provide: a,b end\n\
 >       \1"
->      ,Program [Provide [ProvideName "a", ProvideName "b"]] [StExpr $ Sel $ Num 1])
+>      ,Module [Provide [ProvideName "a", ProvideName "b"]] [StExpr $ Sel $ Num 1])
 
 
 >     ,("provide: a as b end\n\
 >       \1"
->      ,Program [Provide [ProvideAlias "a" "b"]] [StExpr $ Sel $ Num 1])
+>      ,Module [Provide [ProvideAlias "a" "b"]] [StExpr $ Sel $ Num 1])
 
 
 
 >     ,("include file(\"file.tea\")\n\
 >       \1"
->      ,Program [Include (ImportSpecial "file" ["file.tea"])] [StExpr $ Sel $ Num 1])
+>      ,Module [Include (ImportSpecial "file" ["file.tea"])] [StExpr $ Sel $ Num 1])
 
 >     ,("include string-dict\n\
 >       \1"
->      ,Program [Include (ImportName "string-dict")] [StExpr $ Sel $ Num 1])
+>      ,Module [Include (ImportName "string-dict")] [StExpr $ Sel $ Num 1])
 
 >     ,("import file(\"file.tea\") as X\n\
 >       \1"
->      ,Program [Import (ImportSpecial "file" ["file.tea"]) "X"] [StExpr $ Sel $ Num 1])
+>      ,Module [Import (ImportSpecial "file" ["file.tea"]) "X"] [StExpr $ Sel $ Num 1])
 
 >     ,("import string-dict as X\n\
 >       \1"
->      ,Program [Import (ImportName "string-dict") "X"] [StExpr $ Sel $ Num 1])
+>      ,Module [Import (ImportName "string-dict") "X"] [StExpr $ Sel $ Num 1])
 
 
 >     ,("include from X: * end\n\
 >       \1"
->      ,Program [IncludeFrom "X" [ProvideAll]] [StExpr $ Sel $ Num 1])
+>      ,Module [IncludeFrom "X" [ProvideAll]] [StExpr $ Sel $ Num 1])
 
 >     ,("include from X: a end\n\
 >       \1"
->      ,Program [IncludeFrom "X" [ProvideName "a"]] [StExpr $ Sel $ Num 1])
+>      ,Module [IncludeFrom "X" [ProvideName "a"]] [StExpr $ Sel $ Num 1])
 
 >     ,("include from X: a,b end\n\
 >       \1"
->      ,Program [IncludeFrom "X" [ProvideName "a", ProvideName "b"]] [StExpr $ Sel $ Num 1])
+>      ,Module [IncludeFrom "X" [ProvideName "a", ProvideName "b"]] [StExpr $ Sel $ Num 1])
 
 >     ,("include from X: a as b end\n\
 >       \1"
->      ,Program [IncludeFrom "X" [ProvideAlias "a" "b"]] [StExpr $ Sel $ Num 1])
+>      ,Module [IncludeFrom "X" [ProvideAlias "a" "b"]] [StExpr $ Sel $ Num 1])
 
 >     ,("import n1, n2 from my-module\n\
 >       \1"
->      ,Program [ImportNames ["n1", "n2"] (ImportName "my-module")] [StExpr $ Sel $ Num 1])
+>      ,Module [ImportNames ["n1", "n2"] (ImportName "my-module")] [StExpr $ Sel $ Num 1])
 
 
 >     ]
@@ -522,6 +522,6 @@ end
 > testParseStmt :: (String,Stmt) -> T.TestTree
 > testParseStmt t = testParseX parseStmt (prettyStmts . (:[])) t
 
-> testParseProgram :: (String,Program) -> T.TestTree
-> testParseProgram t = testParseX parseProgram prettyProgram t
+> testParseModule :: (String,Module) -> T.TestTree
+> testParseModule t = testParseX parseModule prettyModule t
 

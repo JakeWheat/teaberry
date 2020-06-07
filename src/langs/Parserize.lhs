@@ -1,7 +1,7 @@
 
 > module Parserize (parserize) where
 > 
-> import Parse (parseProgram)
+> import Parse (parseModule)
 > import Data.List (isInfixOf)
 > import Data.Char (isSpace)
 
@@ -67,7 +67,7 @@ much further along
 > parserize :: FilePath -> String -> String
 > parserize _fn src =
 >     let doAnother [] = ""
->         doAnother s = let ast = parseProgram "" s
+>         doAnother s = let ast = parseModule "" s
 >                       in s ++ (case ast of
 >                                    Right _ -> " OK\n"
 >                                    Left e -> "\n" ++ f e ++ "\n")

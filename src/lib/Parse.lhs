@@ -58,7 +58,7 @@ for things like expressions, patterns, terms, etc.
 > {-# LANGUAGE TupleSections,ScopedTypeVariables, MultiWayIf, LambdaCase #-}
 > module Parse (parseExpr
 >              ,parseStmt
->              ,parseProgram) where
+>              ,parseModule) where
 
 > --import Debug.Trace(trace)
 > --import Text.Show.Pretty (ppShow)
@@ -108,8 +108,8 @@ for things like expressions, patterns, terms, etc.
 >               ,Pat(..)
 >               ,PatName(..)
 >               ,Ref(..)
->               ,Program(..)
->               ,PreludeItem(..)
+>               ,Module(..)
+>               ,PreludeStmt(..)
 >               ,ProvideItem(..)
 >               ,ImportSource(..)
 >               )
@@ -128,9 +128,9 @@ for things like expressions, patterns, terms, etc.
 
 
 
-> parseProgram :: FilePath -> String -> Either String Program
-> parseProgram fn src = either (Left . errorBundlePretty) Right $
->                     parse (whiteSpace *> program <* myEof) fn src
+> parseModule :: FilePath -> String -> Either String Module
+> parseModule fn src = either (Left . errorBundlePretty) Right $
+>                     parse (whiteSpace *> pmodule <* myEof) fn src
 
 ------------------------------------------------------------------------------
 
@@ -874,21 +874,21 @@ should just say expression
 >             ,"raises-other-than", "raises-satisfies", "raises-violates"
 >             ,"satisfies", "violates", "raises"]
 
-> program :: Parser Program
-> program = Program <$> many preludeItem <*> many stmt
+> pmodule :: Parser Module
+> pmodule = Module <$> many preludeStmt <*> many stmt
 
-> preludeItem :: Parser PreludeItem
-> preludeItem = (provide <|> include <|> importItem) <?> ""
+> preludeStmt :: Parser PreludeStmt
+> preludeStmt = (provide <|> include <|> importStmt) <?> ""
 
 
-> provide :: Parser PreludeItem
+> provide :: Parser PreludeStmt
 > provide = Provide <$> (keyword_ "provide"
 >                        *> symbol_ ":"
->                        *> commaSep provideItem
+>                        *> commaSep provideStmt
 >                        <* keyword_ "end")
 
-> provideItem :: Parser ProvideItem
-> provideItem = choice
+> provideStmt :: Parser ProvideItem
+> provideStmt = choice
 >     [ProvideAll <$ symbol_ "*"
 >     ,do
 >      a <- identifier
@@ -896,12 +896,12 @@ should just say expression
 >             ,pure $ ProvideName a]
 >     ]
 
-> include :: Parser PreludeItem
+> include :: Parser PreludeStmt
 > include = do
 >     keyword_ "include"
 >     choice [IncludeFrom
 >             <$> (keyword_ "from" *> identifier <* symbol_ ":")
->             <*> (commaSep provideItem <* keyword_ "end")
+>             <*> (commaSep provideStmt <* keyword_ "end")
 >            ,Include <$> importSource]
 
 > importSource :: Parser ImportSource
@@ -913,8 +913,8 @@ should just say expression
 
 todo: try remove this try
 
-> importItem :: Parser PreludeItem
-> importItem = keyword_ "import" *> (try importFrom <|> importAs)
+> importStmt :: Parser PreludeStmt
+> importStmt = keyword_ "import" *> (try importFrom <|> importAs)
 >   where
 >     importFrom = ImportNames
 >                 <$> commaSep1 identifier

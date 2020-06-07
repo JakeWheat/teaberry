@@ -2,7 +2,7 @@
 > {-# LANGUAGE ScopedTypeVariables #-}
 > module Pretty (prettyExpr
 >               ,prettyStmts
->               ,prettyProgram
+>               ,prettyModule
 >               ) where
 
 > import Prelude hiding ((<>))
@@ -20,8 +20,8 @@
 >               ,Stmt(..)
 >               ,Binding(..)
 >               ,Shadow(..)
->               ,Program(..)
->               ,PreludeItem(..)
+>               ,Module(..)
+>               ,PreludeStmt(..)
 >               ,ProvideItem(..)
 >               ,ImportSource(..)
 >               ,Ref(..))
@@ -33,8 +33,8 @@
 > prettyStmts :: [Stmt] -> String
 > prettyStmts = render . stmts
 
-> prettyProgram :: Program -> String
-> prettyProgram = render . program
+> prettyModule :: Module -> String
+> prettyModule = render . pmodule
 
 
 > expr :: Expr -> Doc
@@ -191,22 +191,22 @@
 > xSep :: String -> [Doc] -> Doc
 > xSep x ds = sep $ punctuate (text x) ds
 
-> program :: Program -> Doc
-> program (Program prel sts) =
->     vcat (map preludeItem prel ++ [stmts sts])
+> pmodule :: Module -> Doc
+> pmodule (Module prel sts) =
+>     vcat (map preludeStmt prel ++ [stmts sts])
 
-> preludeItem :: PreludeItem -> Doc
-> preludeItem (Provide pis) =
+> preludeStmt :: PreludeStmt -> Doc
+> preludeStmt (Provide pis) =
 >     vcat [text "provide:"
 >          ,nest 2 $ commaSep $ map provideItem pis
 >          ,text "end"]
-> preludeItem (Include s) = text "include" <+> importSource s
-> preludeItem (IncludeFrom a pis) =
+> preludeStmt (Include s) = text "include" <+> importSource s
+> preludeStmt (IncludeFrom a pis) =
 >     vcat [text "include" <+> text "from" <+> text a <> text ":"
 >          ,nest 2 $ commaSep $ map provideItem pis
 >          ,text "end"]
-> preludeItem (Import is a) = text "import" <+> importSource is <+> text "as" <+> text a
-> preludeItem (ImportNames nms is) = text "import" <+> commaSep (map text nms)
+> preludeStmt (Import is a) = text "import" <+> importSource is <+> text "as" <+> text a
+> preludeStmt (ImportNames nms is) = text "import" <+> commaSep (map text nms)
 >                                   <+> text "from" <+> importSource is
 
 > provideItem :: ProvideItem -> Doc

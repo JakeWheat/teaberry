@@ -11,8 +11,8 @@ The high level syntax which the parser produces
 >               ,VariantDecl(..)
 >               ,Pat(..)
 >               ,PatName(..)
->               ,Program(..)
->               ,PreludeItem(..)
+>               ,Module(..)
+>               ,PreludeStmt(..)
 >               ,ProvideItem(..)
 >               ,ImportSource(..)
 >               ,Ref(..)
@@ -23,11 +23,12 @@ The high level syntax which the parser produces
 > import Scientific (Scientific,extractInt)
 > import GHC.Generics (Generic)
 
-> data Program = Program [PreludeItem]
->                        [Stmt]
+------------------------------------------------------------------------------
+
+> data Module = Module [PreludeStmt] [Stmt]
 >              deriving (Eq,Show,Data,Typeable,Generic) 
 
-> data PreludeItem = Provide [ProvideItem]
+> data PreludeStmt = Provide [ProvideItem]
 >                  | Import ImportSource String
 >                  | Include ImportSource
 >                  | IncludeFrom String [ProvideItem]
@@ -51,7 +52,26 @@ import * from <import-source>
 >                   | ImportName String
 >                   deriving (Eq,Show,Data,Typeable,Generic) 
 
- 
+todo: change pattern in fundecl
+
+there are several kinds of patterns in the language and they all
+support partial things
+let, letdecl variations:
+  letdecl, rec, fun, var, let, lterec
+
+lam, fun args
+cases branches
+
+patterns:
+iden with optional shadow
+  (is there anywhere that supports an iden and not a shadow?)
+variant patterns
+variant and iden names can be optionally qualified
+tuple patterns
+as patterns (can these only go with tuple patterns?)
+
+is it worth having different syntaxes for these?
+
 
 > data Stmt = StExpr Expr
 >           | When Expr Expr

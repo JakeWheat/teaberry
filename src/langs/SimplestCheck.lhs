@@ -63,9 +63,9 @@ parsing
 
 > parse :: String -> Either String Script
 > parse src = do
->     p <- P.parseProgram "" src
+>     p <- P.parseModule "" src
 >     case p of
->         S.Program [] [S.Check Nothing is]
+>         S.Module [] [S.Check Nothing is]
 >             | Right ts <- mapM f is -> pure $ Script ts
 >         _ -> Left $ "unsupported syntax: " ++ show p
 >   where

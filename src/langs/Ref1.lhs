@@ -858,9 +858,9 @@ like a desugaring process.
 
 > parse :: String -> Either String [Stmt]
 > parse src =
->     case P.parseProgram "" src of
->       Right (S.Program [] sts) -> convStmts sts
->       Right (S.Program x _) -> Left $ "parse: prelude not supported " ++ show x
+>     case P.parseModule "" src of
+>       Right (S.Module [] sts) -> convStmts sts
+>       Right (S.Module x _) -> Left $ "parse: prelude not supported " ++ show x
 >       Left e -> Left e
 
 > convStmts :: [S.Stmt] -> Either String [Stmt]
