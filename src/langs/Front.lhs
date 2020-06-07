@@ -56,7 +56,7 @@ todo: how to write the tests for this
 > import Scientific (Scientific, extractInt, divideScientific)
 > import Data.List (intercalate, nubBy, sortOn)
 
-> --import Debug.Trace (trace)
+> import Debug.Trace (trace)
 > import qualified TestUtils as T
 
 > import Data.IORef (IORef, newIORef, readIORef, writeIORef)
@@ -401,6 +401,7 @@ store holds the values of variables
 > envLookup :: String -> Env -> Interpreter Value
 > envLookup nm env =
 >     maybe (throwInterp $ "Identifier not found: " ++ nm {-++ "\n" ++ showEnvNames env-}) pure
+>     -- $ trace ("\n----------\n" ++ _showEnvNames env ++"\n-----------\n")
 >     $ lookup nm (envEnv env)
 
 > addForeignFun :: String -> [String] -> ([Value] -> Interpreter Value) -> Env -> Either String Env
@@ -734,7 +735,6 @@ b = r.b
 >     -- extent the env with the record bindings
 
   
-> interp (Block {}) = throwInterp "undesugared block passed to interpreter"
 > interp (Seq a b) = interp a *> interp b
 
 > interp z@(If bs e) = do
@@ -791,6 +791,7 @@ todo: combine
 >     s -> throwM s)
 
 
+> interp (Block {}) = throwInterp "undesugared block passed to interpreter"
 > interp (UnboxRef {}) = throwInterp "undesugared unboxref"
 > interp x@(LetRec {}) = throwInterp $ "undesugared letrec in interp " ++ show x
 > interp e@(DotExpr {}) = throwInterp $ "interp: undesugared dotexpr " ++ show e
