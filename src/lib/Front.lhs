@@ -69,8 +69,12 @@ syntax
 >             deriving (Eq, Show, Data)
 
 > data PreludeStmt = Import ImportSource String
->                  | IncludeFrom String [(String, String)]
+>                  | IncludeFrom String [ProvideItem]
 >                  deriving (Eq, Show, Data)
+
+> data ProvideItem = ProvideAlias String String
+>                  deriving (Eq,Show,Data) 
+
 
 > data ImportSource = ImportSpecial String [String]
 >                   | ImportName String
@@ -888,7 +892,7 @@ add the last statement which returns the last value and the env, for
 >     builtins = if skipBuiltins
 >                then []
 >                else [Import (ImportName "built-ins") "built-ins"
->                     ,IncludeFrom "built-ins" (map (\a -> (a,a)) bs)]
+>                     ,IncludeFrom "built-ins" (map (\a -> ProvideAlias a a) bs)]
 >     -- temp before * is supported
 >     bs = ["is-empty","is-link", "empty", "link", "is-List", "nothing", "is-Nothing", "is-nothing"]
 
@@ -898,7 +902,7 @@ add the last statement which returns the last value and the env, for
 >     pure [LetDecl b (TupleGet (Iden (importSourceName is)) 1)]
 
 > desugarPreludeStmt (IncludeFrom nm is) =
->     pure $ flip map is $ \(n1,n2) ->
+>     pure $ flip map is $ \(ProvideAlias n1 n2) ->
 >         LetDecl n2 (DotExpr (TupleGet (Iden ("module." ++ nm)) 1) n1)
 
 > importSourceName :: ImportSource -> String
@@ -1474,7 +1478,7 @@ parse
 > convPrelude (S.IncludeFrom x as) | Just as' <- mapM f as =
 >     pure $ IncludeFrom x as'
 >   where
->     f (S.ProvideAlias a b) = Just (a,b)
+>     f (S.ProvideAlias a b) = Just (ProvideAlias a b)
 >     f _ = Nothing          
   
 > convPrelude x = Left $ "unsupported prelude statement " ++ show x
