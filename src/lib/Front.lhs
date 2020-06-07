@@ -51,7 +51,7 @@ syntax, interpreter, desugarer, tests
 > import Scientific (Scientific, extractInt, divideScientific)
 > import Data.List (intercalate, nubBy, sortOn)
 
-> import Debug.Trace (trace, traceStack)
+> --import Debug.Trace (trace, traceStack)
 > import qualified TestUtils as T
 
 > import Data.IORef (IORef, newIORef, readIORef, writeIORef)
@@ -105,6 +105,7 @@ syntax
 >           | Text String
 >           | TupleSel [Expr]
 >           | RecordSel [(String,Expr)]
+>           -- todo: see if can remove this
 >           | VariantSel String [(String,Expr)]
 >           | Construct Expr [Expr]
 >             -- other things
@@ -113,7 +114,7 @@ syntax
 >           | Lam [String] Expr
 >           | Let [(String,Expr)] Expr
 >           | LetRec [(String,Expr)] Expr
->           | LetSplat Expr Expr
+>           --  | LetSplat Expr Expr
 >           | Block [Stmt]
 >           | Seq Expr Expr
 >           | If [(Expr,Expr)] (Maybe Expr)
@@ -121,6 +122,7 @@ syntax
 >           | DotExpr Expr String
 >           | TupleGet Expr Int
 >           | Cases String Expr [(String, [String], Expr)] (Maybe Expr)
+>           -- todo: see if can remove the following
 >           | Box Expr
 >           | SetBox Expr Expr
 >           | UnboxRef Expr String
@@ -129,7 +131,27 @@ syntax
 >           deriving (Eq, Show, Data)
 
 
-todo: interpreter syntax goes here
+interpreter syntax
+
+> data IExpr
+>     = INum Scientific
+>     | IText String
+>      -- why does this exist? it's just app isn't it?
+>     | IVariantSel String [(String,IExpr)]
+>     | IIden String
+>     | IApp IExpr [IExpr]
+>     | ILam [String] IExpr
+>     | ILet [(String,IExpr)] IExpr
+>     | ILetSplat IExpr IExpr
+>     | ISeq IExpr IExpr
+>     | IIf [(IExpr,IExpr)] (Maybe IExpr)
+>     | IBox IExpr
+>     | ISetBox IExpr IExpr
+>     | IUnbox IExpr
+>     | ICatch IExpr IExpr
+>     deriving (Eq, Show, Data)
+
+
 
 ------------------------------------------------------------------------------
 
@@ -218,7 +240,7 @@ hacky top level evaluate. not really sure if it will pay its way once
 >                 y <- either throwInterp pure $ runDesugar (maybe "toplevel.x" id fnm) ast srcs
 >                 let z = simplify y
 >                 case executionStage ebs of
->                     DumpDesugar -> pure (TextV $ "\n" ++ pretty z ++ "\n", ebs, [])
+>                     DumpDesugar -> pure (TextV $ "\n" ++ prettyIExpr z ++ "\n", ebs, [])
 >                     FullExecution -> do
 >                         v <- {-trace (pretty z) $-} interp z
 >                         t <- runAddedTests
@@ -284,9 +306,9 @@ recursively load all the referenced modules in the source given
 
 simplify
 
-> simplify :: Expr -> Expr
+> simplify :: IExpr -> IExpr
 > simplify = transformBi $ \case
->     Let bs (Let bs' x) -> Let (bs ++ bs') x
+>     ILet bs (ILet bs' x) -> ILet (bs ++ bs') x
 >     x1 -> x1
 
 
@@ -301,7 +323,7 @@ values
 >            | VariantV String -- variant name
 >                       [(String,Value)] -- fields
 >            | BoxV Int
->            | FunV [String] Expr Env
+>            | FunV [String] IExpr Env
 >            | ForeignFunV String
 
 value type name is used for looking up overloaded foreign functions
@@ -709,15 +731,15 @@ interp
 > throwInterp :: String -> Interpreter a
 > throwInterp e = throwM $ InterpreterException e
   
-> interp :: Expr -> Interpreter Value
-> interp (Num n) = pure (NumV n)
-> interp (Text t) = pure (TextV t)
-> interp (VariantSel nm fs) = VariantV nm <$> mapM f fs
+> interp :: IExpr -> Interpreter Value
+> interp (INum n) = pure (NumV n)
+> interp (IText t) = pure (TextV t)
+> interp (IVariantSel nm fs) = VariantV nm <$> mapM f fs
 >   where
 >     f (n,v) = (n,) <$> interp v
 
 
-> interp (Iden a) = do
+> interp (IIden a) = do
 >     env <- ask
 >     x <- envLookup a $ ieEnv env
 >     case x of
@@ -726,17 +748,17 @@ interp
 >                   fetchStore i (isStore st)
 >         _ -> pure x
 
-> interp (App f es) = do
+> interp (IApp f es) = do
 >     fv <- interp f
 >     vs <- mapM interp es
 >     app fv vs
-> interp (Lam ps e) = do
+> interp (ILam ps e) = do
 >     env <- ask
 >     pure $ FunV ps e $ ieEnv env
-> interp (Let bs e) = do
+> interp (ILet bs e) = do
 >     let newEnv [] = interp e
 >         newEnv ((b,ex):bs') = do
->             traceIt 1 $ "let " ++ b ++ " = " ++ pretty ex
+>             traceIt 1 $ "let " ++ b ++ " = " ++ prettyIExpr ex
 >             v <- interp ex
 >             traceIt 1 $ "let " ++ b ++ " = " ++ torepr' v
 >             local (\x -> x {ieEnv = extendEnv [(b,v)] $ ieEnv x}) $ newEnv bs'
@@ -750,20 +772,20 @@ expand-record(r)
 a = r.a
 b = r.b
 
-> interp (LetSplat re e) = do
+> interp (ILetSplat re e) = do
 >     x <- interp re
 >     case x of
 >         VariantV "record" bs ->
->             local (\x -> x {ieEnv = extendEnv bs $ ieEnv x}) $ interp e
+>             local (\y -> y {ieEnv = extendEnv bs $ ieEnv y}) $ interp e
 >         _ -> throwInterp $ "expected record in letsplat, got " ++ show x
 >     -- get value for r in env
 >     -- make sure it's a record
 >     -- extent the env with the record bindings
 
   
-> interp (Seq a b) = interp a *> interp b
+> interp (ISeq a b) = interp a *> interp b
 
-> interp z@(If bs e) = do
+> interp z@(IIf bs e) = do
 >     let f ((c,t):bs') = do
 >             c' <- interp c
 >             case c' of
@@ -773,16 +795,16 @@ b = r.b
 >         f [] = case e of
 >                    Just x -> interp x
 >                    Nothing -> throwInterp $ "no if branches matched and no else:\n"
->                               ++ pretty z
+>                               ++ prettyIExpr z
 >     f bs
 
-> interp (Box e) = do
+> interp (IBox e) = do
 >     v <- interp e
 >     box v
 
 todo: combine
 
-> interp (SetBox (Iden b) v) = do
+> interp (ISetBox (IIden b) v) = do
 >     env <- ask
 >     b' <- envLookup b $ ieEnv env
 >     v' <- interp v
@@ -792,7 +814,7 @@ todo: combine
 >     modify $ \s -> updateISStore (extendStore i v') s
 >     pure v'
 
-> interp (SetBox b v) = do
+> interp (ISetBox b v) = do
 >     b' <- interp b
 >     v' <- interp v
 >     i <- case b' of
@@ -801,7 +823,7 @@ todo: combine
 >     modify $ \s -> updateISStore (extendStore i v') s
 >     pure v'
       
-> interp (Unbox b) = do
+> interp (IUnbox b) = do
 >     b' <- interp b
 >     case b' of
 >         BoxV i -> do
@@ -809,24 +831,12 @@ todo: combine
 >                   fetchStore i (isStore st)
 >         _ -> throwInterp $ "attemped to unbox non box value: " ++ torepr' b'
 
-> interp (Catch e c) = interp e `catch` (\case
+> interp (ICatch e c) = interp e `catch` (\case
 >     ValueException v -> do
 >         cf <- interp c
 >         app cf [v]
 >     -- is rethrowing an exception like this bad in haskell?
 >     s -> throwM s)
-
-
-> interp (Block {}) = throwInterp "undesugared block passed to interpreter"
-> interp (UnboxRef {}) = throwInterp "undesugared unboxref"
-> interp x@(LetRec {}) = throwInterp $ "undesugared letrec in interp " ++ show x
-> interp e@(DotExpr {}) = throwInterp $ "interp: undesugared dotexpr " ++ show e
-> interp e@(Cases {}) = throwInterp $ "interp: undesugared cases " ++ show e
-> interp e@(Construct {}) = throwInterp $ "interp: undesugared construct " ++ show e
-> interp e@(RecordSel {}) = throwInterp $ "interp: undesugared recordsel " ++ show e
-> interp e@(TupleSel {}) = throwInterp $ "interp: undesugared tuplesel " ++ show e
-> interp e@(TupleGet {}) = throwInterp $ "interp: undesugared tupleget " ++ show e
-> interp e@(Ask {}) = throwInterp $ "interp: undesugared ask " ++ show e
 
   
 > app :: Value -> [Value] -> Interpreter Value
@@ -875,7 +885,7 @@ desugaring
 >     in (pref ++ "-" ++ show suff
 >        ,s {uniqueCtr = suff + 1})
 
-> runDesugar :: String -> Module -> [(String,Module)] -> Either String Expr
+> runDesugar :: String -> Module -> [(String,Module)] -> Either String IExpr
 > runDesugar nm ast srcs = fst <$> runExcept (evalRWST go () startingDesugarState)
 >   where
 >     go = do
@@ -895,7 +905,7 @@ desugaring
 >         dsm <- desugarModule (n == "built-ins") m
 >         desugarEm (("module." ++ n, dsm):desugaredModules) ms
 >     combineEm [] = id
->     combineEm ((n,e):es) = Let [(n,e)] <$> combineEm es
+>     combineEm ((n,e):es) = ILet [(n,e)] <$> combineEm es
 
 desugar module:
 desugar the prelude
@@ -906,7 +916,7 @@ add the last statement which returns the last value and the env, for
 > nothingSyntaxHack :: Expr
 > nothingSyntaxHack = VariantSel "nothing" []
 
-> desugarModule :: Bool -> Module -> Desugarer Expr
+> desugarModule :: Bool -> Module -> Desugarer IExpr
 > desugarModule skipBuiltins (Module ps stmts) = do
 >     ps' <- concat <$> mapM desugarPreludeStmt (builtins ++ ps)
 >     -- add the final value for repl/embedded and imported module support
@@ -939,23 +949,22 @@ add the last statement which returns the last value and the env, for
 > importSourceName (ImportSpecial "file" [s]) = "module." ++ s
 > importSourceName (ImportName n) = "module." ++ n  
   
-> desugar :: Expr -> Desugarer Expr
+> desugar :: Expr -> Desugarer IExpr
 
 > desugar (Block sts) = desugarStmts sts
-> desugar (Num i) = pure $ Num i
-> desugar (Text i) = pure $ Text i
+> desugar (Num i) = pure $ INum i
+> desugar (Text i) = pure $ IText i
 > desugar (TupleSel fs) =
 >     desugar $ VariantSel "tuple" $ zipWith f [(0::Int)..] fs
 >   where
 >     f n v = (show n,v)
-> desugar (VariantSel nm fs) =
->     VariantSel nm <$> mapM f fs
+> desugar (VariantSel nm fs) = IVariantSel nm <$> mapM f fs
 >   where
 >     f (n,v) = (n,) <$> desugar v
 
 > desugar (RecordSel fs) = desugar (VariantSel "record" fs)
 
-> desugar (Iden i) = pure $ Iden i
+> desugar (Iden i) = pure $ IIden i
 
 > desugar (App (Iden "is") [a,b]) = do
 >     uniqueV0 <- makeUniqueVar "is-v0"
@@ -998,16 +1007,16 @@ add the last statement which returns the last value and the env, for
 > desugar (App (Iden "and") [a,b]) = do
 >     desugar (If [(a, b)] (Just $ Iden "false"))
 
-> desugar (App (Iden "catch") [a,b]) = desugar (Catch a b)
+> desugar (App (Iden "catch") [a,b]) = ICatch <$> desugar a <*> desugar b
 
-> desugar (Catch a b) = Catch <$> desugar a <*> desugar b
+> desugar (Catch a b) = ICatch <$> desugar a <*> desugar b
 
 
-> desugar (App f as) = App <$> desugar f <*> mapM desugar as
-> desugar (Lam ns e) = Lam ns <$> desugar e
+> desugar (App f as) = IApp <$> desugar f <*> mapM desugar as
+> desugar (Lam ns e) = ILam ns <$> desugar e
 > desugar (Let bs e) = do
 >     let f (n,v) = (n,) <$> desugar v
->     Let <$> mapM f bs <*> desugar e
+>     ILet <$> mapM f bs <*> desugar e
 
 > desugar (LetRec bs e) = do
 >     desugar (Let (mapMaybe convLam bs ++ map createBind bs) e)
@@ -1030,17 +1039,17 @@ add the last statement which returns the last value and the env, for
 >         App (Iden f) args | f `elem` bindNames -> App (Iden f) (map Iden bindNames ++ args)
 >         x -> x
 
-> desugar (LetSplat re e) =
->     LetSplat <$> desugar re <*> desugar e
+> {-desugar (LetSplat re e) =
+>     ILetSplat <$> desugar re <*> desugar e-}
   
 > desugar (Seq a b) =
->     Seq <$> desugar a <*> desugar b
+>     ISeq <$> desugar a <*> desugar b
 
 
 > desugar (Ask bs e) = desugar (If bs e)
 
 > desugar (If bs e) =
->     If <$> mapM f bs <*> case e of
+>     IIf <$> mapM f bs <*> case e of
 >                              Nothing -> pure Nothing
 >                              Just e1 -> Just <$> desugar e1
 >   where
@@ -1049,12 +1058,11 @@ add the last statement which returns the last value and the env, for
 > desugar (DotExpr e f) = do
 >     desugar (App (Iden "variant-field-get") [Text f, e])
 
-> desugar (Box v) = Box <$> desugar v
+> desugar (Box v) = IBox <$> desugar v
 
 no idea if this is good or not
 
-> desugar (SetBox i@(Iden {}) v) = SetBox i <$> desugar v
-> desugar (SetBox b v) = SetBox <$> desugar b <*> desugar v
+> desugar (SetBox b v) = ISetBox <$> desugar b <*> desugar v
 
 hardcoded list constructor. It isn't quite right since it matches
 on the literal list, instead of working for any list value here
@@ -1093,11 +1101,11 @@ xxx.make([list: <elements>])
 
 > desugar (UnboxRef e n) = desugar (Unbox (DotExpr e n))
 
-> desugar (Unbox x) = Unbox <$> desugar x
+> desugar (Unbox x) = IUnbox <$> desugar x
 > desugar (TupleGet e i) = desugar (DotExpr e (show i))
 
   
-> desugarStmts :: [Stmt] -> Desugarer Expr
+> desugarStmts :: [Stmt] -> Desugarer IExpr
 
 > desugarStmts (Check nm bdy : es) = do
 >     (uniqueCheckBlockIDVarName,uniqueCheckBlockID) <- enterNewCheckBlock
@@ -1113,7 +1121,7 @@ xxx.make([list: <elements>])
 >     exitCheckBlock
 >     case es of
 >         [] -> pure desugaredCheck
->         _ -> Seq desugaredCheck <$> desugarStmts es
+>         _ -> ISeq desugaredCheck <$> desugarStmts es
 >   where
 >     appI i as = App (Iden i) as
 
@@ -1134,7 +1142,7 @@ testing hack
 
 
 > desugarStmts (LetSplatDecl re : es) = do
->     LetSplat <$> desugar re <*> desugarStmts es
+>     ILetSplat <$> desugar re <*> desugarStmts es
 
 > desugarStmts es@(st : _) | isRecOrFun st = do
 >     (recs,es') <- getRecs es [] []
@@ -1154,19 +1162,20 @@ testing hack
 >     isRecOrFun FunDecl {} = True
 >     isRecOrFun _ = False      
 
-
+> desugarStmts (FunDecl {}: _) = lift $ throwE $ "Internal: I had a bet with ghc that fundecl pattern was always matched in desugarstmts, and now ghc has won that bet"
+> desugarStmts (RecDecl {}: _) = lift $ throwE $ "Internal: I had a bet with ghc that recdecl pattern was always matched in desugarstmts, and now ghc has won that bet"
 
 > desugarStmts (VarDecl n v : es) = desugarStmts (LetDecl n (Box v) : es)
 
 
 > desugarStmts (StExpr e : es) =
->     Seq <$> desugar e <*> desugarStmts es
+>     ISeq <$> desugar e <*> desugarStmts es
 
 > desugarStmts (When c t : es) =
 >     let e = (If [(c, Block [StExpr t
 >                            ,StExpr nothingSyntaxHack])]
 >                     (Just nothingSyntaxHack))
->     in Seq <$> desugar e <*> desugarStmts es
+>     in ISeq <$> desugar e <*> desugarStmts es
 
 
 > desugarStmts (SetVar n v : es) = do
@@ -1595,7 +1604,7 @@ parse
 > convExpr (S.Construct e es) = Construct <$> convExpr e <*> mapM convExpr es
 
 
-> convExpr x = Left $ "parse: unsupported expression " ++ show x
+> -- convExpr x = Left $ "parse: unsupported expression " ++ show x
 
 > convSt :: S.Stmt -> Either String Stmt
 > convSt (S.StExpr e) = StExpr <$> convExpr e
@@ -1641,7 +1650,6 @@ pretty
 > pretty :: Expr -> String
 > pretty x = Pr.prettyExpr $ unconv x
 
-
 > unconv :: Expr -> S.Expr
 > unconv (Num n) = S.Sel (S.Num n)
 > unconv (Text n) = S.Sel (S.Text n)
@@ -1683,7 +1691,6 @@ pretty
 
 > unconv (UnboxRef e n) = S.Unbox (unconv e) n
 > unconv (Unbox e) = S.App (S.Iden "unbox") [unconv e]
-> unconv (LetSplat re e) = S.App (S.Iden "letsplat") [unconv re, unconv e]
 
   
 > --unconv x = error $ "unconv: " ++ show x
@@ -1715,6 +1722,41 @@ pretty
 
 > unconvPattern :: String -> S.Pat
 > unconvPattern n = S.IdenP S.NoShadow (S.PatName n)
+
+
+> prettyIExpr :: IExpr -> String
+> prettyIExpr x = Pr.prettyExpr $ unconvI x
+
+> unconvI :: IExpr -> S.Expr
+
+> unconvI (INum n) = S.Sel (S.Num n)
+> unconvI (IText n) = S.Sel (S.Text n)
+> unconvI (IVariantSel nm fs) = S.App (S.Iden nm) (map f fs)
+>   where
+>     f (n,v) = S.Sel (S.TupleSel $ map unconvI [IText n, v])
+
+> unconvI (IIden s) = S.Iden s
+> unconvI (ICatch e t) = unconvI (IApp (IIden "catch") [e,t])
+> unconvI (IApp (IIden e) [a,b]) | isOp e = S.BinOp (unconvI a) e (unconvI b)
+>   where isOp x = not $ any (\z -> isAlphaNum z || z `elem` "_") x
+> 
+> unconvI (IApp e fs) = S.App (unconvI e) $ map unconvI fs
+> unconvI (ILam ns e) = S.Lam (map unconvIPattern ns) $ unconvI e
+> unconvI (ILet bs e) = S.Let (map (uncurry unconvIBinding) bs) (unconvI e)
+> unconvI (ISeq a b) = S.Block $ map (S.StExpr . unconvI) [a, b]
+> unconvI (IIf bs e) = S.If (map f bs) (fmap unconvI e)
+>   where
+>     f (c,t) = (unconvI c, unconvI t)
+> unconvI (IBox e) = S.App (S.Iden "box") [unconvI e]
+> unconvI (ISetBox e f) = S.App (S.Iden "setbox") [unconvI e, unconvI f]
+> unconvI (IUnbox e) = S.App (S.Iden "unbox") [unconvI e]
+> unconvI (ILetSplat re e) = S.App (S.Iden "letsplat") [unconvI re, unconvI e]
+
+> unconvIBinding :: String -> IExpr -> S.Binding
+> unconvIBinding n v = S.Binding (unconvIPattern n) (unconvI v)
+
+> unconvIPattern :: String -> S.Pat
+> unconvIPattern n = S.IdenP S.NoShadow (S.PatName n)
 
 ------------------------------------------------------------------------------
 
