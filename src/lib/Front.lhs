@@ -1611,7 +1611,7 @@ parse
 > convSt (S.When c t) = When <$> convExpr c <*> convExpr t
 > convSt (S.LetDecl (S.Binding (S.IdenP (S.PatName _ nm)) v)) = LetDecl nm <$> convExpr v
 > convSt (S.RecDecl (S.Binding (S.IdenP (S.PatName _ nm)) v)) = RecDecl nm <$> convExpr v
-> convSt (S.FunDecl nm ps bdy whr) = do
+> convSt (S.FunDecl (S.PatName _ nm) ps bdy whr) = do
 >     whr' <- case whr of
 >                 Nothing -> pure Nothing
 >                 Just w -> Just <$> mapM convSt w
@@ -1700,7 +1700,7 @@ pretty
 > unconvStmt (RecDecl n e) = S.RecDecl (unconvBinding n e)
 > unconvStmt (LetSplatDecl re) = S.StExpr (S.App (S.Iden "letsplatdecl") [unconv re])
 > unconvStmt (FunDecl nm ps bdy w) =
->     S.FunDecl nm (map unconvPattern ps) (unconv bdy) (fmap (map unconvStmt) w)
+>     S.FunDecl (S.PatName S.NoShadow nm) (map unconvPattern ps) (unconv bdy) (fmap (map unconvStmt) w)
 > unconvStmt (StExpr e) = S.StExpr (unconv e)
 > unconvStmt (When c t) = S.When (unconv c) (unconv t)
 > unconvStmt (Check nm bs) = S.Check nm $ map unconvStmt bs

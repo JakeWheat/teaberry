@@ -124,7 +124,13 @@ todo: review all the whitespace rules that are being ignored
 >     ,("block:\n\
 >       \  fun f(a): a + 1 end\n\
 >       \end"
->      ,Block[FunDecl "f" [idenPat "a"] (BinOp (Iden "a") "+" (num 1)) Nothing])
+>      ,Block[FunDecl (PatName NoShadow "f") [idenPat "a"] (BinOp (Iden "a") "+" (num 1)) Nothing])
+
+>     ,("block:\n\
+>       \  fun shadow f(a): a + 1 end\n\
+>       \end"
+>      ,Block[FunDecl (PatName Shadow "f") [idenPat "a"] (BinOp (Iden "a") "+" (num 1)) Nothing])
+
 
 
 >     ,("block:\n\
@@ -132,8 +138,8 @@ todo: review all the whitespace rules that are being ignored
 >       \  a = 1\n\
 >       \  a + 1\n\
 >       \end\n\
->       \end", Block[FunDecl "f" [idenPat "a"] (Block [LetDecl (Binding (idenPat "a") (num 1))
->                                             ,StExpr $ BinOp (Iden "a") "+" (num 1)]) Nothing])
+>       \end", Block[FunDecl (PatName NoShadow "f") [idenPat "a"] (Block [LetDecl (Binding (idenPat "a") (num 1))
+>                                              ,StExpr $ BinOp (Iden "a") "+" (num 1)]) Nothing])
 
 
 >     ,("if a: b end", If [(Iden "a",Iden "b")] Nothing)
@@ -413,7 +419,7 @@ end
 >       \  double(10) is 20\n\
 >       \  double(15) is 30\n\
 >       \end"
->      ,FunDecl "double" [idenPat "n"] (BinOp (Iden "n") "+" (Iden "n"))
+>      ,FunDecl (PatName NoShadow "double") [idenPat "n"] (BinOp (Iden "n") "+" (Iden "n"))
 >       (Just [StExpr $ BinOp (App (Iden "double") [num 10]) "is" (num 20)
 >            ,StExpr $ BinOp (App (Iden "double") [num 15]) "is" (num 30)]))
 

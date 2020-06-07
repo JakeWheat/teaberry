@@ -110,20 +110,17 @@
 
 
 > pat :: Pat -> Doc
-> pat (IdenP (PatName s p)) = (case s of
->                        NoShadow -> empty
->                        Shadow -> text "shadow")
->                   <+> text p
+> pat (IdenP pn) = patName pn
 > pat (VariantP q c ps) = maybe empty (\a -> text a <> text ".") q
 >                         <> text c <> parens (commaSep $ map pat ps)
 > pat (TupleP ps) = text "{" <> (xSep ";" $ map pat ps) <> text "}"
-> pat (AsP p (PatName s nm)) =
->     pat p
->     <+> text "as"
->     <+> (case s of
->                 NoShadow -> empty
->                 Shadow -> text "shadow")
->     <+> text nm
+> pat (AsP p pn) = pat p <+> text "as" <+> patName pn
+
+> patName :: PatName -> Doc
+> patName (PatName s p) = (case s of
+>                              NoShadow -> empty
+>                              Shadow -> text "shadow")
+>                         <+> text p
 
 > stmt :: Stmt -> Doc
 > stmt (StExpr e) = expr e
@@ -138,8 +135,8 @@
 >     f (n,v) = text n <> text ":" <+> expr v
 
 > stmt (RecDecl b) = text "rec" <+> binding b
-> stmt (FunDecl n as e w) = vcat
->      [text "fun" <+> text n <+> parens (commaSep $ map pat as) <> text ":"
+> stmt (FunDecl pn as e w) = vcat
+>      [text "fun" <+> patName pn <+> parens (commaSep $ map pat as) <> text ":"
 >      ,nest 2 (expr e)
 >      ,maybe empty whereBlock w
 >      ,text "end"]

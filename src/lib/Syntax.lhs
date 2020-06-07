@@ -77,7 +77,7 @@ is it worth having different syntaxes for these?
 >           | When Expr Expr
 >           | LetDecl Binding
 >           | RecDecl Binding
->           | FunDecl String -- name
+>           | FunDecl PatName -- name
 >                     [Pat] -- args
 >                     Expr -- body
 >                     (Maybe [Stmt]) -- test block

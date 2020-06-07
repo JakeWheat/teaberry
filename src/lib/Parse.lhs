@@ -787,8 +787,9 @@ should just say expression
 > pat :: Parser Pat
 > pat = bchoice
 >       [TupleP <$> ((symbol_ "{" <?> "") *> xSep ';' pat <* symbol_ "}")
+>       ,IdenP <$> (PatName <$> (Shadow <$ keyword_ "shadow")
+>                           <*> identifier)
 >       ,do
->        s <- boption NoShadow (Shadow <$ keyword_ "shadow")
 >        i <- identifier
 >        choice [do
 >                j <- char '.' *> identifier
@@ -799,14 +800,17 @@ should just say expression
 >               ,choice [do
 >                        as <- parens (commaSep pat)
 >                        pure $ VariantP Nothing i as
->                       ,pure $ IdenP (PatName s i)]]
+>                       ,pure $ IdenP (PatName NoShadow i)]]
 >       <**> boption id asPatSuffix]
 
+> patName :: Parser PatName
+> patName = PatName <$> boption NoShadow (Shadow <$ keyword_ "shadow")
+>                   <*> identifier
+
 > asPatSuffix :: Parser (Pat -> Pat)
-> asPatSuffix = f <$> (keyword_ "as" *> boption NoShadow (Shadow <$ keyword_ "shadow"))
->                 <*> identifier
+> asPatSuffix = f <$> (keyword_ "as" *> patName)
 >    where
->      f a b c = AsP c (PatName a b)
+>      f a b = AsP b a
 
 > {-vntPSuffix :: Parser (Pat -> Pat)
 > vntPSuffix = do
@@ -832,7 +836,7 @@ should just say expression
 
 > funDecl :: Parser Stmt
 > funDecl = FunDecl
->     <$> (keyword "fun" *> identifier)
+>     <$> (keyword "fun" *> patName)
 >     <*> parens (commaSep pat)
 >     <*> (symbol_ ":" *> (unwrapSingle <$>
 >          (Block <$> some stmt)))
