@@ -131,7 +131,7 @@ syntax
 >           | App Expr [Expr]
 >           | UnaryMinus Expr
 >           | BinOp Expr String Expr
->           | Lam [String] Expr
+>           | Lam [Pat] Expr
 >           | Let [(String,Expr)] Expr
 >           | LetRec [(String,Expr)] Expr
 >           | Block [Stmt]
@@ -1018,7 +1018,7 @@ add the last statement which returns the last value and the env, for
 >     appI i es = App (Iden i) es
 
 > desugar (App (Iden "raises") [e0, e1]) = do
->   desugar (App (Iden "raises-satisfies") [e0, Lam ["a"] $ App (Iden "tostring-equals") [e1, Iden "a"]])
+>   desugar (App (Iden "raises-satisfies") [e0, lam ["a"] $ App (Iden "tostring-equals") [e1, Iden "a"]])
 
 > desugar x@(App (Iden "raises-satisfies") [e0,e1]) = do
 >   let p = pretty x
@@ -1038,31 +1038,39 @@ add the last statement which returns the last value and the env, for
 
 
 > desugar (App f as) = IApp <$> desugar f <*> mapM desugar as
-> desugar (Lam ns e) = ILam ns <$> desugar e
+> desugar (Lam ns e) = ILam <$> mapM b ns <*> desugar e
+>   where
+>     b (IdenP (PatName _ x)) = pure x
+>     b x = lift $ throwE $ "unsupported pattern in lambda: " ++ show x
 > desugar (Let bs e) = do
 >     let f (n,v) = (n,) <$> desugar v
 >     ILet <$> mapM f bs <*> desugar e
 
 > desugar (LetRec bs e) = do
->     desugar (Let (mapMaybe convLam bs ++ map createBind bs) e)
+>     bsx <- mapM createBind bs
+>     desugar (Let (mapMaybe convLam bs ++ bsx) e)
 >   where
 >     newName = (++"'")
 >     bindNames = map fst bs
 >     bindNames' = map newName bindNames
 >     -- fX = lam (asX): bdyX end -> fX' = lam (f0,f1,...,*asX): bdyX' end
 >     convLam (n,Lam as bdy) =
->         Just (newName n, Lam (bindNames ++ as) $ patchBody bdy)
+>         Just (newName n, Lam (map mkP bindNames ++ as) $ patchBody bdy)
 >     -- fX = bdyX (something not a lam) -> fX = bdyX'
 >     -- not sure about this one
 >     convLam _ = Nothing --(newName n, patchBody x)
 >     -- fX = lam (asX): bdyX end -> fX = lam(asX): fX'(f0',f1',...,*asX) end
->     createBind (n,Lam as _bdy) =
->         (n, Lam as $ App (Iden $ newName n) (map Iden (bindNames' ++ as)))
->     createBind (n,x) = (n, patchBody x)
+>     createBind (n,Lam as _bdy) = do
+>         as' <- mapM hackGetName as
+>         pure (n, Lam as $ App (Iden $ newName n) (map Iden (bindNames' ++ as')))
+>     createBind (n,x) = pure (n, patchBody x)
 >     --bdyN with fN(as) replaced with fN(f0,...fX,*as)
 >     patchBody = transformBi $ \case
 >         App (Iden f) args | f `elem` bindNames -> App (Iden f) (map Iden bindNames ++ args)
 >         x -> x
+>     hackGetName (IdenP (PatName _ n)) = pure n
+>     hackGetName x = lift $ throwE $ "unsupported pattern in lambda: " ++ show x
+>     mkP i = IdenP (PatName NoShadow i)
 
 > {-desugar (LetSplat re e) =
 >     ILetSplat <$> desugar re <*> desugar e-}
@@ -1135,6 +1143,11 @@ xxx.make([list: <elements>])
 > desugar (Unbox x) = IUnbox <$> desugar x
 > desugar (TupleGet e i) = desugar (DotExpr e (show i))
 
+
+> lam :: [String] -> Expr -> Expr
+> lam ps e = Lam (map f ps) e
+>   where
+>     f i = IdenP (PatName NoShadow i)
   
 > desugarStmts :: [Stmt] -> Desugarer IExpr
 
@@ -1183,7 +1196,7 @@ testing hack
 >     getRecs (RecDecl nm bdy : es') recs whrs =
 >         getRecs es' ((nm,bdy) : recs) whrs
 >     getRecs (FunDecl nm ps bdy whr : es') recs whrs =
->         let bnd = (nm, (Lam ps bdy))
+>         let bnd = (nm, (lam ps bdy))
 >             whrs' = case whr of
 >                   Nothing -> whrs
 >                   Just b -> Check (Just nm) b : whrs
@@ -1226,7 +1239,7 @@ testing hack
 >    makeIsVar vnm = do
 >        arg <- makeUniqueVar "is-x"
 >        pure $ LetDecl ("is-" ++ vnm)
->               (Lam [arg] (appI "safe-variant-name" [Iden arg] `equals` Sel (Text vnm)))
+>               (lam [arg] (appI "safe-variant-name" [Iden arg] `equals` Sel (Text vnm)))
 >    makeIsDat = do
 >        arg <- makeUniqueVar "is-dat"
 >        let varChecks = map (\vnm -> appI ("is-" ++ vnm) [Iden arg]) varntNms
@@ -1234,7 +1247,7 @@ testing hack
 >            f [a] = pure a
 >            f (a:as) = (a `orf`) <$> f as
 >        bdy <- f varChecks
->        pure $ LetDecl ("is-" ++ nm) (Lam [arg] bdy)
+>        pure $ LetDecl ("is-" ++ nm) (lam [arg] bdy)
 
 if there are no args to the variant, it's a binding to a non lambda
 value, not a lambda
@@ -1251,7 +1264,7 @@ pt = lam (x,y): I.App "make-variant" ["pt",[list: {true, "x";x},{false, "y";y}]]
 >    makeVarnt (VariantDecl vnm fs) =
 >        let fields = listSel $ map makeVField fs
 >        in pure $ LetDecl vnm
->                  (Lam (map snd fs) $ appI "make-variant" [Sel $ Text vnm, fields])
+>                  (lam (map snd fs) $ appI "make-variant" [Sel $ Text vnm, fields])
 >    makeVField (x,f) = Sel $ TupleSel [case x of
 >                                     Ref -> Iden "true"
 >                                     Con -> Iden "false"
@@ -1314,7 +1327,7 @@ catch(
 >                ,StExpr $ appx "log-test-fail" [Iden checkBlockIDName
 >                                              ,Iden nameit
 >                                              ,Sel $ Text "No exception raised"]])
->         (Lam ["a"] $ Block
+>         (lam ["a"] $ Block
 >          [LetDecl v1 e1
 >          ,LetDecl nameit $ Sel $ Text syn
 >          ,StExpr $ If [(appx v1 [Iden "a"]
@@ -1577,7 +1590,7 @@ parse
 > convExpr (S.Lam ps e) = do
 >         ps' <- mapM pf ps
 >         e' <- convExpr e
->         Right $ Lam ps' e'
+>         Right $ lam ps' e'
 >       where
 >         pf (S.IdenP (S.PatName _ x)) = Right x
 >         pf x = Left $ "parse: unsupported pattern " ++ show x
@@ -1704,7 +1717,7 @@ pretty
 >   where isOp x = not $ any (\z -> isAlphaNum z || z `elem` "_") x
 > 
 > unconv (App e fs) = S.App (unconv e) $ map unconv fs
-> unconv (Lam ns e) = S.Lam (map unconvPattern ns) $ unconv e
+> unconv (Lam ns e) = S.Lam (map unconvPat ns) $ unconv e
 > unconv (Let bs e) = S.Let (map (uncurry unconvBinding) bs) (unconv e)
 > unconv (LetRec bs e) = S.LetRec (map (uncurry unconvBinding) bs) (unconv e)
 > unconv (Block sts) = S.Block $ map unconvStmt sts
