@@ -131,7 +131,6 @@ is it worth having different syntaxes for these?
 >               | Str String
 >               | Tuple [Expr]
 >               | Record [(String,Expr)]
->               | NothingS
 >               deriving (Eq,Show,Data,Typeable,Generic) 
 
 > data VariantDecl = VariantDecl String [(Ref,String)]
