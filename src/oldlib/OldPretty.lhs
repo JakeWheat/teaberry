@@ -1,6 +1,6 @@
 
 > {-# LANGUAGE ScopedTypeVariables #-}
-> module Pretty (prettyExpr
+> module OldPretty (prettyExpr
 >               ,prettyStmts
 >               ,prettyModule
 >               ) where
@@ -11,7 +11,7 @@
 >                          doubleQuotes,
 >                          {-braces, ($$), ($+$),-} vcat)
 
-> import Syntax (Stmt(..)
+> import OldSyntax (Stmt(..)
 >               ,Expr(..)
 >               ,Selector(..)
 >               ,VariantDecl(..)
@@ -110,20 +110,23 @@
 
 
 > pat :: Pat -> Doc
-> pat (IdenP (PatName s p)) = (case s of
+> pat (IdenP s p) = (case s of
 >                        NoShadow -> empty
 >                        Shadow -> text "shadow")
->                   <+> text p
-> pat (VariantP q c ps) = maybe empty (\a -> text a <> text ".") q
->                         <> text c <> parens (commaSep $ map pat ps)
+>                   <+> patName p
+> pat (VariantP c ps) = patName c <> parens (commaSep $ map pat ps)
 > pat (TupleP ps) = text "{" <> (xSep ";" $ map pat ps) <> text "}"
-> pat (AsP p (PatName s nm)) =
+> pat (AsP p s nm) =
 >     pat p
 >     <+> text "as"
 >     <+> (case s of
 >                 NoShadow -> empty
 >                 Shadow -> text "shadow")
 >     <+> text nm
+
+> patName :: PatName -> Doc
+> patName (PatName s) = text s
+> patName (QPatName q s) = text q <> text "." <> text s
 
 > stmt :: Stmt -> Doc
 > stmt (StExpr e) = expr e

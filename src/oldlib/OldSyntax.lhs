@@ -3,7 +3,7 @@
 The high level syntax which the parser produces
 
 > {-# LANGUAGE DeriveDataTypeable,DeriveGeneric, ScopedTypeVariables #-}
-> module Syntax (Stmt(..)
+> module OldSyntax (Stmt(..)
 >               ,Shadow(..)
 >               ,Binding(..)
 >               ,Expr(..)
@@ -93,13 +93,14 @@ is it worth having different syntaxes for these?
 > data Binding = Binding Pat Expr
 >           deriving (Eq,Show,Data,Typeable,Generic) 
 
-> data Pat = IdenP PatName
->          | VariantP (Maybe String) String [Pat]
+> data Pat = IdenP Shadow PatName
+>          | VariantP PatName [Pat]
 >          | TupleP [Pat]
->          | AsP Pat PatName
+>          | AsP Pat Shadow String
 >           deriving (Eq,Show,Data,Typeable,Generic) 
 
-> data PatName = PatName Shadow String
+> data PatName = PatName String
+>              | QPatName String String
 >              deriving (Eq,Show,Data,Typeable,Generic) 
 
 > data Shadow = NoShadow | Shadow

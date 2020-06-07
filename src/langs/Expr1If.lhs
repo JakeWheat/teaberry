@@ -8,8 +8,8 @@ boolean literals are constants in the default env
 
 > module Expr1If (tests) where
 
-> import qualified Parse as P
-> import qualified Syntax as S
+> import qualified OldParse as P
+> import qualified OldSyntax as S
 > import SimpleExpr (simpleInterpreterExamples
 >                   ,TestTree
 >                   ,makeSimpleTests

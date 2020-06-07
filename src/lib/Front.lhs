@@ -1551,14 +1551,14 @@ parse
 >         e' <- convExpr e
 >         Right $ Lam ps' e'
 >       where
->         pf (S.IdenP _ (S.PatName x)) = Right x
+>         pf (S.IdenP (S.PatName _ x)) = Right x
 >         pf x = Left $ "parse: unsupported pattern " ++ show x
 > convExpr (S.Let bs e) = do
 >         bs' <- mapM bf bs
 >         e' <- convExpr e
 >         Right $ Let bs' e'
 >       where
->         bf (S.Binding (S.IdenP _ (S.PatName x)) ex) =
+>         bf (S.Binding (S.IdenP (S.PatName _ x)) ex) =
 >             (x,) <$> convExpr ex
 >         bf x = Left $ "parse: unsupported binding " ++ show x
 > convExpr (S.LetRec bs e) = do
@@ -1566,7 +1566,7 @@ parse
 >         e' <- convExpr e
 >         Right $ LetRec bs' e'
 >       where
->         bf (S.Binding (S.IdenP _ (S.PatName x)) ex) =
+>         bf (S.Binding (S.IdenP (S.PatName _ x)) ex) =
 >             (x,) <$> convExpr ex
 >         bf x = Left $ "unsupported binding " ++ show x
 
@@ -1590,13 +1590,13 @@ parse
 > convExpr (S.Cases ty e bs els) =
 >     Cases ty <$> convExpr e <*> mapM f bs <*> maybe (pure Nothing) ((Just <$>) .  convExpr) els
 >   where
->     f (S.VariantP vnm ps, ve)
->         | Right ps' <- mapM unpat ps = (convPatName vnm, ps',) <$> convExpr ve
->     f (S.IdenP _ vnm, ve) = (convPatName vnm, [],) <$> convExpr ve
+>     f (S.VariantP x vnm ps, ve)
+>         | Right ps' <- mapM unpat ps =
+>               let vnm' = maybe vnm (\y -> y ++ "." ++ vnm) x
+>               in (vnm', ps',) <$> convExpr ve
+>     f (S.IdenP (S.PatName _ vnm), ve) = (vnm, [],) <$> convExpr ve
 >     f x = Left $ "parse: unsupported pattern: " ++ show x
->     convPatName (S.PatName x) = x
->     convPatName (S.QPatName x y) = x ++ "." ++ y
->     unpat (S.IdenP _ (S.PatName x)) = pure x
+>     unpat (S.IdenP (S.PatName _ x)) = pure x
 >     unpat x = Left $ "parse: unsupported pattern: " ++ show x
 
 > convExpr (S.Unbox e n) = flip UnboxRef n <$> convExpr e
@@ -1609,18 +1609,18 @@ parse
 > convSt :: S.Stmt -> Either String Stmt
 > convSt (S.StExpr e) = StExpr <$> convExpr e
 > convSt (S.When c t) = When <$> convExpr c <*> convExpr t
-> convSt (S.LetDecl (S.Binding (S.IdenP _ (S.PatName nm)) v)) = LetDecl nm <$> convExpr v
-> convSt (S.RecDecl (S.Binding (S.IdenP _ (S.PatName nm)) v)) = RecDecl nm <$> convExpr v
+> convSt (S.LetDecl (S.Binding (S.IdenP (S.PatName _ nm)) v)) = LetDecl nm <$> convExpr v
+> convSt (S.RecDecl (S.Binding (S.IdenP (S.PatName _ nm)) v)) = RecDecl nm <$> convExpr v
 > convSt (S.FunDecl nm ps bdy whr) = do
 >     whr' <- case whr of
 >                 Nothing -> pure Nothing
 >                 Just w -> Just <$> mapM convSt w
 >     FunDecl nm <$> mapM pf ps <*> convExpr bdy <*> pure whr'
 >   where 
->     pf (S.IdenP _ (S.PatName x)) = Right x
+>     pf (S.IdenP (S.PatName _ x)) = Right x
 >     pf x = Left $ "unsupported pattern " ++ show x
 > convSt (S.Check nm bdy) = Check nm <$> mapM convSt bdy
-> convSt (S.VarDecl (S.Binding (S.IdenP _ (S.PatName nm)) v)) = VarDecl nm <$> convExpr v
+> convSt (S.VarDecl (S.Binding (S.IdenP (S.PatName _ nm)) v)) = VarDecl nm <$> convExpr v
 > convSt (S.SetVar n e) = SetVar n <$> convExpr e
 > convSt (S.SetRef e ss) = SetRef <$> convExpr e <*> mapM f ss
 >    where
@@ -1684,7 +1684,7 @@ pretty
 > unconv (Cases ty t bs els) =
 >     S.Cases ty (unconv t) (map f bs) (fmap unconv els)
 >   where
->     f (n,fs,e) = (S.VariantP (S.PatName n) (map unconvPattern fs), unconv e)
+>     f (n,fs,e) = (S.VariantP Nothing n (map unconvPattern fs), unconv e)
 >
 > unconv (Box e) = S.App (S.Iden "box") [unconv e]
 > unconv (SetBox e f) = S.App (S.Iden "setbox") [unconv e, unconv f]
@@ -1721,7 +1721,7 @@ pretty
 > unconvBinding n v = S.Binding (unconvPattern n) (unconv v)
 
 > unconvPattern :: String -> S.Pat
-> unconvPattern n = S.IdenP S.NoShadow (S.PatName n)
+> unconvPattern n = S.IdenP (S.PatName S.NoShadow n)
 
 
 > prettyIExpr :: IExpr -> String
@@ -1756,7 +1756,7 @@ pretty
 > unconvIBinding n v = S.Binding (unconvIPattern n) (unconvI v)
 
 > unconvIPattern :: String -> S.Pat
-> unconvIPattern n = S.IdenP S.NoShadow (S.PatName n)
+> unconvIPattern n = S.IdenP (S.PatName S.NoShadow n)
 
 ------------------------------------------------------------------------------
 

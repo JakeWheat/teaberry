@@ -12,9 +12,9 @@ implement slightly more of tuples, make em, get fields, compare
 
 > import Text.RawString.QQ
 
-> import qualified Parse as P
-> import qualified Syntax as S
-> import qualified Pretty as Pr
+> import qualified OldParse as P
+> import qualified OldSyntax as S
+> import qualified OldPretty as Pr
 
 
 > import Control.Monad.Trans.Class (lift)
@@ -209,10 +209,7 @@ desugaring code
 >   where
 >     appI i as = App (Iden i) as
 
-> desugarStmts (FunDecl {}: _) = lift $ throwE $ "Internal: I had a bet with ghc that fundecl pattern was always matched in desugarstmts, and now ghc has won that bet"
-> desugarStmts (RecDecl {}: _) = lift $ throwE $ "Internal: I had a bet with ghc that recdecl pattern was always matched in desugarstmts, and now ghc has won that bet"
 
- 
 > desugarStmts [] = lift $ throwE $ "empty block"
 
 > desugarStmts [StExpr e] = desugar e
@@ -220,6 +217,11 @@ desugaring code
 > desugarStmts [x@(FunDecl {})] = desugarStmts [x, StExpr $ Iden "nothing"]
 > desugarStmts [x@(RecDecl {})] = desugarStmts [x, StExpr $ Iden "nothing"]
 
+  
+> desugarStmts (FunDecl {}: _) = lift $ throwE $ "Internal: I had a bet with ghc that fundecl pattern was always matched in desugarstmts, and now ghc has won that bet"
+> desugarStmts (RecDecl {}: _) = lift $ throwE $ "Internal: I had a bet with ghc that recdecl pattern was always matched in desugarstmts, and now ghc has won that bet"
+
+  
 > desugarStmts (LetDecl n v : es) = desugar (Let [(n,v)] (Block es))
 
 desugaring mutually recursive rec and fun

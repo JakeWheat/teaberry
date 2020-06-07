@@ -56,7 +56,7 @@ for things like expressions, patterns, terms, etc.
 
 
 > {-# LANGUAGE TupleSections,ScopedTypeVariables, MultiWayIf, LambdaCase #-}
-> module Parse (parseExpr
+> module OldParse (parseExpr
 >              ,parseStmt
 >              ,parseModule) where
 
@@ -102,10 +102,7 @@ for things like expressions, patterns, terms, etc.
 > import Data.Char (isAlphaNum,isDigit)
 
 
-> import Syntax (Stmt(..)
->               ,Expr(..)
->               ,Selector(..)
->               ,VariantDecl(..)
+> import OldSyntax (Stmt(..), Expr(..), Selector(..), VariantDecl(..)
 >               ,Shadow(..)
 >               ,Binding(..)
 >               ,Pat(..)
@@ -731,10 +728,10 @@ parsing code, which is worse, but either method is viable
 
 
 > epExprToPat :: EPExpr -> Maybe Pat
-> epExprToPat (EPExpr (Iden i)) = Just $ IdenP (PatName NoShadow i)
+> epExprToPat (EPExpr (Iden i)) = Just $ IdenP NoShadow (PatName i)
 > epExprToPat (EPApp (Iden f) ps) = do
 >     ps' <- mapM epExprToPat ps
->     pure $ VariantP Nothing f ps'
+>     pure $ VariantP (PatName f) ps'
 > epExprToPat (EPSel (EPTupleP ps)) = do
 >     ps' <- mapM epExprToPat ps
 >     pure $ TupleP ps'
@@ -746,12 +743,12 @@ parsing code, which is worse, but either method is viable
 >     pure $ TupleP ps'
 > epExprToPat (EPExpr (App (Iden f) es)) = do
 >     ps' <- mapM (epExprToPat . EPExpr) es
->     pure $ VariantP Nothing f ps'
+>     pure $ VariantP (PatName f) ps'
 
 > epExprToPat (EPAsP p s i) = do
 >     p' <- epExprToPat p
->     pure $ AsP p' (PatName s i)
-> epExprToPat (EPShadowIden i) = Just $ IdenP (PatName Shadow i)
+>     pure $ AsP p' s i
+> epExprToPat (EPShadowIden i) = Just $ IdenP Shadow (PatName i)
 > epExprToPat _ = Nothing
 
 todo: when the flags are added to tell the parser whether to accept
@@ -790,23 +787,21 @@ should just say expression
 >       ,do
 >        s <- boption NoShadow (Shadow <$ keyword_ "shadow")
 >        i <- identifier
+>        i' <- choice [do
+>                      j <- char '.' *> identifier
+>                      pure $ QPatName i j
+>                     ,pure $ PatName i]
 >        choice [do
->                j <- char '.' *> identifier
->                choice [do
->                        as <- parens (commaSep pat)
->                        pure $ VariantP (Just i) j as
->                       ,pure $ VariantP (Just i) j []]
->               ,choice [do
->                        as <- parens (commaSep pat)
->                        pure $ VariantP Nothing i as
->                       ,pure $ IdenP (PatName s i)]]
+>                as <- parens (commaSep pat)
+>                pure $ VariantP i' as
+>               ,pure $ IdenP s i']
 >       <**> boption id asPatSuffix]
 
 > asPatSuffix :: Parser (Pat -> Pat)
 > asPatSuffix = f <$> (keyword_ "as" *> boption NoShadow (Shadow <$ keyword_ "shadow"))
 >                 <*> identifier
 >    where
->      f a b c = AsP c (PatName a b)
+>      f a b c = AsP c a b
 
 > {-vntPSuffix :: Parser (Pat -> Pat)
 > vntPSuffix = do

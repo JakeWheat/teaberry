@@ -16,8 +16,8 @@ the expressions are any expressions supported
 > import Text.RawString.QQ
 > import qualified SimpleExprReader as SE
 > import qualified SimpleExpr as SE
-> import qualified Parse as P
-> import qualified Syntax as S
+> import qualified OldParse as P
+> import qualified OldSyntax as S
 
 > import qualified Test.Tasty as T
 > import qualified Test.Tasty.HUnit as T

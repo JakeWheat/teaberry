@@ -7,13 +7,13 @@ Simple expressions with recursive functions
 
 > module Expr1Letrecstar (tests) where
 
-> import qualified Parse as P
-> import qualified Syntax as S
+> import qualified OldParse as P
+> import qualified OldSyntax as S
 > import SimpleExpr (simpleInterpreterExamples
 >                   ,TestTree
 >                   ,makeSimpleTests
 >                   )
-> import qualified Pretty as Pr
+> import qualified OldPretty as Pr
 
 > import Data.Generics.Uniplate.Data (transformBi)
 > import Data.Data (Data)

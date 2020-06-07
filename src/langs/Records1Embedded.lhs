@@ -44,9 +44,9 @@ do demo of opaque ffi values
 
 > import qualified TestUtils as T
 
-> import qualified Parse as P
-> import qualified Syntax as S
-> import qualified Pretty as Pr
+> import qualified OldParse as P
+> import qualified OldSyntax as S
+> import qualified OldPretty as Pr
 
 
 > import Control.Monad.Trans.Class (lift)

@@ -17,8 +17,8 @@ desugars let decls to let expressions
 >                   ,makeSimpleTests
 >                   ,simpleInterpreterExamples)
 
-> import qualified Parse as P
-> import qualified Syntax as S
+> import qualified OldParse as P
+> import qualified OldSyntax as S
 
 
 > import Control.Monad.Trans.Class (lift)
