@@ -823,8 +823,8 @@ like a desugaring process.
 
 > convExpr :: S.Expr -> Either String Expr
 > convExpr (S.Sel (S.Num x)) = Right $ Num x
-> convExpr (S.Sel (S.Str x)) = Right $ Text x
-> convExpr (S.Sel (S.Tuple fs)) = TupleSel <$> mapM convExpr fs
+> convExpr (S.Sel (S.Text x)) = Right $ Text x
+> convExpr (S.Sel (S.TupleSel fs)) = TupleSel <$> mapM convExpr fs
 > convExpr (S.Iden s) = Right $ Iden s
 > convExpr (S.Parens e) = convExpr e
 > convExpr (S.App f es) = App <$> (convExpr f) <*> mapM convExpr es
@@ -848,7 +848,7 @@ like a desugaring process.
 >             (x,) <$> convExpr ex
 >         bf x = Left $ "parse: unsupported binding " ++ show x
 
-> convExpr (S.Sel (S.Record fs)) = RecordSel <$> mapM f fs
+> convExpr (S.Sel (S.RecordSel fs)) = RecordSel <$> mapM f fs
 >   where
 >     f (a,b) = (a,) <$> convExpr b
 
@@ -900,8 +900,8 @@ pretty
 
 > unconv :: Expr -> S.Expr
 > unconv (Num n) = S.Sel (S.Num n)
-> unconv (Text n) = S.Sel (S.Str n)
-> unconv (TupleSel fs) = S.Sel (S.Tuple $ map unconv fs)
+> unconv (Text n) = S.Sel (S.Text n)
+> unconv (TupleSel fs) = S.Sel (S.TupleSel $ map unconv fs)
 > unconv (TupleGet e i) = S.TupleGet (unconv e) i
 > unconv (Iden s) = S.Iden s
 > unconv (VariantSel nm fs) = S.App (S.Iden nm) (map f fs)
@@ -926,7 +926,7 @@ pretty
 >     f (n,fs,e) = (S.VariantP (S.PatName n) (map unconvPattern fs), unconv e)
 >
 > unconv (Construct e es) = S.Construct (unconv e) (map unconv es)  
-> unconv (RecordSel fs) = S.Sel (S.Record (map f fs))
+> unconv (RecordSel fs) = S.Sel (S.RecordSel (map f fs))
 >   where
 >     f (a,b) = (a,unconv b)
 

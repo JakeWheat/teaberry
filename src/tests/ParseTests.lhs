@@ -44,10 +44,10 @@
 >     ,("false", Iden "false")
 >     ,("3", num 3)
 >     ,("3.3", num 3.3)
->     ,("\"String\"", Sel $ Str "String")
->     --,("\"St\\\"ri\\\"ng\"", Str "St\"ri\"ng")
->     --,("'Str\"ing'", Str "Str\"ing")
->     --,("```multiline\nstring```", Str "multiline\nstring")
+>     ,("\"String\"", Sel $ Text "String")
+>     --,("\"St\\\"ri\\\"ng\"", Text "St\"ri\"ng")
+>     --,("'Str\"ing'", Text "Str\"ing")
+>     --,("```multiline\nstring```", Text "multiline\nstring")
 
 >     ,("a(3)", App (Iden "a") [num 3])
 
@@ -198,23 +198,23 @@ todo: review all the whitespace rules that are being ignored
 >     --,("let {x; y}: {1; 2} in x + y end"
 >     -- ,Let [(TupleP [IdenP "x",IdenP "y"], Tuple [num 1, num 2])] (BinOp (Iden "x" "+" (Iden "y"))))
 
->     ,("{1; 2;}", Sel $ Tuple [num 1, num 2])
->     ,("{1; 2}", Sel $ Tuple [num 1, num 2])
+>     ,("{1; 2;}", Sel $ TupleSel [num 1, num 2])
+>     ,("{1; 2}", Sel $ TupleSel [num 1, num 2])
 
->     ,("{a; b}", Sel $ Tuple [Iden "a", Iden "b"])
+>     ,("{a; b}", Sel $ TupleSel [Iden "a", Iden "b"])
 
 >     ,("{a: \"one\", b : 2, c : x }"
->      ,Sel $ Record [("a", Sel $ Str "one")
+>      ,Sel $ RecordSel [("a", Sel $ Text "one")
 >                    ,("b", num 2)
 >                    ,("c", Iden "x")])
 >     ,("{a: 1,}"
->      ,Sel $ Record [("a", num 1)])
+>      ,Sel $ RecordSel [("a", num 1)])
 
 
 >     ,("[list: {\"a\"; 1}, {\"b\"; 2}, {\"c\"; 3}]"
->      ,Construct (Iden "list") [Sel $ Tuple [Sel $ Str "a",num 1]
->                               ,Sel $ Tuple [Sel $ Str "b",num 2]
->                               ,Sel $ Tuple [Sel $ Str "c",num 3]])
+>      ,Construct (Iden "list") [Sel $ TupleSel [Sel $ Text "a",num 1]
+>                               ,Sel $ TupleSel [Sel $ Text "b",num 2]
+>                               ,Sel $ TupleSel [Sel $ Text "c",num 3]])
 >     ,("t.{1}", TupleGet (Iden "t") 1)
 
 >     ,("a.x", DotExpr (Iden "a") "x")
@@ -224,8 +224,8 @@ todo: review all the whitespace rules that are being ignored
 >       \  | link(f, r) => \"link\"\n\
 >       \end"
 >      ,Cases "List" (Construct (Iden "list") [num 1, num 2, num 3])
->         [(idenPat "empty", Sel $ Str "empty")
->         ,(VariantP (PatName "link") [idenPat "f", idenPat "r"], Sel $ Str "link")]
+>         [(idenPat "empty", Sel $ Text "empty")
+>         ,(VariantP (PatName "link") [idenPat "f", idenPat "r"], Sel $ Text "link")]
 >         Nothing)
 
 >     ,("cases(List) [list: 1,2,3]:\n\
@@ -233,32 +233,32 @@ todo: review all the whitespace rules that are being ignored
 >       \  | else => \"else\"\n\
 >       \end"
 >      ,Cases "List" (Construct (Iden "list") [num 1, num 2, num 3])
->         [(idenPat "empty", Sel $ Str "empty")]
->         (Just $ Sel $ Str "else"))
+>         [(idenPat "empty", Sel $ Text "empty")]
+>         (Just $ Sel $ Text "else"))
 
 >     ,("cases(List) [list: {\"a\"; 1}, {\"b\"; 2}, {\"c\"; 3}]:\n\
 >       \  | empty => \"empty\"\n\
 >       \  | link({x;y}, r) => x\n\
 >       \  | else => \"else\"\n\
 >       \end"
->      ,Cases "List" (Construct (Iden "list") [Sel $ Tuple [Sel $ Str "a", num 1]
->                                             ,Sel $ Tuple [Sel $ Str "b", num 2]
->                                             ,Sel $ Tuple [Sel $ Str "c", num 3]])
->         [(idenPat "empty", Sel $ Str "empty")
+>      ,Cases "List" (Construct (Iden "list") [Sel $ TupleSel [Sel $ Text "a", num 1]
+>                                             ,Sel $ TupleSel [Sel $ Text "b", num 2]
+>                                             ,Sel $ TupleSel [Sel $ Text "c", num 3]])
+>         [(idenPat "empty", Sel $ Text "empty")
 >         ,(VariantP (PatName "link") [TupleP [idenPat "x", idenPat "y"], idenPat "r"], Iden "x")]
->         (Just $ Sel $ Str "else"))
+>         (Just $ Sel $ Text "else"))
 
 >     ,("cases(z.List) [list: {\"a\"; 1}, {\"b\"; 2}, {\"c\"; 3}]:\n\
 >       \  | z.empty => \"empty\"\n\
 >       \  | z.link({x;y}, r) => x\n\
 >       \  | else => \"else\"\n\
 >       \end"
->      ,Cases "z.List" (Construct (Iden "list") [Sel $ Tuple [Sel $ Str "a", num 1]
->                                               ,Sel $ Tuple [Sel $ Str "b", num 2]
->                                               ,Sel $ Tuple [Sel $ Str "c", num 3]])
->         [(IdenP NoShadow (QPatName "z" "empty"), Sel $ Str "empty")
+>      ,Cases "z.List" (Construct (Iden "list") [Sel $ TupleSel [Sel $ Text "a", num 1]
+>                                               ,Sel $ TupleSel [Sel $ Text "b", num 2]
+>                                               ,Sel $ TupleSel [Sel $ Text "c", num 3]])
+>         [(IdenP NoShadow (QPatName "z" "empty"), Sel $ Text "empty")
 >         ,(VariantP (QPatName "z" "link") [TupleP [idenPat "x", idenPat "y"], idenPat "r"], Iden "x")]
->         (Just $ Sel $ Str "else"))
+>         (Just $ Sel $ Text "else"))
 
 
 
@@ -276,7 +276,7 @@ todo: review all the whitespace rules that are being ignored
 >     ,("a := 6", SetVar "a" (num 6))
 >     ,("{x; y} = {1; 2}"
 >      ,LetDecl (Binding (TupleP [idenPat "x", idenPat "y"])
->       (Sel $ Tuple [num 1, num 2])))
+>       (Sel $ TupleSel [num 1, num 2])))
 
 >     ,("{{w; x}; {y; z}} = x154"
 >      ,LetDecl (Binding
@@ -390,8 +390,8 @@ end
 >       ,TPred (Iden "expr1") "is-not%" (Iden "pred") (Iden "expr2")
 >       ,StExpr $ BinOp (Iden "expr") "satisfies" (Iden "pred")
 >       ,StExpr $ BinOp (Iden "expr") "violates" (Iden "pred")
->       ,StExpr $ BinOp (Iden "expr") "raises" (Sel $ Str "exn-string")
->       ,StExpr $ BinOp (Iden "expr") "raises-other-than" (Sel $ Str "exn-string")
+>       ,StExpr $ BinOp (Iden "expr") "raises" (Sel $ Text "exn-string")
+>       ,StExpr $ BinOp (Iden "expr") "raises-other-than" (Sel $ Text "exn-string")
 >       ,TPostfixOp (Iden "expr") "does-not-raise"
 >       ,StExpr $ BinOp (Iden "expr") "raises-satisfies" (Iden "pred")
 >       ,StExpr $ BinOp (Iden "expr") "raises-violates" (Iden "pred")
@@ -438,7 +438,7 @@ end
 > parseModuleExamples :: [(String,Module)]
 > parseModuleExamples =
 >     [("\"hello\""
->      ,Module [] [StExpr $ Sel $ Str "hello"])
+>      ,Module [] [StExpr $ Sel $ Text "hello"])
 
 >     ,("provide: * end\n\
 >       \1"

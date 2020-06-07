@@ -108,6 +108,8 @@ is it worth having different syntaxes for these?
 
 
 > data Expr = Sel Selector
+
+
 >           | Iden String
 >           | Parens Expr
 >           | TupleGet Expr Int
@@ -128,9 +130,9 @@ is it worth having different syntaxes for these?
 
 
 > data Selector = Num Scientific
->               | Str String
->               | Tuple [Expr]
->               | Record [(String,Expr)]
+>               | Text String
+>               | TupleSel [Expr]
+>               | RecordSel [(String,Expr)]
 >               deriving (Eq,Show,Data,Typeable,Generic) 
 
 > data VariantDecl = VariantDecl String [(Ref,String)]

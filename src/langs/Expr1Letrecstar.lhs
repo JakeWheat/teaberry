@@ -334,8 +334,8 @@ parser
 >
 > convExpr :: S.Expr -> Either String Expr
 > convExpr (S.Sel (S.Num x)) = Right $ Num x
-> convExpr (S.Sel (S.Str x)) = Right $ Text x
-> convExpr (S.Sel (S.Tuple fs)) = TupleSel <$> mapM convExpr fs
+> convExpr (S.Sel (S.Text x)) = Right $ Text x
+> convExpr (S.Sel (S.TupleSel fs)) = TupleSel <$> mapM convExpr fs
 > convExpr (S.Iden s) = Right $ Iden s
 > convExpr (S.Parens e) = convExpr e
 > convExpr (S.App f es) = App <$> (convExpr f) <*> mapM convExpr es
@@ -387,8 +387,8 @@ for error messages, etc.
 > unconv :: Expr -> S.Expr
 > unconv (Num n) = S.Sel (S.Num n)
 > unconv (Iden s) = S.Iden s
-> unconv (Text s) = S.Sel (S.Str s)
-> unconv (TupleSel fs) = S.Sel (S.Tuple (map unconv fs))
+> unconv (Text s) = S.Sel (S.Text s)
+> unconv (TupleSel fs) = S.Sel (S.TupleSel (map unconv fs))
 
 > unconv (App e fs) = S.App (unconv e) $ map unconv fs
 > unconv (Lam ns e) = S.Lam (map unconvPattern ns) $ unconv e

@@ -309,7 +309,7 @@ and make sure it doesn't parse newlines when it shouldn't
 >             <?> "string literal"
 
 > stringE :: Parser Expr
-> stringE = (Sel . Str) <$> stringRaw
+> stringE = (Sel . Text) <$> stringRaw
 >             <?> "string literal"
 
 > appSuffix :: Parser (Expr -> Expr)
@@ -433,15 +433,15 @@ todo: remove the trys by implementing a proper lexer or a lexer style
 >
 
 > tupleOrRecord :: Parser Expr
-> tupleOrRecord = tupleOrRecord2 (Sel . Record)
->                                (Sel . Tuple)
+> tupleOrRecord = tupleOrRecord2 (Sel . RecordSel)
+>                                (Sel . TupleSel)
 >                                expr
 >                                (\case
 >                                      Iden i -> Just i
 >                                      _ -> Nothing)
 
 > tupleOrRecordP :: Parser EPExpr
-> tupleOrRecordP = tupleOrRecord2 (EPExpr . Sel . Record)
+> tupleOrRecordP = tupleOrRecord2 (EPExpr . Sel . RecordSel)
 >                                  (EPSel . EPTupleP)
 >                                  epExpr
 >                                  (\case
@@ -714,7 +714,7 @@ parsing code, which is worse, but either method is viable
 > epSelToSel (EPSelector s) = Just s
 > epSelToSel (EPTupleP es) = do
 >     es' <- mapM epExprToExpr es
->     pure $ Tuple es'
+>     pure $ TupleSel es'
 
 > epExprToExpr :: EPExpr -> Maybe Expr
 > epExprToExpr (EPExpr e) = Just e
@@ -735,10 +735,10 @@ parsing code, which is worse, but either method is viable
 > epExprToPat (EPSel (EPTupleP ps)) = do
 >     ps' <- mapM epExprToPat ps
 >     pure $ TupleP ps'
-> epExprToPat (EPSel (EPSelector (Tuple es))) = do
+> epExprToPat (EPSel (EPSelector (TupleSel es))) = do
 >     ps' <- mapM (epExprToPat . EPExpr) es
 >     pure $ TupleP ps'
-> epExprToPat (EPExpr (Sel (Tuple es))) = do
+> epExprToPat (EPExpr (Sel (TupleSel es))) = do
 >     ps' <- mapM (epExprToPat . EPExpr) es
 >     pure $ TupleP ps'
 > epExprToPat (EPExpr (App (Iden f) es)) = do

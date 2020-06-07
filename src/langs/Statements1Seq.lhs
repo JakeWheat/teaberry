@@ -329,8 +329,8 @@ parse
 
 > convExpr :: S.Expr -> Either String Expr
 > convExpr (S.Sel (S.Num x)) = Right $ Num x
-> convExpr (S.Sel (S.Str x)) = Right $ Text x
-> convExpr (S.Sel (S.Tuple fs)) = TupleSel <$> mapM convExpr fs
+> convExpr (S.Sel (S.Text x)) = Right $ Text x
+> convExpr (S.Sel (S.TupleSel fs)) = TupleSel <$> mapM convExpr fs
 > convExpr (S.Iden s) = Right $ Iden s
 > convExpr (S.Parens e) = convExpr e
 > convExpr (S.App f es) = App <$> (convExpr f) <*> mapM convExpr es

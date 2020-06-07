@@ -1485,10 +1485,10 @@ parse
 
 > convExpr :: S.Expr -> Either String Expr
 > convExpr (S.Sel (S.Num x)) = Right $ Num x
-> convExpr (S.Sel (S.Str x)) = Right $ Text x
-> convExpr (S.Sel (S.Tuple fs)) = TupleSel <$> mapM convExpr fs
+> convExpr (S.Sel (S.Text x)) = Right $ Text x
+> convExpr (S.Sel (S.TupleSel fs)) = TupleSel <$> mapM convExpr fs
 
-> convExpr (S.Sel (S.Record fs)) = RecordSel <$> mapM f fs
+> convExpr (S.Sel (S.RecordSel fs)) = RecordSel <$> mapM f fs
 >   where
 >     f (a,b) = (a,) <$> convExpr b
 
@@ -1609,14 +1609,14 @@ pretty
 
 > unconv :: Expr -> S.Expr
 > unconv (Num n) = S.Sel (S.Num n)
-> unconv (Text n) = S.Sel (S.Str n)
-> unconv (TupleSel fs) = S.Sel (S.Tuple $ map unconv fs)
+> unconv (Text n) = S.Sel (S.Text n)
+> unconv (TupleSel fs) = S.Sel (S.TupleSel $ map unconv fs)
 > unconv (VariantSel nm fs) = S.App (S.Iden nm) (map f fs)
 >   where
 >     f (n,v) = unconv (TupleSel [Text n, v])
 > unconv (Construct e es) = S.Construct (unconv e) (map unconv es)  
 
-> unconv (RecordSel fs) = S.Sel (S.Record (map f fs))
+> unconv (RecordSel fs) = S.Sel (S.RecordSel (map f fs))
 >   where
 >     f (a,b) = (a,unconv b)
 > unconv (Iden s) = S.Iden s
