@@ -652,6 +652,7 @@ created
 
 > makeVariant2 :: Value -> Value -> Value -> Interpreter Value
 > makeVariant2 (TextV vnt) f0 f1 = makeVariant vnt [f0,f1]
+> makeVariant2 x _ _  = throwInterp $ "makeVariant2: expected text for first arg, got " ++ show x
 
 
 > makeVariant :: String -> [Value] -> Interpreter Value
@@ -913,6 +914,8 @@ add the last statement which returns the last value and the env, for
 > desugarPreludeStmt (IncludeFrom nm is) =
 >     pure $ flip map is $ \(ProvideAlias n1 n2) ->
 >         LetDecl (patName n2) (DotExpr (TupleGet (Iden ("module." ++ nm)) 1) n1)
+
+> desugarPreludeStmt x = lift $ throwE $ "unsupported prelude statement: " ++ show x
 
 > importSourceName :: ImportSource -> Desugarer String
 > importSourceName (ImportSpecial "file" [s]) = pure $ "module." ++ s
@@ -1237,6 +1240,8 @@ setbox(a.b, 2)
 >         refSets = flip map fs $ \(n,v) -> SetBox (DotExpr (Iden enm) n) v
 >     desugarStmts (sts : (map StExpr refSets ++ es))
 
+> desugarStmts (e@(TPred {}) : _) = lift $ throwE $ "test preds are not supported " ++ show e
+> desugarStmts (e@(TPostfixOp {}) : _) = lift $ throwE $ "test preds are not supported " ++ show e
 
 
 aexpr raises-satisfies bexpr

@@ -95,6 +95,13 @@ common libfiles
                        OldSyntax
                        DesugarListBetter
 
+common libfilesextra
+  other-modules:     Syntax
+                       Parse
+                       Pretty
+                       Scientific
+                       Front
+                       
 -- this is the old version of the code that is in the process of being replaced
 library
   import:              shared-properties, libfiles
@@ -111,7 +118,7 @@ library
    
 
 Test-Suite RunTests
-  import:              shared-properties, libfiles
+  import:              shared-properties, libfiles, libfilesextra
   type:                exitcode-stdio-1.0
   main-is:             RunTests.lhs
   other-modules:       
@@ -120,7 +127,7 @@ Test-Suite RunTests
   hs-source-dirs:      src/tests
 
 executable teaberry
-  import:              shared-properties, libfiles
+  import:              shared-properties, libfiles, libfilesextra
   main-is:             Teaberry.lhs
   build-depends:       haskeline,
                        optparse-applicative

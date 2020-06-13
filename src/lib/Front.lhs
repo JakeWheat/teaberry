@@ -442,8 +442,9 @@ ffi catalog
 >    -- hack to make it work for any data type     
 >    ,("safe-variant-name", unaryOp anyIn pure (const $ nothingLiteralHack))
 >    ,("make-variant", binaryOp unwrapText unwrapList id makeVariant)
+>    ,("make-variant-0", unaryOp unwrapText id makeVariant0)
+>    ,("make-variant-2", ternaryOp anyIn anyIn anyIn id makeVariant2)
 >    ,("env-to-record", nullaryOp id envToRecord)
->    ,("link", binaryOp anyIn anyIn pure listLink)
 >    ,("call-construct-make", binaryOp variantIn variantIn id callConstructMake)
 
 >    -- another mystery
@@ -466,8 +467,7 @@ ffi catalog
 
 >    ])
 >    $ emptyEnv {envEnv = [("true", BoolV True)
->                         ,("false", BoolV False)
->                         ,("empty", VariantV "empty" [])]}
+>                         ,("false", BoolV False)]}
 
 hardcoded nothing. There is also a syntax version. even though nothing
 is defined in built in, it needs bootstrapping like list because a
@@ -589,9 +589,6 @@ created
 >     liftIO $ threadDelay (floor (v * 1000 * 1000))
 >     pure nothingLiteralHack
 
-> listLink :: Value -> Value -> Value
-> listLink a b = VariantV "link" [("first",a),("rest",b)]
-
   
 > safeVariantName :: Value -> Interpreter Value
 > safeVariantName (VariantV x _) = pure $ TextV $ dropQualifiers x
@@ -622,6 +619,14 @@ created
        
 > variantFieldGetOrd _ x =
 >     throwInterp $ "variant field get ord called on " ++ torepr' x
+
+
+> makeVariant0 :: String -> Interpreter Value
+> makeVariant0 vnt = makeVariant vnt []
+
+> makeVariant2 :: Value -> Value -> Value -> Interpreter Value
+> makeVariant2 (TextV vnt) f0 f1 = makeVariant vnt [f0,f1]
+> makeVariant2 x _ _  = throwInterp $ "makeVariant2: expected text for first arg, got " ++ show x
 
 
 > makeVariant :: String -> [Value] -> Interpreter Value
@@ -881,6 +886,9 @@ add the last statement which returns the last value and the env, for
 > desugarPreludeStmt (IncludeFrom nm is) =
 >     pure $ flip map is $ \(ProvideAlias n1 n2) ->
 >         LetDecl (patName n2) (DotExpr (TupleGet (Iden ("module." ++ nm)) 1) n1)
+
+> desugarPreludeStmt x = lift $ throwE $ "unsupported prelude statement: " ++ show x
+
 
 > importSourceName :: ImportSource -> Desugarer String
 > importSourceName (ImportSpecial "file" [s]) = pure $ "module." ++ s
@@ -1162,7 +1170,7 @@ testing hack
 if there are no args to the variant, it's a binding to a non lambda
 value, not a lambda
 
->    makeVarnt (VariantDecl vnm []) = pure $ LetDecl (patName vnm) (appI "make-variant" [Text vnm, listSel []])
+>    makeVarnt (VariantDecl vnm []) = pure $ LetDecl (patName vnm) (appI "make-variant-0" [Text vnm])
 
   | pt(x,y) ->
 pt = lam (x,y): I.App "make-variant" ["pt",[list: {false, "x";x},{false, "y";y}]]
@@ -1170,6 +1178,13 @@ pt = lam (x,y): I.App "make-variant" ["pt",[list: {false, "x";x},{false, "y";y}]
   | pt(ref x,y) ->
 pt = lam (x,y): I.App "make-variant" ["pt",[list: {true, "x";x},{false, "y";y}]]
   
+special case to bootstrap the variant constructor for list link
+
+>    makeVarnt (VariantDecl vnm [f0,f1]) =
+>        pure $ LetDecl (patName vnm)
+>        (lam [snd f0, snd f1] $ appI "make-variant-2"
+>            [Text vnm, makeVField f0, makeVField f1])
+
 
 >    makeVarnt (VariantDecl vnm fs) =
 >        let fields = listSel $ map makeVField fs
@@ -1197,7 +1212,8 @@ setbox(a.b, 2)
 >         refSets = flip map fs $ \(n,v) -> SetBox (DotExpr (Iden enm) n) v
 >     desugarStmts (sts : (map StExpr refSets ++ es))
 
-
+> desugarStmts (e@(TPred {}) : _) = lift $ throwE $ "test preds are not supported " ++ show e
+> desugarStmts (e@(TPostfixOp {}) : _) = lift $ throwE $ "test preds are not supported " ++ show e
 
 aexpr raises-satisfies bexpr
 desugars to
