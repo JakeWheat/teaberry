@@ -356,19 +356,19 @@ todo: remove the trys by implementing a proper lexer or a lexer style
 > unaryMinus = UnaryMinus <$> (symbol "-" *> term)
 
 > lamE :: Parser Expr
-> lamE = Lam <$> (keyword_ "lam" *> parens (commaSep pat) <* symbol_ ":")
+> lamE = Lam <$> (keyword_ "lam" *> parens (commaSep patName) <* symbol_ ":")
 >            <*> (expr <* keyword_ "end")
 >            
 
 > expressionLet :: Parser Expr
 > expressionLet = keyword_ "let" *> letBody Let
 >
-> letBody :: ([(Pat,Expr)] -> Expr -> Expr) -> Parser Expr
+> letBody :: ([(PatName,Expr)] -> Expr -> Expr) -> Parser Expr
 > letBody ctor = ctor <$> commaSep1 binding
 >                     <*> (symbol_ ":" *> expr <* keyword_ "end")
 
-> binding :: Parser (Pat,Expr)
-> binding = (,) <$> pat
+> binding :: Parser (PatName,Expr)
+> binding = (,) <$> patName
 >                        <*> (symbol_ "=" *> expr)
 
 > expressionLetRec :: Parser Expr
@@ -442,15 +442,6 @@ todo: remove the trys by implementing a proper lexer or a lexer style
 >                                      Iden i -> Just i
 >                                      _ -> Nothing)
 
-> tupleOrRecordP :: Parser EPExpr
-> tupleOrRecordP = tupleOrRecord2 (EPExpr . Sel . RecordSel)
->                                  (EPSel . EPTupleP)
->                                  epExpr
->                                  (\case
->                                        EPExpr (Iden i) -> Just i
->                                        _ -> Nothing)
->                                
-
 > tupleOrRecord2 :: ([(String, Expr)] -> a)
 >                -> ([a] -> a)
 >                -> Parser a
@@ -518,7 +509,7 @@ todo: remove the trys by implementing a proper lexer or a lexer style
 >         symbol_ "|"
 >         choice
 >             [Right <$> (keyword_ "else" *> symbol_ "=>" *> expr)
->             ,Left <$> ((,) <$> (pat <?> "pattern") <*> (symbol_ "=>" *> expr))]
+>             ,Left <$> ((,) <$> (casePat <?> "pattern") <*> (symbol_ "=>" *> expr))]
 >     endCase ty t cs el = keyword_ "end" *> pure (Cases ty t (reverse cs) el)
 
 todo: try remove this try
@@ -586,6 +577,7 @@ put all the parsers which start with a keyword first
 >     ,varDecl
 >     ,dataDecl
 >     ,checkBlock
+>     ,shadowLet
 >     ,startsWithExprOrPattern
 >     ] <?> "statement"
 
@@ -660,161 +652,78 @@ shadow
 3. create the wrapper to convert to an expression with a fail
 4. implement the above branching
 
+
+
+starts with expr or pattern can parse an stexpr
+and it can parse:
+let decl without shadow = ...
+set var :=
+set ref !{ ...
+and a test expression
+ 
 > startsWithExprOrPattern :: Parser Stmt
 > startsWithExprOrPattern = do
->     ex <- epExpr
->     --trace (ppShow ex) $
->     choice
->         [do
->          EPExpr (Iden i) <- pure ex
->          SetVar i <$> ((symbol_ ":=" <?> "") *> expr)
->         ,do
->          Just p <- pure $ epExprToPat ex
->          e <- ((symbol_ "=" <?> "") *> expr)
->          pure $ LetDecl p e
->         ,do
->          Just ex' <- pure $ epExprToExpr ex
->          bchoice
->             [do
->              let rf = (,) <$> identifier <*> (symbol_ ":" *> expr)
->              SetRef ex' <$> (symbol_ "!{" *> commaSep1 rf <* symbol "}")
->             ,do
->              exprSuffix ex' <**> bchoice [testPost
->                                          ,pure StExpr]]]
+>     ex <- expr
+>     case ex of
+>         Iden i -> choice
+>             [SetVar i <$> ((symbol_ ":=" <?> "") *> expr)
+>             ,LetDecl (PatName NoShadow i) <$> ((symbol_ "=" <?> "") *> expr)
+>             ,handleExpr ex]
+>         _ -> handleExpr ex
+>   where
+>     handleExpr ex =
+>         bchoice
+>         [let rf = (,) <$> identifier <*> (symbol_ ":" *> expr)
+>          in SetRef ex <$> ((symbol_ "!{" <?> "") *> commaSep1 rf <* symbol "}")
+>         ,exprSuffix ex <**> bchoice [testPost, pure StExpr]]
 >            
 
-very hacky
-
-how to deal with this awful mess?
-1. don't be lazy and wrap expr like epexpr does
-just reproduce the whole ast of expr and pattern in a new type
-2. don't be lazy and try to wrap this around the expr parser
-refactor all the parsing to parse patterns or expressions
-then can add the guards and wrappers to be able to parse either, or
-only parse on or the other depending on the context. switching might
-need to be scoped?
-this will be a little dynamic, because we will assume when e.g. it's
-in expression only mode, it will parse something that will convert to
-an expr without the possibility of failing, which the type system
-won't check. I think the alternative is a lot more duplication of
-parsing code, which is worse, but either method is viable
+> shadowLet :: Parser Stmt
+> shadowLet = keyword_ "shadow" *>
+>     (f <$> identifier <*> ((symbol_ "=" <?> "") *> expr))
+>   where
+>     f i v = LetDecl (PatName Shadow i) v
 
 
-> data EPExpr = EPExpr Expr
->             | EPSel EPSelector
->             | EPParens EPExpr
->             | EPApp Expr [EPExpr]
->             | EPShadowIden String
->             | EPAsP EPExpr Shadow String
->             deriving (Eq,Show) 
-
-> data EPSelector = EPTupleP [EPExpr]
->                 | EPSelector Selector
->             deriving (Eq,Show) 
-
-> epSelToSel :: EPSelector -> Maybe Selector
-> epSelToSel (EPSelector s) = Just s
-> epSelToSel (EPTupleP es) = do
->     es' <- mapM epExprToExpr es
->     pure $ TupleSel es'
-
-> epExprToExpr :: EPExpr -> Maybe Expr
-> epExprToExpr (EPExpr e) = Just e
-> epExprToExpr (EPSel s) = Sel <$> epSelToSel s
-> epExprToExpr (EPParens e) = Parens <$> epExprToExpr e
-> epExprToExpr (EPApp e es) = do
->     es' <- mapM epExprToExpr es
->     pure $ App e es'
-> epExprToExpr (EPShadowIden {}) = Nothing
-> epExprToExpr (EPAsP {}) = Nothing
-
-
-> epExprToPat :: EPExpr -> Maybe Pat
-> epExprToPat (EPExpr (Iden i)) = Just $ IdenP (PatName NoShadow i)
-> epExprToPat (EPApp (Iden f) ps) = do
->     ps' <- mapM epExprToPat ps
->     pure $ VariantP Nothing f ps'
-> epExprToPat (EPSel (EPTupleP ps)) = do
->     ps' <- mapM epExprToPat ps
->     pure $ TupleP ps'
-> epExprToPat (EPSel (EPSelector (TupleSel es))) = do
->     ps' <- mapM (epExprToPat . EPExpr) es
->     pure $ TupleP ps'
-> epExprToPat (EPExpr (Sel (TupleSel es))) = do
->     ps' <- mapM (epExprToPat . EPExpr) es
->     pure $ TupleP ps'
-> epExprToPat (EPExpr (App (Iden f) es)) = do
->     ps' <- mapM (epExprToPat . EPExpr) es
->     pure $ VariantP Nothing f ps'
-
-> epExprToPat (EPAsP p s i) = do
->     p' <- epExprToPat p
->     pure $ AsP p' (PatName s i)
-> epExprToPat (EPShadowIden i) = Just $ IdenP (PatName Shadow i)
-> epExprToPat _ = Nothing
-
-todo: when the flags are added to tell the parser whether to accept
-expressions or patterns or both, the error message should say
-'expression' if expressions are accepted, and if only patterns are
-accepted, it should say 'pattern', so if both are possible, it
-should just say expression
-
-> epExpr :: Parser EPExpr
-> epExpr = do
->     x <- bchoice
->         [(EPShadowIden <$> (keyword_ "shadow" *> identifier))
->         ,(EPParens <$> parens epExpr)
->         ,tupleOrRecordP
->         ,EPExpr <$> expr]
->     bchoice [(EPAsP x <$> (keyword_ "as" *> boption NoShadow (Shadow <$ keyword_ "shadow"))
->                     <*> identifier)
->             ,pure x]
-
-
-1. create ExprOrPattern
-   add as, shadow iden
-2. rewrite the exprToPattern to work on this
-3. write eorptoExpr
-4. see everything work5
-5. add wrappers for just expr and just pattern
-   switch them in
-   adjust to use a flag in the parser to allow either either, just
-   exprs or just patterns?
-   can also add a flag to allow test operators or not
-
-
-> pat :: Parser Pat
-> pat = bchoice
->       [TupleP <$> ((symbol_ "{" <?> "") *> xSep ';' pat <* symbol_ "}")
->       ,IdenP <$> (PatName <$> (Shadow <$ keyword_ "shadow")
->                           <*> identifier)
->       ,do
->        i <- identifier
->        choice [do
->                j <- char '.' *> identifier
->                choice [do
->                        as <- parens (commaSep pat)
->                        pure $ VariantP (Just i) j as
->                       ,pure $ VariantP (Just i) j []]
->               ,choice [do
->                        as <- parens (commaSep pat)
->                        pure $ VariantP Nothing i as
->                       ,pure $ IdenP (PatName NoShadow i)]]
->       <**> boption id asPatSuffix]
 
 > patName :: Parser PatName
 > patName = PatName <$> boption NoShadow (Shadow <$ keyword_ "shadow")
 >                   <*> identifier
 
+a case pattern can be:
+an (optionally dotted) identifier
+a (optionally dotted) shadow identifier
+a arged variant which is an (optionally dotted) identifier then parens commasep case pattern
+a case pattern with an as suffix
+
+a dotted identifier will parse as a variant with no args, it's a bit hacky
+
+> casePat :: Parser Pat
+> casePat = patTerm <**> boption id asPatSuffix
+>   where
+>     patTerm = choice
+>         [do
+>          keyword_ "shadow"
+>          i <- identifier
+>          pure (IdenP $ PatName Shadow i)
+>         ,do
+>          i <- identifier
+>          choice [do
+>                j <- char '.' *> identifier
+>                choice [do
+>                        as <- parens (commaSep casePat)
+>                        pure $ VariantP (Just i) j as
+>                       ,pure $ VariantP (Just i) j []]
+>               ,choice [do
+>                        as <- parens (commaSep casePat)
+>                        pure $ VariantP Nothing i as
+>                       ,pure $ IdenP (PatName NoShadow i)]]]
+>     
+
 > asPatSuffix :: Parser (Pat -> Pat)
 > asPatSuffix = f <$> (keyword_ "as" *> patName)
 >    where
 >      f a b = AsP b a
-
-> {-vntPSuffix :: Parser (Pat -> Pat)
-> vntPSuffix = do
->     x <- parens (commaSep pat)
->     pure (\(IdenP NoShadow y) -> VariantP y x)-}
 
 > whenStmt :: Parser Stmt
 > whenStmt = When <$> (keyword_ "when" *> expr)
@@ -836,7 +745,7 @@ should just say expression
 > funDecl :: Parser Stmt
 > funDecl = FunDecl
 >     <$> (keyword "fun" *> patName)
->     <*> parens (commaSep pat)
+>     <*> parens (commaSep patName)
 >     <*> (symbol_ ":" *> (unwrapSingle <$>
 >          (Block <$> some stmt)))
 >     <*> (boptional whereBlock <* keyword_ "end")

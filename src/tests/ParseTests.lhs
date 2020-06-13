@@ -229,8 +229,8 @@ todo: review all the whitespace rules that are being ignored
 >       \  | link(f, r) => \"link\"\n\
 >       \end"
 >      ,Cases "List" (Construct (Iden "list") [num 1, num 2, num 3])
->         [(idenPat "empty", Sel $ Text "empty")
->         ,(VariantP Nothing "link" [idenPat "f", idenPat "r"], Sel $ Text "link")]
+>         [(IdenP $ idenPat "empty", Sel $ Text "empty")
+>         ,(VariantP Nothing "link" [IdenP $ idenPat "f", IdenP $ idenPat "r"], Sel $ Text "link")]
 >         Nothing)
 
 >     ,("cases(List) [list: 1,2,3]:\n\
@@ -238,10 +238,10 @@ todo: review all the whitespace rules that are being ignored
 >       \  | else => \"else\"\n\
 >       \end"
 >      ,Cases "List" (Construct (Iden "list") [num 1, num 2, num 3])
->         [(idenPat "empty", Sel $ Text "empty")]
+>         [(IdenP $ idenPat "empty", Sel $ Text "empty")]
 >         (Just $ Sel $ Text "else"))
 
->     ,("cases(List) [list: {\"a\"; 1}, {\"b\"; 2}, {\"c\"; 3}]:\n\
+>     {-,("cases(List) [list: {\"a\"; 1}, {\"b\"; 2}, {\"c\"; 3}]:\n\
 >       \  | empty => \"empty\"\n\
 >       \  | link({x;y}, r) => x\n\
 >       \  | else => \"else\"\n\
@@ -251,18 +251,18 @@ todo: review all the whitespace rules that are being ignored
 >                                             ,Sel $ TupleSel [Sel $ Text "c", num 3]])
 >         [(idenPat "empty", Sel $ Text "empty")
 >         ,(VariantP Nothing "link" [TupleP [idenPat "x", idenPat "y"], idenPat "r"], Iden "x")]
->         (Just $ Sel $ Text "else"))
+>         (Just $ Sel $ Text "else"))-}
 
 >     ,("cases(z.List) [list: {\"a\"; 1}, {\"b\"; 2}, {\"c\"; 3}]:\n\
 >       \  | z.empty => \"empty\"\n\
->       \  | z.link({x;y}, r) => x\n\
+>       \  | z.link(f, r) => x\n\
 >       \  | else => \"else\"\n\
 >       \end"
 >      ,Cases "z.List" (Construct (Iden "list") [Sel $ TupleSel [Sel $ Text "a", num 1]
 >                                               ,Sel $ TupleSel [Sel $ Text "b", num 2]
 >                                               ,Sel $ TupleSel [Sel $ Text "c", num 3]])
 >         [(VariantP (Just "z") "empty" [], Sel $ Text "empty")
->         ,(VariantP (Just "z") "link" [TupleP [idenPat "x", idenPat "y"], idenPat "r"], Iden "x")]
+>         ,(VariantP (Just "z") "link" [IdenP $ idenPat "f", IdenP $ idenPat "r"], Iden "x")]
 >         (Just $ Sel $ Text "else"))
 
 
@@ -270,8 +270,8 @@ todo: review all the whitespace rules that are being ignored
 >       ]
 >  where
 >    num = Sel . Num
->    idenPat x = IdenP (PatName NoShadow x)
->    idenPatShadow x = IdenP (PatName Shadow x)
+>    idenPat x = PatName NoShadow x
+>    idenPatShadow x = PatName Shadow x
 
 > parseStmtExamples :: [(String, Stmt)]
 > parseStmtExamples =
@@ -279,7 +279,7 @@ todo: review all the whitespace rules that are being ignored
 >      ,When (BinOp (Iden "x") "==" (Sel $ Num 3)) (Sel $ Num 4))
 >     ,("var a = 5", VarDecl (idenPat "a") (num 5))
 >     ,("a := 6", SetVar "a" (num 6))
->     ,("{x; y} = {1; 2}"
+>     {-,("{x; y} = {1; 2}"
 >      ,LetDecl (TupleP [idenPat "x", idenPat "y"])
 >       (Sel $ TupleSel [num 1, num 2]))
 
@@ -294,7 +294,7 @@ todo: review all the whitespace rules that are being ignored
 
 >     ,("{w; x} as shadow wx = z"
 >      ,LetDecl (AsP (TupleP [idenPat "w", idenPat "x"]) (PatName Shadow "wx"))
->       (Iden "z"))
+>       (Iden "z"))-}
 
 
 
@@ -429,15 +429,15 @@ end
 >     ,("var shadow a = 1"
 >      ,VarDecl (idenPatShadow "a") (num 1))
 
->     ,("{shadow x12; shadow y12} = x"
+>     {-,("{shadow x12; shadow y12} = x"
 >      ,LetDecl (TupleP [idenPatShadow "x12", idenPatShadow "y12"])
->       (Iden "x"))
+>       (Iden "x"))-}
 
 >     ]
 >  where
 >    num = Sel . Num
->    idenPat x = IdenP (PatName NoShadow x)
->    idenPatShadow x = IdenP (PatName Shadow x)
+>    idenPat x = PatName NoShadow x
+>    idenPatShadow x = PatName Shadow x
 
 > parseModuleExamples :: [(String,Module)]
 > parseModuleExamples =

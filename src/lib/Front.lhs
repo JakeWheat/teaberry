@@ -1592,24 +1592,21 @@ parse
 >         e' <- convExpr e
 >         Right $ lam ps' e'
 >       where
->         pf (S.IdenP (S.PatName _ x)) = Right x
->         pf x = Left $ "parse: unsupported pattern " ++ show x
+>         pf (S.PatName _ x) = Right x
 > convExpr (S.Let bs e) = do
 >         bs' <- mapM bf bs
 >         e' <- convExpr e
 >         Right $ Let bs' e'
 >       where
->         bf (S.IdenP (S.PatName _ x), ex) =
+>         bf (S.PatName _ x, ex) =
 >             (x,) <$> convExpr ex
->         bf x = Left $ "parse: unsupported binding " ++ show x
 > convExpr (S.LetRec bs e) = do
 >         bs' <- mapM bf bs
 >         e' <- convExpr e
 >         Right $ LetRec bs' e'
 >       where
->         bf (S.IdenP (S.PatName _ x), ex) =
+>         bf (S.PatName _ x, ex) =
 >             (x,) <$> convExpr ex
->         bf x = Left $ "unsupported binding " ++ show x
 
 > convExpr (S.Block sts) = Block <$> mapM convSt sts
 
@@ -1643,7 +1640,6 @@ parse
 > convPat :: S.Pat -> Either String Pat
 > convPat (S.IdenP nm) = IdenP <$> convPatName nm
 > convPat (S.VariantP q nm ps) = VariantP q nm <$> mapM convPat ps
-> convPat (S.TupleP ps) = TupleP <$> mapM convPat ps
 > convPat (S.AsP p pn) = AsP <$> convPat p <*> convPatName pn
 
 > convPatName :: S.PatName -> Either String PatName
@@ -1658,18 +1654,17 @@ parse
 > convSt :: S.Stmt -> Either String Stmt
 > convSt (S.StExpr e) = StExpr <$> convExpr e
 > convSt (S.When c t) = When <$> convExpr c <*> convExpr t
-> convSt (S.LetDecl (S.IdenP (S.PatName _ nm)) v) = LetDecl nm <$> convExpr v
-> convSt (S.RecDecl (S.IdenP (S.PatName _ nm)) v) = RecDecl nm <$> convExpr v
+> convSt (S.LetDecl (S.PatName _ nm) v) = LetDecl nm <$> convExpr v
+> convSt (S.RecDecl (S.PatName _ nm) v) = RecDecl nm <$> convExpr v
 > convSt (S.FunDecl (S.PatName _ nm) ps bdy whr) = do
 >     whr' <- case whr of
 >                 Nothing -> pure Nothing
 >                 Just w -> Just <$> mapM convSt w
 >     FunDecl nm <$> mapM pf ps <*> convExpr bdy <*> pure whr'
 >   where 
->     pf (S.IdenP (S.PatName _ x)) = Right x
->     pf x = Left $ "unsupported pattern " ++ show x
+>     pf (S.PatName _ x) = Right x
 > convSt (S.Check nm bdy) = Check nm <$> mapM convSt bdy
-> convSt (S.VarDecl (S.IdenP (S.PatName _ nm)) v) = VarDecl nm <$> convExpr v
+> convSt (S.VarDecl (S.PatName _ nm) v) = VarDecl nm <$> convExpr v
 > convSt (S.SetVar n e) = SetVar n <$> convExpr e
 > convSt (S.SetRef e ss) = SetRef <$> convExpr e <*> mapM f ss
 >    where
@@ -1717,7 +1712,7 @@ pretty
 >   where isOp x = not $ any (\z -> isAlphaNum z || z `elem` "_") x
 > 
 > unconv (App e fs) = S.App (unconv e) $ map unconv fs
-> unconv (Lam ns e) = S.Lam (map unconvPat ns) $ unconv e
+> unconv (Lam ns e) = S.Lam (map unconvPatToPatName ns) $ unconv e
 > unconv (Let bs e) = S.Let (map (uncurry unconvBinding) bs) (unconv e)
 > unconv (LetRec bs e) = S.LetRec (map (uncurry unconvBinding) bs) (unconv e)
 > unconv (Block sts) = S.Block $ map unconvStmt sts
@@ -1750,8 +1745,9 @@ pretty
 > unconvPat :: Pat -> S.Pat
 > unconvPat (IdenP pn) = S.IdenP (unconvPatName pn)
 > unconvPat (VariantP q nm ps) = S.VariantP q nm (map unconvPat ps)
-> unconvPat (TupleP ps) = S.TupleP (map unconvPat ps)
 > unconvPat (AsP p pn) = S.AsP (unconvPat p) (unconvPatName pn)
+
+> unconvPatToPatName (IdenP (PatName _ x)) = S.PatName S.NoShadow x
 
 > unconvPatName :: PatName -> S.PatName
 > unconvPatName (PatName sh n) = S.PatName sh' n
@@ -1765,7 +1761,7 @@ pretty
 > unconvStmt (RecDecl n e) = uncurry S.RecDecl (unconvBinding n e)
 > unconvStmt (LetSplatDecl re) = S.StExpr (S.App (S.Iden "letsplatdecl") [unconv re])
 > unconvStmt (FunDecl nm ps bdy w) =
->     S.FunDecl (S.PatName S.NoShadow nm) (map unconvPattern ps) (unconv bdy) (fmap (map unconvStmt) w)
+>     S.FunDecl (S.PatName S.NoShadow nm) (map (S.PatName S.NoShadow) ps) (unconv bdy) (fmap (map unconvStmt) w)
 > unconvStmt (StExpr e) = S.StExpr (unconv e)
 > unconvStmt (When c t) = S.When (unconv c) (unconv t)
 > unconvStmt (Check nm bs) = S.Check nm $ map unconvStmt bs
@@ -1782,8 +1778,8 @@ pretty
 >      uf (Ref,x) = (S.Ref,x)
 >      uf (Con,x) = (S.Con,x)
 
-> unconvBinding :: String -> Expr -> (S.Pat, S.Expr)
-> unconvBinding n v = (unconvPattern n, unconv v)
+> unconvBinding :: String -> Expr -> (S.PatName, S.Expr)
+> unconvBinding n v = (S.PatName S.NoShadow n, unconv v)
 
 > unconvPattern :: String -> S.Pat
 > unconvPattern n = S.IdenP (S.PatName S.NoShadow n)
@@ -1806,7 +1802,7 @@ pretty
 >   where isOp x = not $ any (\z -> isAlphaNum z || z `elem` "_") x
 > 
 > unconvI (IApp e fs) = S.App (unconvI e) $ map unconvI fs
-> unconvI (ILam ns e) = S.Lam (map unconvIPattern ns) $ unconvI e
+> unconvI (ILam ns e) = S.Lam (map unconvIPatName ns) $ unconvI e
 > unconvI (ILet bs e) = S.Let (map (uncurry unconvIBinding) bs) (unconvI e)
 > unconvI (ISeq a b) = S.Block $ map (S.StExpr . unconvI) [a, b]
 > unconvI (IIf bs e) = S.If (map f bs) (fmap unconvI e)
@@ -1817,8 +1813,11 @@ pretty
 > unconvI (IUnbox e) = S.App (S.Iden "unbox") [unconvI e]
 > unconvI (ILetSplat re e) = S.App (S.Iden "letsplat") [unconvI re, unconvI e]
 
-> unconvIBinding :: String -> IExpr -> (S.Pat, S.Expr)
-> unconvIBinding n v = (unconvIPattern n, unconvI v)
+> unconvIBinding :: String -> IExpr -> (S.PatName, S.Expr)
+> unconvIBinding n v = (unconvIPatName n, unconvI v)
+
+> unconvIPatName :: String -> S.PatName
+> unconvIPatName n = S.PatName S.NoShadow n
 
 > unconvIPattern :: String -> S.Pat
 > unconvIPattern n = S.IdenP (S.PatName S.NoShadow n)

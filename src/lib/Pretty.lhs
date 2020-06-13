@@ -71,7 +71,7 @@
 > expr (UnaryMinus e) = text "-" <> expr e
 > expr (BinOp a op b) = expr a <+> text op <+> expr b
 > expr (Lam bs e) = vcat
->     [text "lam" <> parens (commaSep $ map pat bs) <> text ":"
+>     [text "lam" <> parens (commaSep $ map patName bs) <> text ":"
 >     ,nest 2 (expr e)
 >     ,text "end"]
 > expr (Let bs e) =
@@ -103,16 +103,15 @@
 
 > expr (UnboxRef e f) = expr e <> text "!" <> text f
 
-> binding :: Pat -> Expr -> Doc
+> binding :: PatName -> Expr -> Doc
 > binding n e =
->     pat n <+> text "=" <+> nest 2 (expr e)
+>     patName n <+> text "=" <+> nest 2 (expr e)
 
 
 > pat :: Pat -> Doc
 > pat (IdenP pn) = patName pn
 > pat (VariantP q c ps) = maybe empty (\a -> text a <> text ".") q
 >                         <> text c <> parens (commaSep $ map pat ps)
-> pat (TupleP ps) = text "{" <> (xSep ";" $ map pat ps) <> text "}"
 > pat (AsP p pn) = pat p <+> text "as" <+> patName pn
 
 > patName :: PatName -> Doc
@@ -127,7 +126,7 @@
 
 > stmt (LetDecl n e) = binding n e
 
-> stmt (VarDecl pn e) = text "var" <+> pat pn <+> text "=" <+> expr e
+> stmt (VarDecl pn e) = text "var" <+> patName pn <+> text "=" <+> expr e
 > stmt (SetVar n e) = text n <+> text ":=" <+> nest 2 (expr e)
 > stmt (SetRef e fs) = expr e <> text "!{" <> commaSep (map f fs) <> text "}"
 >   where
@@ -135,7 +134,7 @@
 
 > stmt (RecDecl n e) = text "rec" <+> binding n e
 > stmt (FunDecl pn as e w) = vcat
->      [text "fun" <+> patName pn <+> parens (commaSep $ map pat as) <> text ":"
+>      [text "fun" <+> patName pn <+> parens (commaSep $ map patName as) <> text ":"
 >      ,nest 2 (expr e)
 >      ,maybe empty whereBlock w
 >      ,text "end"]

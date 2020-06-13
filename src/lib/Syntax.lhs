@@ -54,13 +54,13 @@ import * from <import-source>
 
 > data Stmt = StExpr Expr
 >           | When Expr Expr
->           | LetDecl Pat Expr
->           | RecDecl Pat Expr
+>           | LetDecl PatName Expr
+>           | RecDecl PatName Expr
 >           | FunDecl PatName -- name
->                     [Pat] -- args
+>                     [PatName] -- args
 >                     Expr -- body
 >                     (Maybe [Stmt]) -- test block
->           | VarDecl Pat Expr -- todo: make patname
+>           | VarDecl PatName Expr -- todo: make patname
 >           | SetVar String Expr
 >           | SetRef Expr [(String,Expr)]
 >           | DataDecl String [VariantDecl] (Maybe [Stmt])
@@ -75,21 +75,13 @@ import * from <import-source>
 > data Ref = Ref | Con
 >          deriving (Eq,Show,Data) 
 
-revisit patterns again?
-recdecl, vardecl: patname only
-letdecl: do patname only
-  and do another let for tuple binding?
-same with let
-would this make things simpler?
-cases has a different pattern
-  it doesn't support tuple, but supports the rest
-the problem with these sort of changes is you end up in the mess
-that is parse expression or pattern
-this needs a good rethink first
+compared with pyret:
+no tuple binding
+can use 'as' in variant binding in cases (todo: explore this)
+variant bindings can be nested
 
 > data Pat = IdenP PatName
 >          | VariantP (Maybe String) String [Pat]
->          | TupleP [Pat]
 >          | AsP Pat PatName
 >           deriving (Eq,Show,Data) 
 
@@ -112,9 +104,9 @@ this needs a good rethink first
 >           | App Expr [Expr]
 >           | UnaryMinus Expr
 >           | BinOp Expr String Expr
->           | Lam [Pat] Expr
->           | Let [(Pat,Expr)] Expr
->           | LetRec [(Pat,Expr)] Expr
+>           | Lam [PatName] Expr
+>           | Let [(PatName,Expr)] Expr
+>           | LetRec [(PatName,Expr)] Expr
 >           | Block [Stmt]
 >           | UnboxRef Expr String
 >           deriving (Eq,Show,Data) 
