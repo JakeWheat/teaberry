@@ -7,7 +7,6 @@ The high level syntax which the parser produces
 > module Syntax (Stmt(..)
 >               ,Shadow(..)
 >               ,Expr(..)
->               ,Selector(..)
 >               ,VariantDecl(..)
 >               ,Pat(..)
 >               ,PatName(..)
@@ -92,7 +91,10 @@ variant bindings can be nested
 >           deriving (Eq,Show,Data) 
 
 
-> data Expr = Sel Selector
+> data Expr = Num Scientific
+>           | Text String
+>           | TupleSel [Expr]
+>           | RecordSel [(String,Expr)]
 >           | Iden String
 >           | Parens Expr
 >           | TupleGet Expr Int
@@ -110,12 +112,4 @@ variant bindings can be nested
 >           | Block [Stmt]
 >           | UnboxRef Expr String
 >           deriving (Eq,Show,Data) 
-
-todo: merge this into expr
-
-> data Selector = Num Scientific
->               | Text String
->               | TupleSel [Expr]
->               | RecordSel [(String,Expr)]
->               deriving (Eq,Show,Data) 
 

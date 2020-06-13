@@ -104,7 +104,6 @@ for things like expressions, patterns, terms, etc.
 
 > import Syntax (Stmt(..)
 >               ,Expr(..)
->               ,Selector(..)
 >               ,VariantDecl(..)
 >               ,Shadow(..)
 >               ,Pat(..)
@@ -300,7 +299,7 @@ consider what other numbers to support, e.g. integer, positive
 > numE = do
 >     x <- num
 >     maybe (fail $ "parsing number failed: " ++ x)
->           (pure . Sel . Num) (readMaybe x)
+>           (pure . Num) (readMaybe x)
 
 todo: escape quotes
 and make sure it doesn't parse newlines when it shouldn't
@@ -311,7 +310,7 @@ and make sure it doesn't parse newlines when it shouldn't
 >             <?> "string literal"
 
 > stringE :: Parser Expr
-> stringE = (Sel . Text) <$> stringRaw
+> stringE = Text <$> stringRaw
 >             <?> "string literal"
 
 > appSuffix :: Parser (Expr -> Expr)
@@ -434,9 +433,12 @@ todo: remove the trys by implementing a proper lexer or a lexer style
 >             <*> (commaSep expr <* symbol_ "]")
 >
 
+todo: this was parameterized when it could parse a tuple pattern also,
+ these have been removed so could simplify this code
+
 > tupleOrRecord :: Parser Expr
-> tupleOrRecord = tupleOrRecord2 (Sel . RecordSel)
->                                (Sel . TupleSel)
+> tupleOrRecord = tupleOrRecord2 RecordSel
+>                                TupleSel
 >                                expr
 >                                (\case
 >                                      Iden i -> Just i

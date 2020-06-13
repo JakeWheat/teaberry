@@ -111,8 +111,10 @@ syntax
 >           deriving (Eq,Show,Data) 
 
 
-> data Expr = -- selectors
->             Sel Selector
+> data Expr = Num Scientific
+>           | Text String
+>           | TupleSel [Expr]
+>           | RecordSel [(String,Expr)]
 >           -- todo: see if can remove this
 >           | VariantSel String [(String,Expr)]
 >           | Iden String
@@ -138,13 +140,6 @@ syntax
 >           | Unbox Expr
 >           | Catch Expr Expr
 >           deriving (Eq, Show, Data)
-
-> data Selector = Num Scientific
->               | Text String
->               | TupleSel [Expr]
->               | RecordSel [(String,Expr)]
->               deriving (Eq,Show,Data) 
-
 
 interpreter syntax
 
@@ -907,7 +902,7 @@ desugaring
 >          -- for repl support, splat out the contents of the last module
 >          -- and return the last value of this module plus the env           
 >          sf <- desugarStmts [LetSplatDecl (tg 1)
->                             ,StExpr $ Sel $ TupleSel [tg 0, tg 1]]
+>                             ,StExpr $ TupleSel [tg 0, tg 1]]
 >          let y = (combineEm srcs') sf
 >          pure y
 >     tg i = TupleGet (Iden ("module." ++ nm)) i
@@ -937,7 +932,7 @@ add the last statement which returns the last value and the env, for
 >     stmts' <- addTopRet stmts
 >     desugarStmts (ps' ++ stmts')
 >   where
->     mk x = StExpr $ Sel $ TupleSel [x, App (Iden "env-to-record") []]
+>     mk x = StExpr $ TupleSel [x, App (Iden "env-to-record") []]
 >     addTopRet [] = pure [mk nothingSyntaxHack]
 >     addTopRet [StExpr x] = do
 >         z <- makeUniqueVar "z"
@@ -973,9 +968,9 @@ add the last statement which returns the last value and the env, for
 > desugar :: Expr -> Desugarer IExpr
 
 > desugar (Block sts) = desugarStmts sts
-> desugar (Sel (Num i)) = pure $ INum i
-> desugar (Sel (Text i)) = pure $ IText i
-> desugar (Sel (TupleSel fs)) =
+> desugar (Num i) = pure $ INum i
+> desugar (Text i) = pure $ IText i
+> desugar (TupleSel fs) =
 >     desugar $ VariantSel "tuple" $ zipWith f [(0::Int)..] fs
 >   where
 >     f n v = (show n,v)
@@ -983,7 +978,7 @@ add the last statement which returns the last value and the env, for
 >   where
 >     f (n,v) = (n,) <$> desugar v
 
-> desugar (Sel (RecordSel fs)) = desugar (VariantSel "record" fs)
+> desugar (RecordSel fs) = desugar (VariantSel "record" fs)
 
 > desugar (Iden i) = pure $ IIden i
 
@@ -1000,7 +995,7 @@ add the last statement which returns the last value and the env, for
 >     desugar $ Block
 >               [LetDecl (patName uniqueV0) a
 >               ,LetDecl (patName uniqueV1) b
->               ,LetDecl (patName uniqueName) (Sel $ Text $ pretty a ++ " is " ++ pretty b)
+>               ,LetDecl (patName uniqueName) (Text $ pretty a ++ " is " ++ pretty b)
 >               ,StExpr $
 >                If [(eqIdens uniqueV0 uniqueV1
 >                   ,appI "log-test-pass" [Iden checkBlockIDName
@@ -1008,9 +1003,9 @@ add the last statement which returns the last value and the env, for
 >                   (Just $ appI "log-test-fail"
 >                    [Iden checkBlockIDName
 >                    ,Iden uniqueName
->                    ,Sel (Text "Values not equal:\n")
+>                    ,Text "Values not equal:\n"
 >                        `plus` appI "torepr" [Iden uniqueV0]
->                        `plus` Sel (Text "\n")
+>                        `plus` Text "\n"
 >                        `plus` appI "torepr" [Iden uniqueV1]])]
 >   where
 >     plus c d = appI "+" [c, d]
@@ -1082,7 +1077,7 @@ add the last statement which returns the last value and the env, for
 >     f (c,t) = (,) <$> desugar c <*> desugar t
   
 > desugar (DotExpr e f) = do
->     desugar (App (Iden "variant-field-get") [Sel $ Text f, e])
+>     desugar (App (Iden "variant-field-get") [Text f, e])
 
 > desugar (Box v) = IBox <$> desugar v
 
@@ -1118,12 +1113,12 @@ xxx.make([list: <elements>])
 >     desugar $ Let [(patName tv, t)] $ If bs' els
 >   where
 >     f tv (VariantP _q vnm fnms, e) | Just fnms' <- mapM getPn fnms =
->         let tst = appI "safe-variant-name" [Iden tv] `equals` (Sel $ Text vnm)
->             thn = zipWith (\fnm n -> LetDecl (patName fnm) (appI "variant-field-get-ord" [Sel $ Num $ fromIntegral n, Iden tv]))
+>         let tst = appI "safe-variant-name" [Iden tv] `equals` Text vnm
+>             thn = zipWith (\fnm n -> LetDecl (patName fnm) (appI "variant-field-get-ord" [Num $ fromIntegral n, Iden tv]))
 >                           fnms' [(0::Int)..]
 >         in pure (tst, Block (thn ++ [StExpr e]))
 >     f tv (IdenP (PatName NoShadow vnm), e) =
->         let tst = appI "safe-variant-name" [Iden tv] `equals` (Sel $ Text vnm)
+>         let tst = appI "safe-variant-name" [Iden tv] `equals` (Text vnm)
 >         in pure (tst, Block [StExpr e])
 >     f _ x = lift $ throwE $ "unsupported pattern in cases: " ++ show x
 >     getPn (IdenP (PatName _ x)) = Just x
@@ -1153,7 +1148,7 @@ xxx.make([list: <elements>])
 >                  [LetDecl (patName uniqueCheckBlockIDVarName) uniqueCheckBlockID
 >                  ,StExpr $ appI "log-check-block"
 >                              [Iden uniqueCheckBlockIDVarName
->                              ,Sel $ Text blockName]]
+>                              ,Text blockName]]
 >                  ++ bdy)]
 >     exitCheckBlock
 >     case es of
@@ -1232,7 +1227,7 @@ testing hack
 >    makeIsVar vnm = do
 >        arg <- makeUniqueVar "is-x"
 >        pure $ LetDecl (patName $ "is-" ++ vnm)
->               (lam [arg] (appI "safe-variant-name" [Iden arg] `equals` Sel (Text vnm)))
+>               (lam [arg] (appI "safe-variant-name" [Iden arg] `equals` Text vnm))
 >    makeIsDat = do
 >        arg <- makeUniqueVar "is-dat"
 >        let varChecks = map (\vnm -> appI ("is-" ++ vnm) [Iden arg]) varntNms
@@ -1245,7 +1240,7 @@ testing hack
 if there are no args to the variant, it's a binding to a non lambda
 value, not a lambda
 
->    makeVarnt (VariantDecl vnm []) = pure $ LetDecl (patName vnm) (appI "make-variant" [Sel $ Text vnm, listSel []])
+>    makeVarnt (VariantDecl vnm []) = pure $ LetDecl (patName vnm) (appI "make-variant" [Text vnm, listSel []])
 
   | pt(x,y) ->
 pt = lam (x,y): I.App "make-variant" ["pt",[list: {false, "x";x},{false, "y";y}]]
@@ -1257,11 +1252,11 @@ pt = lam (x,y): I.App "make-variant" ["pt",[list: {true, "x";x},{false, "y";y}]]
 >    makeVarnt (VariantDecl vnm fs) =
 >        let fields = listSel $ map makeVField fs
 >        in pure $ LetDecl (patName vnm)
->                  (lam (map snd fs) $ appI "make-variant" [Sel $ Text vnm, fields])
->    makeVField (x,f) = Sel $ TupleSel [case x of
+>                  (lam (map snd fs) $ appI "make-variant" [Text vnm, fields])
+>    makeVField (x,f) = TupleSel [case x of
 >                                     Ref -> Iden "true"
 >                                     Con -> Iden "false"
->                                ,Sel $ Text f, Iden f]
+>                                ,Text f, Iden f]
 >    listSel xs = Construct (Iden "list") xs
 >    appI i as = App (Iden i) as
 >    equals a b = App (Iden "==") [a,b]
@@ -1316,20 +1311,20 @@ catch(
 >     v1 <- makeUniqueVar "isv1"
 >     pure $ Catch
 >         (Block [StExpr e
->                ,LetDecl (patName nameit) $ Sel $ Text syn
+>                ,LetDecl (patName nameit) $ Text syn
 >                ,StExpr $ appx "log-test-fail" [Iden checkBlockIDName
 >                                              ,Iden nameit
->                                              ,Sel $ Text "No exception raised"]])
+>                                              ,Text "No exception raised"]])
 >         (lam ["a"] $ Block
 >          [LetDecl (patName v1) e1
->          ,LetDecl (patName nameit) $ Sel $ Text syn
+>          ,LetDecl (patName nameit) $ Text syn
 >          ,StExpr $ If [(appx v1 [Iden "a"]
 >                        ,appx "log-test-pass" [Iden checkBlockIDName, Iden nameit])]
 >                    $ Just $ appx "log-test-fail"
 >                             [Iden checkBlockIDName
 >                             ,Iden nameit
->                             ,Sel (Text failMsg) `plus`
->                              Sel (Text ", value was ") `plus`
+>                             ,Text failMsg `plus`
+>                              Text ", value was " `plus`
 >                              appx "torepr" [Iden "a"]]])
 >   where
 >       plus a b = appx "+" [a,b]
@@ -1348,7 +1343,7 @@ testing support in the desugarer monad
 >     nm <- makeUniqueVar "check-block-id"
 >     put $ s {nextUnusedCheckBlockID = newID + 1
 >             ,currentCheckBlockIDName = Just nm}
->     pure (nm,Sel $ Num $ fromIntegral newID)
+>     pure (nm,Num $ fromIntegral newID)
 
 > exitCheckBlock :: Desugarer ()
 > exitCheckBlock = modify $ \s -> s {currentCheckBlockIDName = Nothing}
@@ -1565,11 +1560,11 @@ parse
 > convStmts = mapM convSt
 
 > convExpr :: S.Expr -> Either String Expr
-> convExpr (S.Sel (S.Num x)) = Right $ Sel $ Num x
-> convExpr (S.Sel (S.Text x)) = Right $ Sel $ Text x
-> convExpr (S.Sel (S.TupleSel fs)) = (Sel . TupleSel) <$> mapM convExpr fs
+> convExpr (S.Num x) = Right $ Num x
+> convExpr (S.Text x) = Right $ Text x
+> convExpr (S.TupleSel fs) = TupleSel <$> mapM convExpr fs
 
-> convExpr (S.Sel (S.RecordSel fs)) = (Sel . RecordSel) <$> mapM f fs
+> convExpr (S.RecordSel fs) = RecordSel <$> mapM f fs
 >   where
 >     f (a,b) = (a,) <$> convExpr b
 
@@ -1688,15 +1683,15 @@ pretty
 > pretty x = Pr.prettyExpr $ unconv x
 
 > unconv :: Expr -> S.Expr
-> unconv (Sel (Num n)) = S.Sel (S.Num n)
-> unconv (Sel (Text n)) = S.Sel (S.Text n)
-> unconv (Sel (TupleSel fs)) = S.Sel (S.TupleSel $ map unconv fs)
+> unconv (Num n) = S.Num n
+> unconv (Text n) = S.Text n
+> unconv (TupleSel fs) = S.TupleSel $ map unconv fs
 > unconv (VariantSel nm fs) = S.App (S.Iden nm) (map f fs)
 >   where
->     f (n,v) = unconv (Sel $ TupleSel [Sel $ Text n, v])
+>     f (n,v) = unconv (TupleSel [Text n, v])
 > unconv (Construct e es) = S.Construct (unconv e) (map unconv es)  
 
-> unconv (Sel (RecordSel fs)) = S.Sel (S.RecordSel (map f fs))
+> unconv (RecordSel fs) = S.RecordSel (map f fs)
 >   where
 >     f (a,b) = (a,unconv b)
 > unconv (Iden s) = S.Iden s
@@ -1778,11 +1773,11 @@ pretty
 
 > unconvI :: IExpr -> S.Expr
 
-> unconvI (INum n) = S.Sel (S.Num n)
-> unconvI (IText n) = S.Sel (S.Text n)
+> unconvI (INum n) = S.Num n
+> unconvI (IText n) = S.Text n
 > unconvI (IVariantSel nm fs) = S.App (S.Iden nm) (map f fs)
 >   where
->     f (n,v) = S.Sel (S.TupleSel $ map unconvI [IText n, v])
+>     f (n,v) = S.TupleSel $ map unconvI [IText n, v]
 
 > unconvI (IIden s) = S.Iden s
 > unconvI (ICatch e t) = unconvI (IApp (IIden "catch") [e,t])
