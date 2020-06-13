@@ -82,10 +82,10 @@ syntax
 
 > data Stmt = StExpr Expr
 >           | When Expr Expr
->           | LetDecl String Expr
->           | RecDecl String Expr
->           | FunDecl String [String] Expr (Maybe [Stmt])
->           | VarDecl String Expr
+>           | LetDecl PatName Expr
+>           | RecDecl PatName Expr
+>           | FunDecl PatName [PatName] Expr (Maybe [Stmt])
+>           | VarDecl PatName Expr
 >           | SetVar String Expr
 >           | SetRef Expr [(String,Expr)]
 >           | DataDecl String [VariantDecl] (Maybe [Stmt])
@@ -127,8 +127,8 @@ syntax
 >           | UnaryMinus Expr
 >           | BinOp Expr String Expr
 >           | Lam [PatName] Expr
->           | Let [(String,Expr)] Expr
->           | LetRec [(String,Expr)] Expr
+>           | Let [(PatName,Expr)] Expr
+>           | LetRec [(PatName,Expr)] Expr
 >           | Block [Stmt]
 >           | UnboxRef Expr String
 >           -- todo: see if can remove the following - they should be part of the interpreter syntax
@@ -941,7 +941,7 @@ add the last statement which returns the last value and the env, for
 >     addTopRet [] = pure [mk nothingSyntaxHack]
 >     addTopRet [StExpr x] = do
 >         z <- makeUniqueVar "z"
->         pure [LetDecl z x, mk $ Iden z]
+>         pure [LetDecl (patName z) x, mk $ Iden z]
 >     addTopRet (x:xs) = (x:) <$> addTopRet xs
 >     builtins = if skipBuiltins
 >                then []
@@ -950,15 +950,20 @@ add the last statement which returns the last value and the env, for
 >     -- temp before * is supported
 >     bs = ["is-empty","is-link", "empty", "link", "is-List", "nothing", "is-Nothing", "is-nothing"]
 
+> patName :: String -> PatName
+> patName x = PatName NoShadow x
+
+> unPatName :: PatName -> String
+> unPatName (PatName _ x) = x
   
 > desugarPreludeStmt :: PreludeStmt -> Desugarer [Stmt]
 > desugarPreludeStmt (Import is b) = do
 >     n <- importSourceName is
->     pure [LetDecl b (TupleGet (Iden n) 1)]
+>     pure [LetDecl (patName b) (TupleGet (Iden n) 1)]
 
 > desugarPreludeStmt (IncludeFrom nm is) =
 >     pure $ flip map is $ \(ProvideAlias n1 n2) ->
->         LetDecl n2 (DotExpr (TupleGet (Iden ("module." ++ nm)) 1) n1)
+>         LetDecl (patName n2) (DotExpr (TupleGet (Iden ("module." ++ nm)) 1) n1)
 
 > importSourceName :: ImportSource -> Desugarer String
 > importSourceName (ImportSpecial "file" [s]) = pure $ "module." ++ s
@@ -993,9 +998,9 @@ add the last statement which returns the last value and the env, for
 >     checkBlockIDName <- (maybe (lift $ throwE "'is' test outside check block") pure)
 >                         =<< (gets currentCheckBlockIDName)
 >     desugar $ Block
->               [LetDecl uniqueV0 a
->               ,LetDecl uniqueV1 b
->               ,LetDecl uniqueName (Sel $ Text $ pretty a ++ " is " ++ pretty b)
+>               [LetDecl (patName uniqueV0) a
+>               ,LetDecl (patName uniqueV1) b
+>               ,LetDecl (patName uniqueName) (Sel $ Text $ pretty a ++ " is " ++ pretty b)
 >               ,StExpr $
 >                If [(eqIdens uniqueV0 uniqueV1
 >                   ,appI "log-test-pass" [Iden checkBlockIDName
@@ -1037,7 +1042,7 @@ add the last statement which returns the last value and the env, for
 >   where
 >     b (PatName _ x) = pure x
 > desugar (Let bs e) = do
->     let f (n,v) = (n,) <$> desugar v
+>     let f (PatName _ n,v) = (n,) <$> desugar v
 >     ILet <$> mapM f bs <*> desugar e
 
 > desugar (LetRec bs e) = do
@@ -1045,28 +1050,23 @@ add the last statement which returns the last value and the env, for
 >     desugar (Let (mapMaybe convLam bs ++ bsx) e)
 >   where
 >     newName = (++"'")
->     bindNames = map fst bs
+>     bindNames = map (unPatName . fst) bs
 >     bindNames' = map newName bindNames
 >     -- fX = lam (asX): bdyX end -> fX' = lam (f0,f1,...,*asX): bdyX' end
 >     convLam (n,Lam as bdy) =
->         Just (newName n, Lam (map mkP bindNames ++ as) $ patchBody bdy)
+>         Just (patName $ newName $ unPatName n, Lam (map patName bindNames ++ as) $ patchBody bdy)
 >     -- fX = bdyX (something not a lam) -> fX = bdyX'
 >     -- not sure about this one
 >     convLam _ = Nothing --(newName n, patchBody x)
 >     -- fX = lam (asX): bdyX end -> fX = lam(asX): fX'(f0',f1',...,*asX) end
 >     createBind (n,Lam as _bdy) = do
->         as' <- mapM hackGetName as
->         pure (n, Lam as $ App (Iden $ newName n) (map Iden (bindNames' ++ as')))
+>         let as' = map unPatName as
+>         pure (n, Lam as $ App (Iden $ newName $ unPatName n) (map Iden (bindNames' ++ as')))
 >     createBind (n,x) = pure (n, patchBody x)
 >     --bdyN with fN(as) replaced with fN(f0,...fX,*as)
 >     patchBody = transformBi $ \case
 >         App (Iden f) args | f `elem` bindNames -> App (Iden f) (map Iden bindNames ++ args)
 >         x -> x
->     hackGetName (PatName _ n) = pure n
->     mkP i = PatName NoShadow i
-
-> {-desugar (LetSplat re e) =
->     ILetSplat <$> desugar re <*> desugar e-}
   
 > desugar (Seq a b) =
 >     ISeq <$> desugar a <*> desugar b
@@ -1115,11 +1115,11 @@ xxx.make([list: <elements>])
 > desugar (Cases _ty t bs els) = do
 >     tv <- makeUniqueVar "casest"
 >     bs' <- mapM (f tv) bs
->     desugar $ Let [(tv, t)] $ If bs' els
+>     desugar $ Let [(patName tv, t)] $ If bs' els
 >   where
 >     f tv (VariantP _q vnm fnms, e) | Just fnms' <- mapM getPn fnms =
 >         let tst = appI "safe-variant-name" [Iden tv] `equals` (Sel $ Text vnm)
->             thn = zipWith (\fnm n -> LetDecl fnm (appI "variant-field-get-ord" [Sel $ Num $ fromIntegral n, Iden tv]))
+>             thn = zipWith (\fnm n -> LetDecl (patName fnm) (appI "variant-field-get-ord" [Sel $ Num $ fromIntegral n, Iden tv]))
 >                           fnms' [(0::Int)..]
 >         in pure (tst, Block (thn ++ [StExpr e]))
 >     f tv (IdenP (PatName NoShadow vnm), e) =
@@ -1150,7 +1150,7 @@ xxx.make([list: <elements>])
 >     desugaredCheck <- desugar $
 >         appI "add-tests"
 >         [Lam [] (Block $
->                  [LetDecl uniqueCheckBlockIDVarName uniqueCheckBlockID
+>                  [LetDecl (patName uniqueCheckBlockIDVarName) uniqueCheckBlockID
 >                  ,StExpr $ appI "log-check-block"
 >                              [Iden uniqueCheckBlockIDVarName
 >                              ,Sel $ Text blockName]]
@@ -1185,14 +1185,14 @@ testing hack
 >     (recs,es') <- getRecs es [] []
 >     desugar (LetRec recs (Block es'))
 >   where
->     getRecs :: [Stmt] -> [(String,Expr)] -> [Stmt] -> Desugarer ([(String,Expr)], [Stmt])
+>     getRecs :: [Stmt] -> [(PatName,Expr)] -> [Stmt] -> Desugarer ([(PatName,Expr)], [Stmt])
 >     getRecs (RecDecl nm bdy : es') recs whrs =
 >         getRecs es' ((nm,bdy) : recs) whrs
 >     getRecs (FunDecl nm ps bdy whr : es') recs whrs =
->         let bnd = (nm, (lam ps bdy))
+>         let bnd = (nm, (Lam ps bdy))
 >             whrs' = case whr of
 >                   Nothing -> whrs
->                   Just b -> Check (Just nm) b : whrs
+>                   Just b -> Check (Just $ unPatName nm) b : whrs
 >         in getRecs es' (bnd : recs) whrs'
 >     getRecs sts recs whrs  = pure (reverse recs,reverse whrs ++ sts)
 >     isRecOrFun RecDecl {} = True
@@ -1231,7 +1231,7 @@ testing hack
 >    varntNms = map (\(VariantDecl vnm _) -> vnm) varnts
 >    makeIsVar vnm = do
 >        arg <- makeUniqueVar "is-x"
->        pure $ LetDecl ("is-" ++ vnm)
+>        pure $ LetDecl (patName $ "is-" ++ vnm)
 >               (lam [arg] (appI "safe-variant-name" [Iden arg] `equals` Sel (Text vnm)))
 >    makeIsDat = do
 >        arg <- makeUniqueVar "is-dat"
@@ -1240,12 +1240,12 @@ testing hack
 >            f [a] = pure a
 >            f (a:as) = (a `orf`) <$> f as
 >        bdy <- f varChecks
->        pure $ LetDecl ("is-" ++ nm) (lam [arg] bdy)
+>        pure $ LetDecl (patName $ "is-" ++ nm) (lam [arg] bdy)
 
 if there are no args to the variant, it's a binding to a non lambda
 value, not a lambda
 
->    makeVarnt (VariantDecl vnm []) = pure $ LetDecl vnm (appI "make-variant" [Sel $ Text vnm, listSel []])
+>    makeVarnt (VariantDecl vnm []) = pure $ LetDecl (patName vnm) (appI "make-variant" [Sel $ Text vnm, listSel []])
 
   | pt(x,y) ->
 pt = lam (x,y): I.App "make-variant" ["pt",[list: {false, "x";x},{false, "y";y}]]
@@ -1256,7 +1256,7 @@ pt = lam (x,y): I.App "make-variant" ["pt",[list: {true, "x";x},{false, "y";y}]]
 
 >    makeVarnt (VariantDecl vnm fs) =
 >        let fields = listSel $ map makeVField fs
->        in pure $ LetDecl vnm
+>        in pure $ LetDecl (patName vnm)
 >                  (lam (map snd fs) $ appI "make-variant" [Sel $ Text vnm, fields])
 >    makeVField (x,f) = Sel $ TupleSel [case x of
 >                                     Ref -> Iden "true"
@@ -1276,7 +1276,7 @@ setbox(a.b, 2)
   
 > desugarStmts (SetRef e fs : es) = do
 >     enm <- makeUniqueVar "setref"
->     let sts = LetDecl enm e
+>     let sts = LetDecl (patName enm) e
 >         refSets = flip map fs $ \(n,v) -> SetBox (DotExpr (Iden enm) n) v
 >     desugarStmts (sts : (map StExpr refSets ++ es))
 
@@ -1316,13 +1316,13 @@ catch(
 >     v1 <- makeUniqueVar "isv1"
 >     pure $ Catch
 >         (Block [StExpr e
->                ,LetDecl nameit $ Sel $ Text syn
+>                ,LetDecl (patName nameit) $ Sel $ Text syn
 >                ,StExpr $ appx "log-test-fail" [Iden checkBlockIDName
 >                                              ,Iden nameit
 >                                              ,Sel $ Text "No exception raised"]])
 >         (lam ["a"] $ Block
->          [LetDecl v1 e1
->          ,LetDecl nameit $ Sel $ Text syn
+>          [LetDecl (patName v1) e1
+>          ,LetDecl (patName nameit) $ Sel $ Text syn
 >          ,StExpr $ If [(appx v1 [Iden "a"]
 >                        ,appx "log-test-pass" [Iden checkBlockIDName, Iden nameit])]
 >                    $ Just $ appx "log-test-fail"
@@ -1592,14 +1592,14 @@ parse
 >         Right $ Let bs' e'
 >       where
 >         bf (S.PatName _ x, ex) =
->             (x,) <$> convExpr ex
+>             (PatName NoShadow x,) <$> convExpr ex
 > convExpr (S.LetRec bs e) = do
 >         bs' <- mapM bf bs
 >         e' <- convExpr e
 >         Right $ LetRec bs' e'
 >       where
 >         bf (S.PatName _ x, ex) =
->             (x,) <$> convExpr ex
+>             (PatName NoShadow x,) <$> convExpr ex
 
 > convExpr (S.Block sts) = Block <$> mapM convSt sts
 
@@ -1647,17 +1647,17 @@ parse
 > convSt :: S.Stmt -> Either String Stmt
 > convSt (S.StExpr e) = StExpr <$> convExpr e
 > convSt (S.When c t) = When <$> convExpr c <*> convExpr t
-> convSt (S.LetDecl (S.PatName _ nm) v) = LetDecl nm <$> convExpr v
-> convSt (S.RecDecl (S.PatName _ nm) v) = RecDecl nm <$> convExpr v
+> convSt (S.LetDecl (S.PatName _ nm) v) = LetDecl (PatName NoShadow nm) <$> convExpr v
+> convSt (S.RecDecl (S.PatName _ nm) v) = RecDecl (PatName NoShadow nm) <$> convExpr v
 > convSt (S.FunDecl (S.PatName _ nm) ps bdy whr) = do
 >     whr' <- case whr of
 >                 Nothing -> pure Nothing
 >                 Just w -> Just <$> mapM convSt w
->     FunDecl nm <$> mapM pf ps <*> convExpr bdy <*> pure whr'
+>     FunDecl (patName nm) <$> mapM pf ps <*> convExpr bdy <*> pure whr'
 >   where 
->     pf (S.PatName _ x) = Right x
+>     pf (S.PatName _ x) = Right $ patName x
 > convSt (S.Check nm bdy) = Check nm <$> mapM convSt bdy
-> convSt (S.VarDecl (S.PatName _ nm) v) = VarDecl nm <$> convExpr v
+> convSt (S.VarDecl (S.PatName _ nm) v) = VarDecl (patName nm) <$> convExpr v
 > convSt (S.SetVar n e) = SetVar n <$> convExpr e
 > convSt (S.SetRef e ss) = SetRef <$> convExpr e <*> mapM f ss
 >    where
@@ -1752,7 +1752,7 @@ pretty
 > unconvStmt (RecDecl n e) = uncurry S.RecDecl (unconvBinding n e)
 > unconvStmt (LetSplatDecl re) = S.StExpr (S.App (S.Iden "letsplatdecl") [unconv re])
 > unconvStmt (FunDecl nm ps bdy w) =
->     S.FunDecl (S.PatName S.NoShadow nm) (map (S.PatName S.NoShadow) ps) (unconv bdy) (fmap (map unconvStmt) w)
+>     S.FunDecl (S.PatName S.NoShadow $ unPatName nm) (map (S.PatName S.NoShadow . unPatName) ps) (unconv bdy) (fmap (map unconvStmt) w)
 > unconvStmt (StExpr e) = S.StExpr (unconv e)
 > unconvStmt (When c t) = S.When (unconv c) (unconv t)
 > unconvStmt (Check nm bs) = S.Check nm $ map unconvStmt bs
@@ -1769,8 +1769,8 @@ pretty
 >      uf (Ref,x) = (S.Ref,x)
 >      uf (Con,x) = (S.Con,x)
 
-> unconvBinding :: String -> Expr -> (S.PatName, S.Expr)
-> unconvBinding n v = (S.PatName S.NoShadow n, unconv v)
+> unconvBinding :: PatName -> Expr -> (S.PatName, S.Expr)
+> unconvBinding (PatName _ n) v = (S.PatName S.NoShadow n, unconv v)
 
 
 > prettyIExpr :: IExpr -> String

@@ -112,7 +112,6 @@ variant bindings can be nested
 >           deriving (Eq,Show,Data) 
 
 todo: merge this into expr
-have to fix the pattern or expression parser first
 
 > data Selector = Num Scientific
 >               | Text String
