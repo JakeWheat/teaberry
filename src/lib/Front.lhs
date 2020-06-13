@@ -28,7 +28,7 @@ syntax, interpreter, desugarer, tests
 
 
 > import qualified Parse as P
-> import qualified Syntax as S
+> import Syntax
 > import qualified Pretty as Pr
 
 > import qualified ParserExtra as Px
@@ -48,7 +48,7 @@ syntax, interpreter, desugarer, tests
 >
 > import Data.Char (isAlphaNum)
 
-> import Scientific (Scientific, extractInt, divideScientific)
+> import Scientific (Scientific, divideScientific)
 > import Data.List (intercalate, nubBy, sortOn)
 
 > --import Debug.Trace (trace, traceStack)
@@ -62,86 +62,8 @@ syntax, interpreter, desugarer, tests
 
 ------------------------------------------------------------------------------
 
-syntax
-======
-
-> data Module = Module [PreludeStmt] [Stmt]
->             deriving (Eq, Show, Data)
-
-> data PreludeStmt = Import ImportSource String
->                  | IncludeFrom String [ProvideItem]
->                  deriving (Eq, Show, Data)
-
-> data ProvideItem = ProvideAlias String String
->                  deriving (Eq,Show,Data) 
-
-
-> data ImportSource = ImportSpecial String [String]
->                   | ImportName String
->                   deriving (Eq,Show, Data) 
-
-> data Stmt = StExpr Expr
->           | When Expr Expr
->           | LetDecl PatName Expr
->           | RecDecl PatName Expr
->           | FunDecl PatName [PatName] Expr (Maybe [Stmt])
->           | VarDecl PatName Expr
->           | SetVar String Expr
->           | SetRef Expr [(String,Expr)]
->           | DataDecl String [VariantDecl] (Maybe [Stmt])
->           | Check (Maybe String) [Stmt]
->           | LetSplatDecl Expr
->           deriving (Eq, Show, Data)
-
-> data VariantDecl = VariantDecl String [(Ref,String)]
->                  deriving (Eq,Show, Data)
-
-> data Ref = Ref | Con
->          deriving (Eq,Show, Data)
-
-> data Pat = IdenP PatName
->          | VariantP (Maybe String) String [Pat]
->          | AsP Pat PatName
->           deriving (Eq,Show,Data) 
-
-> data PatName = PatName Shadow String
->              deriving (Eq,Show,Data) 
-
-> data Shadow = NoShadow | Shadow
->           deriving (Eq,Show,Data) 
-
-
-> data Expr = Num Scientific
->           | Text String
->           | TupleSel [Expr]
->           | RecordSel [(String,Expr)]
->           -- todo: see if can remove this
->           | VariantSel String [(String,Expr)]
->           | Iden String
->           | Parens Expr
->           | TupleGet Expr Int
->           | Construct Expr [Expr]
->           | DotExpr Expr String
->           | If [(Expr,Expr)] (Maybe Expr)
->           | Ask [(Expr,Expr)] (Maybe Expr)
->           | Cases String Expr [(Pat, Expr)] (Maybe Expr)
->           | App Expr [Expr]
->           | UnaryMinus Expr
->           | BinOp Expr String Expr
->           | Lam [PatName] Expr
->           | Let [(PatName,Expr)] Expr
->           | LetRec [(PatName,Expr)] Expr
->           | Block [Stmt]
->           | UnboxRef Expr String
->           -- todo: see if can remove the following - they should be part of the interpreter syntax
->           | Seq Expr Expr
->           | Box Expr
->           | SetBox Expr Expr
->           | Unbox Expr
->           | Catch Expr Expr
->           deriving (Eq, Show, Data)
-
 interpreter syntax
+==================
 
 > data IExpr
 >     = INum Scientific
@@ -281,7 +203,7 @@ recursively load all the referenced modules in the source given
 >     -- recurse on these imports, returning the filename and the
 >     -- file contents
 >     parseMod s = either throwInterp pure $ do
->                  ast@(Module ps _) <- parse s
+>                  ast@(Module ps _) <- P.parseModule "" s -- todo: get the filename in here
 >                  let rs = mapMaybe getImp ps
 >                  pure (ast, rs)
 >     f nm s = do
@@ -776,7 +698,7 @@ interp
 take the fields in the record, and bind them to the current env:
 e.g.
 r = {a:1,b:2}
-expand-record(r)
+let-splat(r)
   ->
 a = r.a
 b = r.b
@@ -995,7 +917,7 @@ add the last statement which returns the last value and the env, for
 >     desugar $ Block
 >               [LetDecl (patName uniqueV0) a
 >               ,LetDecl (patName uniqueV1) b
->               ,LetDecl (patName uniqueName) (Text $ pretty a ++ " is " ++ pretty b)
+>               ,LetDecl (patName uniqueName) (Text $ Pr.prettyExpr a ++ " is " ++ Pr.prettyExpr b)
 >               ,StExpr $
 >                If [(eqIdens uniqueV0 uniqueV1
 >                   ,appI "log-test-pass" [Iden checkBlockIDName
@@ -1016,7 +938,7 @@ add the last statement which returns the last value and the env, for
 >   desugar (App (Iden "raises-satisfies") [e0, lam ["a"] $ App (Iden "tostring-equals") [e1, Iden "a"]])
 
 > desugar x@(App (Iden "raises-satisfies") [e0,e1]) = do
->   let p = pretty x
+>   let p = Pr.prettyExpr x
 >   y <- desugarRaises p e0 e1
 >   desugar y
 
@@ -1303,7 +1225,7 @@ catch(
 > desugarRaises :: String -> Expr -> Expr -> Desugarer Expr
 > desugarRaises syn e e1 = do
 >     let failMsg = "The test operation raises-satisfies failed for the test "
->                   ++ pretty e1
+>                   ++ Pr.prettyExpr e1
 >     checkBlockIDName <- (maybe (lift $ throwE "'is' test outside check block") pure)
 >                         =<< (gets currentCheckBlockIDName)
 >     
@@ -1531,276 +1453,42 @@ ffi boilerplate
 
 ------------------------------------------------------------------------------
 
-parse
-=====
-
-> parse :: String -> Either String Module
-> parse src =
->     case P.parseModule "" src of
->       Right (S.Module ps sts) -> Module <$> mapM convPrelude ps <*> convStmts sts
->       Left e -> Left e
-
-> convPrelude :: S.PreludeStmt -> Either String PreludeStmt
-
-> convPrelude (S.Import (S.ImportName x) y) = pure $ Import (ImportName x) y
-> convPrelude (S.Import (S.ImportSpecial nm as) y) =
->     pure $ Import (ImportSpecial nm as) y
-
-> convPrelude (S.IncludeFrom x as) | Just as' <- mapM f as =
->     pure $ IncludeFrom x as'
->   where
->     f (S.ProvideAlias a b) = Just (ProvideAlias a b)
->     f _ = Nothing          
-  
-> convPrelude x = Left $ "unsupported prelude statement " ++ show x
-
-
-  
-> convStmts :: [S.Stmt] -> Either String [Stmt]
-> convStmts = mapM convSt
-
-> convExpr :: S.Expr -> Either String Expr
-> convExpr (S.Num x) = Right $ Num x
-> convExpr (S.Text x) = Right $ Text x
-> convExpr (S.TupleSel fs) = TupleSel <$> mapM convExpr fs
-
-> convExpr (S.RecordSel fs) = RecordSel <$> mapM f fs
->   where
->     f (a,b) = (a,) <$> convExpr b
-
-> convExpr (S.Iden s) = Right $ Iden s
-> convExpr (S.Parens e) = Parens <$> convExpr e
-> convExpr (S.App f es) = App <$> convExpr f <*> mapM convExpr es
-> convExpr (S.BinOp e f e1) = b <$> convExpr e <*> convExpr e1
->   where
->     b x y = BinOp x f y
-> convExpr (S.UnaryMinus e) = UnaryMinus <$> convExpr e
-> convExpr (S.Lam ps e) = do
->         ps' <- mapM pf ps
->         e' <- convExpr e
->         Right $ lam ps' e'
->       where
->         pf (S.PatName _ x) = Right x
-> convExpr (S.Let bs e) = do
->         bs' <- mapM bf bs
->         e' <- convExpr e
->         Right $ Let bs' e'
->       where
->         bf (S.PatName _ x, ex) =
->             (PatName NoShadow x,) <$> convExpr ex
-> convExpr (S.LetRec bs e) = do
->         bs' <- mapM bf bs
->         e' <- convExpr e
->         Right $ LetRec bs' e'
->       where
->         bf (S.PatName _ x, ex) =
->             (PatName NoShadow x,) <$> convExpr ex
-
-> convExpr (S.Block sts) = Block <$> mapM convSt sts
-
-> convExpr (S.If bs e) = do
->     If <$> mapM f bs <*> maybe (pure Nothing) ((Just <$>) . convExpr) e
->   where
->     f (c,t) = (,) <$> convExpr c <*> convExpr t
-
-> convExpr (S.Ask bs e) = do
->     Ask <$> mapM f bs <*> maybe (pure Nothing) ((Just <$>) . convExpr) e
->   where
->     f (c,t) = (,) <$> convExpr c <*> convExpr t
-
-
-> convExpr (S.DotExpr e f) =
->     flip DotExpr f <$> convExpr e
-> convExpr (S.TupleGet e i) = TupleGet <$> convExpr e <*> pure i
-
-> convExpr (S.Cases ty e bs els) =
->     Cases ty <$> convExpr e <*> mapM f bs <*> maybe (pure Nothing) ((Just <$>) .  convExpr) els
->   where
->     f (p, ve) = do
->         p' <- convPat p
->         ve' <- convExpr ve
->         pure (p',ve')
-
-> convExpr (S.UnboxRef e n) = flip UnboxRef n <$> convExpr e
-
-> convExpr (S.Construct e es) = Construct <$> convExpr e <*> mapM convExpr es
-
-> convPat :: S.Pat -> Either String Pat
-> convPat (S.IdenP nm) = IdenP <$> convPatName nm
-> convPat (S.VariantP q nm ps) = VariantP q nm <$> mapM convPat ps
-> convPat (S.AsP p pn) = AsP <$> convPat p <*> convPatName pn
-
-> convPatName :: S.PatName -> Either String PatName
-> convPatName (S.PatName sh n) = pure $ PatName sh' n
->   where
->     sh' | sh == S.Shadow = Shadow
->         | sh == S.NoShadow = NoShadow
->         | otherwise = error "convpatname: how can it get here?"
-
-> -- convExpr x = Left $ "parse: unsupported expression " ++ show x
-
-> convSt :: S.Stmt -> Either String Stmt
-> convSt (S.StExpr e) = StExpr <$> convExpr e
-> convSt (S.When c t) = When <$> convExpr c <*> convExpr t
-> convSt (S.LetDecl (S.PatName _ nm) v) = LetDecl (PatName NoShadow nm) <$> convExpr v
-> convSt (S.RecDecl (S.PatName _ nm) v) = RecDecl (PatName NoShadow nm) <$> convExpr v
-> convSt (S.FunDecl (S.PatName _ nm) ps bdy whr) = do
->     whr' <- case whr of
->                 Nothing -> pure Nothing
->                 Just w -> Just <$> mapM convSt w
->     FunDecl (patName nm) <$> mapM pf ps <*> convExpr bdy <*> pure whr'
->   where 
->     pf (S.PatName _ x) = Right $ patName x
-> convSt (S.Check nm bdy) = Check nm <$> mapM convSt bdy
-> convSt (S.VarDecl (S.PatName _ nm) v) = VarDecl (patName nm) <$> convExpr v
-> convSt (S.SetVar n e) = SetVar n <$> convExpr e
-> convSt (S.SetRef e ss) = SetRef <$> convExpr e <*> mapM f ss
->    where
->      f (a,b) = (a,) <$> convExpr b
-
-
-> convSt (S.DataDecl nm fs whr) = do
->     whr' <- case whr of
->                 Nothing -> pure Nothing
->                 Just w -> Just <$> mapM convSt w
->     DataDecl nm <$> mapM convVarDecl fs <*> pure whr'
-
-> convSt x = Left $ "parse: unsupported statement " ++ show x
-
-> convVarDecl :: S.VariantDecl -> Either String VariantDecl
-> convVarDecl (S.VariantDecl nm fs) = pure $ VariantDecl nm $ flip map fs $ \(a,b) -> (f a,b)
->    where
->      f S.Con = Con
->      f S.Ref = Ref
-
-
-------------------------------------------------------------------------------
-
-pretty
-======
-
-> pretty :: Expr -> String
-> pretty x = Pr.prettyExpr $ unconv x
-
-> unconv :: Expr -> S.Expr
-> unconv (Num n) = S.Num n
-> unconv (Text n) = S.Text n
-> unconv (TupleSel fs) = S.TupleSel $ map unconv fs
-> unconv (VariantSel nm fs) = S.App (S.Iden nm) (map f fs)
->   where
->     f (n,v) = unconv (TupleSel [Text n, v])
-> unconv (Construct e es) = S.Construct (unconv e) (map unconv es)  
-
-> unconv (RecordSel fs) = S.RecordSel (map f fs)
->   where
->     f (a,b) = (a,unconv b)
-> unconv (Iden s) = S.Iden s
-> unconv (Catch e t) = unconv (App (Iden "catch") [e,t])
-> unconv (App (Iden e) [a,b]) | isOp e = S.BinOp (unconv a) e (unconv b)
->   where isOp x = not $ any (\z -> isAlphaNum z || z `elem` "_") x
-> 
-> unconv (App e fs) = S.App (unconv e) $ map unconv fs
-> unconv (Lam ns e) = S.Lam (map unconvPatName ns) $ unconv e
-> unconv (Let bs e) = S.Let (map (uncurry unconvBinding) bs) (unconv e)
-> unconv (LetRec bs e) = S.LetRec (map (uncurry unconvBinding) bs) (unconv e)
-> unconv (Block sts) = S.Block $ map unconvStmt sts
-> unconv (Seq a b) = S.Block $ map unconvStmt [StExpr a, StExpr b]
-> unconv (If bs e) = S.If (map f bs) (fmap unconv e)
->   where
->     f (c,t) = (unconv c, unconv t)
-> unconv (Ask bs e) = S.Ask (map f bs) (fmap unconv e)
->   where
->     f (c,t) = (unconv c, unconv t)
-> unconv (DotExpr e f) = S.DotExpr (unconv e) f
-> unconv (TupleGet t i) = S.TupleGet (unconv t) i
-> unconv (Cases ty t bs els) =
->     S.Cases ty (unconv t) (map f bs) (fmap unconv els)
->   where
->     f (p,e) = (unconvPat p, unconv e)
->
-> unconv (Box e) = S.App (S.Iden "box") [unconv e]
-> unconv (SetBox e f) = S.App (S.Iden "setbox") [unconv e, unconv f]
-
-> unconv (UnboxRef e n) = S.UnboxRef (unconv e) n
-> unconv (Unbox e) = S.App (S.Iden "unbox") [unconv e]
-
-> unconv (Parens e) = S.Parens (unconv e)
-> unconv (BinOp e0 f e1) = S.BinOp (unconv e0) f (unconv e1)
-> unconv (UnaryMinus e) = S.UnaryMinus (unconv e)
-  
-> --unconv x = error $ "unconv: " ++ show x
-
-> unconvPat :: Pat -> S.Pat
-> unconvPat (IdenP pn) = S.IdenP (unconvPatName pn)
-> unconvPat (VariantP q nm ps) = S.VariantP q nm (map unconvPat ps)
-> unconvPat (AsP p pn) = S.AsP (unconvPat p) (unconvPatName pn)
-
-> unconvPatName :: PatName -> S.PatName
-> unconvPatName (PatName sh n) = S.PatName sh' n
->   where
->     sh' | sh == Shadow = S.Shadow
->         | sh == NoShadow = S.NoShadow
->         | otherwise = error "unconvpatname: how can it get here?"
-
-> unconvStmt :: Stmt -> S.Stmt
-> unconvStmt (LetDecl n e) = uncurry S.LetDecl (unconvBinding n e)
-> unconvStmt (RecDecl n e) = uncurry S.RecDecl (unconvBinding n e)
-> unconvStmt (LetSplatDecl re) = S.StExpr (S.App (S.Iden "letsplatdecl") [unconv re])
-> unconvStmt (FunDecl nm ps bdy w) =
->     S.FunDecl (S.PatName S.NoShadow $ unPatName nm) (map (S.PatName S.NoShadow . unPatName) ps) (unconv bdy) (fmap (map unconvStmt) w)
-> unconvStmt (StExpr e) = S.StExpr (unconv e)
-> unconvStmt (When c t) = S.When (unconv c) (unconv t)
-> unconvStmt (Check nm bs) = S.Check nm $ map unconvStmt bs
-> unconvStmt (VarDecl n e) = uncurry S.VarDecl (unconvBinding n e)
-> unconvStmt (SetVar n e) = S.SetVar n (unconv e)
-> unconvStmt (SetRef e fs) = S.SetRef (unconv e) $ map f fs
->   where
->     f (a,b) = (a,unconv b)
-
-> unconvStmt (DataDecl nm vs w) =
->      S.DataDecl nm (map f vs) (fmap (map unconvStmt) w)
->    where
->      f (VariantDecl vnm fs) = S.VariantDecl vnm $ map uf fs
->      uf (Ref,x) = (S.Ref,x)
->      uf (Con,x) = (S.Con,x)
-
-> unconvBinding :: PatName -> Expr -> (S.PatName, S.Expr)
-> unconvBinding (PatName _ n) v = (S.PatName S.NoShadow n, unconv v)
-
+pretty interpreter syntax
+=========================
 
 > prettyIExpr :: IExpr -> String
 > prettyIExpr x = Pr.prettyExpr $ unconvI x
 
-> unconvI :: IExpr -> S.Expr
+> unconvI :: IExpr -> Expr
 
-> unconvI (INum n) = S.Num n
-> unconvI (IText n) = S.Text n
-> unconvI (IVariantSel nm fs) = S.App (S.Iden nm) (map f fs)
+> unconvI (INum n) = Num n
+> unconvI (IText n) = Text n
+> unconvI (IVariantSel nm fs) = App (Iden nm) (map f fs)
 >   where
->     f (n,v) = S.TupleSel $ map unconvI [IText n, v]
+>     f (n,v) = TupleSel $ map unconvI [IText n, v]
 
-> unconvI (IIden s) = S.Iden s
+> unconvI (IIden s) = Iden s
 > unconvI (ICatch e t) = unconvI (IApp (IIden "catch") [e,t])
-> unconvI (IApp (IIden e) [a,b]) | isOp e = S.BinOp (unconvI a) e (unconvI b)
+> unconvI (IApp (IIden e) [a,b]) | isOp e = BinOp (unconvI a) e (unconvI b)
 >   where isOp x = not $ any (\z -> isAlphaNum z || z `elem` "_") x
 > 
-> unconvI (IApp e fs) = S.App (unconvI e) $ map unconvI fs
-> unconvI (ILam ns e) = S.Lam (map unconvIPatName ns) $ unconvI e
-> unconvI (ILet bs e) = S.Let (map (uncurry unconvIBinding) bs) (unconvI e)
-> unconvI (ISeq a b) = S.Block $ map (S.StExpr . unconvI) [a, b]
-> unconvI (IIf bs e) = S.If (map f bs) (fmap unconvI e)
+> unconvI (IApp e fs) = App (unconvI e) $ map unconvI fs
+> unconvI (ILam ns e) = Lam (map unconvIPatName ns) $ unconvI e
+> unconvI (ILet bs e) = Let (map (uncurry unconvIBinding) bs) (unconvI e)
+> unconvI (ISeq a b) = Block $ map (StExpr . unconvI) [a, b]
+> unconvI (IIf bs e) = If (map f bs) (fmap unconvI e)
 >   where
 >     f (c,t) = (unconvI c, unconvI t)
-> unconvI (IBox e) = S.App (S.Iden "box") [unconvI e]
-> unconvI (ISetBox e f) = S.App (S.Iden "setbox") [unconvI e, unconvI f]
-> unconvI (IUnbox e) = S.App (S.Iden "unbox") [unconvI e]
-> unconvI (ILetSplat re e) = S.App (S.Iden "letsplat") [unconvI re, unconvI e]
+> unconvI (IBox e) = App (Iden "box") [unconvI e]
+> unconvI (ISetBox e f) = App (Iden "setbox") [unconvI e, unconvI f]
+> unconvI (IUnbox e) = App (Iden "unbox") [unconvI e]
+> unconvI (ILetSplat re e) = App (Iden "letsplat") [unconvI re, unconvI e]
 
-> unconvIBinding :: String -> IExpr -> (S.PatName, S.Expr)
+> unconvIBinding :: String -> IExpr -> (PatName, Expr)
 > unconvIBinding n v = (unconvIPatName n, unconvI v)
 
-> unconvIPatName :: String -> S.PatName
-> unconvIPatName n = S.PatName S.NoShadow n
+> unconvIPatName :: String -> PatName
+> unconvIPatName n = PatName NoShadow n
 
 ------------------------------------------------------------------------------
 

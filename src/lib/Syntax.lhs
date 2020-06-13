@@ -66,6 +66,8 @@ import * from <import-source>
 >           | TPred Expr String Expr Expr -- is%, is-not%
 >           | TPostfixOp Expr String --- does-not-raise
 >           | Check (Maybe String) [Stmt]
+>           -- todo: part of the interpreter syntax, remove from here
+>           | LetSplatDecl Expr
 >           deriving (Eq,Show,Data) 
 
 > data VariantDecl = VariantDecl String [(Ref,String)]
@@ -111,5 +113,13 @@ variant bindings can be nested
 >           | LetRec [(PatName,Expr)] Expr
 >           | Block [Stmt]
 >           | UnboxRef Expr String
+>           -- todo: see if can remove this
+>           | VariantSel String [(String,Expr)]
+>           -- todo: see if can remove the following - they should be part of the interpreter syntax
+>           | Seq Expr Expr
+>           | Box Expr
+>           | SetBox Expr Expr
+>           | Unbox Expr
+>           | Catch Expr Expr
 >           deriving (Eq,Show,Data) 
 
