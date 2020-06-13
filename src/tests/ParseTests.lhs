@@ -241,6 +241,19 @@ todo: review all the whitespace rules that are being ignored
 >         [(IdenP $ idenPat "empty", Sel $ Text "empty")]
 >         (Just $ Sel $ Text "else"))
 
+todo:
+cases (X) x:
+  | empty => a
+  | empty as my_empty => a
+  | _ as my_empty => a
+  | link(a,empty) as x => a
+  | link(a,b) => a
+  | link(a,b) as x => a
+  | link(c,link(d,empty)) => a
+  | link(c link(d,empty) as x) => a
+end
+
+
 >     {-,("cases(List) [list: {\"a\"; 1}, {\"b\"; 2}, {\"c\"; 3}]:\n\
 >       \  | empty => \"empty\"\n\
 >       \  | link({x;y}, r) => x\n\

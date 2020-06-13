@@ -99,13 +99,8 @@ syntax
 > data Ref = Ref | Con
 >          deriving (Eq,Show, Data)
 
-
-> data Binding = Binding Pat Expr
->           deriving (Eq,Show,Data) 
-
 > data Pat = IdenP PatName
 >          | VariantP (Maybe String) String [Pat]
->          | TupleP [Pat]
 >          | AsP Pat PatName
 >           deriving (Eq,Show,Data) 
 
@@ -131,7 +126,7 @@ syntax
 >           | App Expr [Expr]
 >           | UnaryMinus Expr
 >           | BinOp Expr String Expr
->           | Lam [Pat] Expr
+>           | Lam [PatName] Expr
 >           | Let [(String,Expr)] Expr
 >           | LetRec [(String,Expr)] Expr
 >           | Block [Stmt]
@@ -1040,8 +1035,7 @@ add the last statement which returns the last value and the env, for
 > desugar (App f as) = IApp <$> desugar f <*> mapM desugar as
 > desugar (Lam ns e) = ILam <$> mapM b ns <*> desugar e
 >   where
->     b (IdenP (PatName _ x)) = pure x
->     b x = lift $ throwE $ "unsupported pattern in lambda: " ++ show x
+>     b (PatName _ x) = pure x
 > desugar (Let bs e) = do
 >     let f (n,v) = (n,) <$> desugar v
 >     ILet <$> mapM f bs <*> desugar e
@@ -1068,9 +1062,8 @@ add the last statement which returns the last value and the env, for
 >     patchBody = transformBi $ \case
 >         App (Iden f) args | f `elem` bindNames -> App (Iden f) (map Iden bindNames ++ args)
 >         x -> x
->     hackGetName (IdenP (PatName _ n)) = pure n
->     hackGetName x = lift $ throwE $ "unsupported pattern in lambda: " ++ show x
->     mkP i = IdenP (PatName NoShadow i)
+>     hackGetName (PatName _ n) = pure n
+>     mkP i = PatName NoShadow i
 
 > {-desugar (LetSplat re e) =
 >     ILetSplat <$> desugar re <*> desugar e-}
@@ -1147,7 +1140,7 @@ xxx.make([list: <elements>])
 > lam :: [String] -> Expr -> Expr
 > lam ps e = Lam (map f ps) e
 >   where
->     f i = IdenP (PatName NoShadow i)
+>     f i = PatName NoShadow i
   
 > desugarStmts :: [Stmt] -> Desugarer IExpr
 
@@ -1712,7 +1705,7 @@ pretty
 >   where isOp x = not $ any (\z -> isAlphaNum z || z `elem` "_") x
 > 
 > unconv (App e fs) = S.App (unconv e) $ map unconv fs
-> unconv (Lam ns e) = S.Lam (map unconvPatToPatName ns) $ unconv e
+> unconv (Lam ns e) = S.Lam (map unconvPatName ns) $ unconv e
 > unconv (Let bs e) = S.Let (map (uncurry unconvBinding) bs) (unconv e)
 > unconv (LetRec bs e) = S.LetRec (map (uncurry unconvBinding) bs) (unconv e)
 > unconv (Block sts) = S.Block $ map unconvStmt sts
@@ -1747,8 +1740,6 @@ pretty
 > unconvPat (VariantP q nm ps) = S.VariantP q nm (map unconvPat ps)
 > unconvPat (AsP p pn) = S.AsP (unconvPat p) (unconvPatName pn)
 
-> unconvPatToPatName (IdenP (PatName _ x)) = S.PatName S.NoShadow x
-
 > unconvPatName :: PatName -> S.PatName
 > unconvPatName (PatName sh n) = S.PatName sh' n
 >   where
@@ -1780,9 +1771,6 @@ pretty
 
 > unconvBinding :: String -> Expr -> (S.PatName, S.Expr)
 > unconvBinding n v = (S.PatName S.NoShadow n, unconv v)
-
-> unconvPattern :: String -> S.Pat
-> unconvPattern n = S.IdenP (S.PatName S.NoShadow n)
 
 
 > prettyIExpr :: IExpr -> String
@@ -1818,9 +1806,6 @@ pretty
 
 > unconvIPatName :: String -> S.PatName
 > unconvIPatName n = S.PatName S.NoShadow n
-
-> unconvIPattern :: String -> S.Pat
-> unconvIPattern n = S.IdenP (S.PatName S.NoShadow n)
 
 ------------------------------------------------------------------------------
 
