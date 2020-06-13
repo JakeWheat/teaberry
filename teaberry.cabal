@@ -93,6 +93,7 @@ common libfiles
                        OldParse
                        OldPretty
                        OldSyntax
+                       DesugarListBetter
 
 -- this is the old version of the code that is in the process of being replaced
 library

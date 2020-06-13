@@ -2,12 +2,21 @@
 # contains definitions for things that should always be there that are
 # implemented in langauge
 
-data Nothing:
-   | nothing
-end
+# todo: list, nothing, provide item and stuff like that is used to bootstrap the language
+# then there are a bunch of other built ins which are just defined in language
+# and are available without importing. keep these two sets separate
 
 data List:
   | empty
   | link(first, rest)
 end
 
+data Nothing:
+   | nothing
+end
+
+
+data ProvideItem:
+  | provide-all
+  | provide-alias(i,a)
+end

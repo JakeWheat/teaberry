@@ -43,6 +43,8 @@
 > import qualified Construct
 > import qualified Variants2
 > import qualified Expr1Catch
+> import qualified DesugarListBetter
+
 > import qualified Front
 
 > import qualified Test.Tasty as T
@@ -91,5 +93,7 @@
 >        ,Construct.tests
 >        ,Variants2.tests
 >        ,Expr1Catch.tests
+>        ,DesugarListBetter.tests
+>  
 >        ,Front.tests
 >        ]

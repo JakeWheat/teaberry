@@ -278,6 +278,18 @@ end
 >         (Just $ Text "else"))
 
 
+>   {-  ,("cases(z.List) [list: {\"a\"; 1}, {\"b\"; 2}, {\"c\"; 3}]:\n\
+>       \  | z.empty => \"empty\"\n\
+>       \  | z.link({x;y}, r) => x\n\
+>       \  | else => \"else\"\n\
+>       \end"
+>      ,Cases "z.List" (Construct (Iden "list") [Sel $ TupleSel [Sel $ Text "a", num 1]
+>                                               ,Sel $ TupleSel [Sel $ Text "b", num 2]
+>                                               ,Sel $ TupleSel [Sel $ Text "c", num 3]])
+>         [(VariantP (Just "z") "empty" [], Sel $ Text "empty")
+>         ,(VariantP (Just "z") "link" [TupleP [idenPat "x", idenPat "y"], idenPat "r"], Iden "x")]
+>         (Just $ Sel $ Text "else"))-}
+
 
 >       ]
 >  where
