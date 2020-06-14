@@ -1686,6 +1686,7 @@ tests
 >     ,"where.tea"
 >
 >     ,"option.tea"
+>     ,"either.tea"
 >     ]
 
 > tests1 :: T.TestTree

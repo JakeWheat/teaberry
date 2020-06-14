@@ -1,0 +1,65 @@
+import either as E
+
+data Person:
+  | student(id, name)
+end
+
+people = [list:
+  student(001, "Charlie Brown"),
+  student(002, "Sally Brown"),
+  student(003, "Lucy van Pelt"),
+  student(003, "Linus van Pelt")]
+
+fun filter(l, p):
+  cases (List) l:
+    | empty => empty
+    | link(x,xs) =>
+      if p(x): link(x, filter(xs,p))
+      else: filter(xs,p)
+      end
+  end
+end
+
+fun length(l):
+  cases (List) l:
+    | empty => 0
+    | link(_,xs) => 1 + length(xs)
+  end
+end
+
+fun get(l, i):
+  cases (List) l:
+    | empty => raise("index")
+    | link(x,xs) =>
+      if i == 0: x
+      else: get(xs, i - 1)
+      end
+  end
+end
+
+fun find-person-from-id(p, i):
+  results = filter(p,lam(a): a.id == i end)
+  result-count = length(results)
+  ask:
+    | result-count == 0 then: E.left("Not found error.")
+    | result-count == 1 then: E.right(get(results, 0))
+    | otherwise: E.left("Duplicate ID error.")
+  end
+where:
+  find-person-from-id(people, 007) is E.left("Not found error.")
+  find-person-from-id(people, 001) is E.right(student(001, "Charlie Brown"))
+  find-person-from-id(people, 003) is E.left("Duplicate ID error.")
+end
+
+check:
+  x = E.left(1)
+  y = E.right(2)
+  f = lam(x):
+    cases(E.Either) x:
+      | E.left(s) => "left" + num-to-string(s)
+      | E.right(p) => "right" + num-to-string(p)
+    end
+  end
+  f(x) is "left1"
+  f(y) is "right2"
+end
