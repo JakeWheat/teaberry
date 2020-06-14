@@ -1,20 +1,8 @@
 
 
-Represents the combination of all the ideas that made it
-
-cleanups:
-parser extra:
-  make an explicit module syntax to put multiple modules in one file
-  change the set syntax to be in language
-
-think about how to split this file:
-syntax, interpreter, desugarer, tests
-
-
-here's a question: what if you do 5 extra langs without merging any to
-front. then how do you merge them all successfully? diffs aren't
-really cutting it. maybe the only way is to refactor all the langs so
-they diff nicely? (and document the connections betwen them)
+implement runscriptinterp which is an ffi utility that allows you to
+run a script inside the interpreter in a similar way to the ffi
+function, so it can be used in the implementation of ffi functions
 
 > {-# LANGUAGE TupleSections #-}
 > {-# LANGUAGE LambdaCase #-}
@@ -22,7 +10,7 @@ they diff nicely? (and document the connections betwen them)
 > {-# LANGUAGE MultiWayIf #-}
 > {-# LANGUAGE DeriveDataTypeable #-}
 
-> module Front (tests
+> module RunScriptInterp (tests
 >              ,TeaberryHandle
 >              ,newTeaberryHandle
 >              ,runScript
@@ -1640,7 +1628,7 @@ tests
 =====
 
 > tests :: T.TestTree
-> tests = T.testGroup "front" [tests1, tests4]
+> tests = T.testGroup "RunScriptInterp" [tests1, tests4]
 
 > testFiles :: [FilePath]
 > testFiles =
@@ -1689,8 +1677,8 @@ tests
 >     ]
 
 > tests1 :: T.TestTree
-> tests1 = T.testGroup "front1" $
->     map (\f -> T.makeTestsIO ("front" ++ f)
+> tests1 = T.testGroup "RunScriptInterp1" $
+>     map (\f -> T.makeTestsIO ("RunScriptInterp" ++ f)
 >             $ runFileTests ("examples/tests/fulltests" </> f))
 >     testFiles
 
@@ -1702,7 +1690,7 @@ tests
 
 
 > tests4 :: T.TestTree
-> tests4 = T.testGroup "front4"
+> tests4 = T.testGroup "RunScriptInterp4"
 >     [testSanityArith
 >     ,testEnvKept
 >     ,testEnvOverridden

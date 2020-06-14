@@ -1,0 +1,58 @@
+
+include option
+
+
+fun set-angle(s):
+  cases(Option) string-to-number(s):
+    | some(a) => a
+    | none => 0
+  end
+where:
+  set-angle("90") is 90
+  set-angle("") is 0
+  set-angle("x") is 0
+end
+
+fun find-smiley(s):
+  i = string-index-of(s, "😊")
+  ask:
+    | i == -1 then: "No smiley!"
+    | otherwise: string-append("Smiley at ", num-to-string(i))
+  end
+where:
+  find-smiley("abcd") is "No smiley!"
+  find-smiley("a😊cd") is "Smiley at 1"
+end
+
+fun option-smiley(s):
+  i = string-index-of(s, "😊")
+  ask:
+    | i == -1 then: none
+    | otherwise: some(i)
+  end
+where:
+  option-smiley("abcd") is none
+  option-smiley("a😊cd") is some(1)
+end
+
+check:
+  add1 = lam(n): n + 1 end
+  n = none
+  and-then(n, add1) is none
+  s = some(5)
+  and-then(s, add1) is some(6)
+end
+
+check:
+  n = none
+  or-else(n, 42) is 42
+
+  s = some(5)
+  or-else(s, 10) is 5
+end
+
+
+check:
+  or-else(string-to-number("90"),0) is 90
+  or-else(string-to-number("x"),0) is 0
+end

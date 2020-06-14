@@ -97,6 +97,7 @@ common libfiles
                        OpaqueFFIValues
                        Provide1
                        FixWhere
+                       RunScriptInterp
 
 common libfilesextra
   other-modules:     Syntax

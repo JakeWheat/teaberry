@@ -1,0 +1,30 @@
+
+provide:
+  some,
+  none,
+  is-Option,
+  is-some,
+  is-none,
+  and-then,
+  or-else
+end
+
+data Option:
+  | none
+  | some(a)
+end
+
+
+fun and-then(a, f):
+  cases(Option) a:
+    | some(a1) => some(f(a1))
+    | none => none
+  end
+end
+
+fun or-else(a, v):
+  cases(Option) a:
+    | some(a1) => a1
+    | none => v
+  end
+end

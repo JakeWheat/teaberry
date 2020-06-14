@@ -47,6 +47,7 @@
 > import qualified OpaqueFFIValues
 > import qualified Provide1
 > import qualified FixWhere
+> import qualified RunScriptInterp
 
 > import qualified Front
 
@@ -100,6 +101,7 @@
 >        ,OpaqueFFIValues.tests
 >        ,Provide1.tests
 >        ,FixWhere.tests
+>        ,RunScriptInterp.tests
 >  
 >        ,Front.tests
 >        ]
