@@ -94,6 +94,7 @@ common libfiles
                        OldPretty
                        OldSyntax
                        DesugarListBetter
+                       OpaqueFFIValues
 
 common libfilesextra
   other-modules:     Syntax
@@ -102,7 +103,6 @@ common libfilesextra
                        Scientific
                        Front
                        
--- this is the old version of the code that is in the process of being replaced
 library
   import:              shared-properties, libfiles
   exposed-modules:     Syntax
@@ -112,10 +112,7 @@ library
                        Front
   hs-source-dirs:      src/lib
   
--- this is the new experimental versions which will be used to create
--- the new version of the code, and continue to be developed to
--- keep feeding into the new version
-   
+ 
 
 Test-Suite RunTests
   import:              shared-properties, libfiles, libfilesextra

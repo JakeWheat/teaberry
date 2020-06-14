@@ -1,20 +1,33 @@
 
 
-Represents the combination of all the ideas that made it
+add opaque ffi values which can be accessed in ffi functions, and
+ passed around but nothing else in language
 
-cleanups:
-parser extra:
-  make an explicit module syntax to put multiple modules in one file
-  change the set syntax to be in language
+simple plan: use Dynamic as an extra ctor in the Value
+extend the numpty type lookup and unwrap/wrap thing in the ffi
 
-think about how to split this file:
-syntax, interpreter, desugarer, tests
+work on a better ffi system:
+review the wrap and unwrap system
+add a standard way to do opaque ffi wrappers
+what's the api for ffi functions:
+a way to raise exceptions
+a value wrapper which hides the important stuff?
+a way to execute teaberry code from within an ffi function
+what are the options for autogenerating wrappers around haskell agdt
+and for autogenerating conversion functions to convert between
+  haskell and teaberry values
+can it do non messy pattern matching on haskell adgt in teaberry?
+
+also start thinking about the c and python ffi, how will they work?
+try to do a complete design next?
+
+start thinking about the ux:
+how do I run a teaberry program that accesses some custom ffi code
+how do I run embedded teaberry which uses custom ffi
+the second case is a little easier?
 
 
-here's a question: what if you do 5 extra langs without merging any to
-front. then how do you merge them all successfully? diffs aren't
-really cutting it. maybe the only way is to refactor all the langs so
-they diff nicely? (and document the connections betwen them)
+
 
 > {-# LANGUAGE TupleSections #-}
 > {-# LANGUAGE LambdaCase #-}
@@ -22,7 +35,7 @@ they diff nicely? (and document the connections betwen them)
 > {-# LANGUAGE MultiWayIf #-}
 > {-# LANGUAGE DeriveDataTypeable #-}
 
-> module Front (tests
+> module OpaqueFFIValues (tests
 >              ,TeaberryHandle
 >              ,newTeaberryHandle
 >              ,runScript
@@ -64,6 +77,7 @@ they diff nicely? (and document the connections betwen them)
 > import Paths_teaberry
 > import System.FilePath ((</>))
 
+> import Data.Dynamic (Dynamic, toDyn, fromDynamic)
 
 ------------------------------------------------------------------------------
 
@@ -261,6 +275,7 @@ values
 >            | BoxV Int
 >            | FunV [String] IExpr Env
 >            | ForeignFunV String
+>            | FFIVal Dynamic
 
 value type name is used for looking up overloaded foreign functions
 
@@ -272,6 +287,7 @@ value type name is used for looking up overloaded foreign functions
 > valueTypeName BoxV {} = "box"
 > valueTypeName FunV {} = "function"
 > valueTypeName ForeignFunV {} = "foreign-function"
+> valueTypeName FFIVal {} = "ffi-val"
 
 > instance Show Value where
 >   show (NumV n) = "NumV " ++ show n
@@ -281,6 +297,7 @@ value type name is used for looking up overloaded foreign functions
 >   show (BoxV n) = "BoxV " ++ show n
 >   show FunV {} = "FunV stuff"
 >   show (ForeignFunV n) = "ForeignFunV " ++ show n
+>   show (FFIVal n) = "FFIVal " ++ show n
 
 > instance Eq Value where
 >     NumV a == NumV b = a == b
@@ -470,9 +487,24 @@ ffi catalog
 >    ,("log-test-pass", binaryOp unwrapNum unwrapText id logTestPass)
 >    ,("log-test-fail", ternaryOp unwrapNum unwrapText unwrapText id logTestFail)
 
+>    ,("mhs", unaryOp unwrapText pure makeHaskellString)
+>    ,("ghs", unaryOp anyIn id getHaskellString)
+
 >    ])
 >    $ emptyEnv {envEnv = [("true", BoolV True)
 >                         ,("false", BoolV False)]}
+
+
+> makeHaskellString :: String -> Value
+> makeHaskellString s = FFIVal $ toDyn s
+
+> getHaskellString :: Value -> Interpreter Value
+> getHaskellString (FFIVal v) = case fromDynamic v of
+>     Just x -> pure $ TextV x
+>     Nothing -> throwInterp $ "expected string in dynamic val, got " ++ show v
+
+> getHaskellString x = throwInterp $ "expected FFIVal in ghs, got " ++ show x
+
 
 hardcoded nothing. There is also a syntax version. even though nothing
 is defined in built in, it needs bootstrapping like list because a
@@ -545,6 +577,7 @@ created
 > torepr' (VariantV nm []) = nm
 > torepr' (VariantV nm fs) =
 >     nm ++ "(" ++ intercalate "," (map (torepr' . snd) fs) ++ ")"
+> torepr' (FFIVal f) = "ffi-val(" ++ show f ++ ")"
  
 
 > tostring :: Value -> Value
@@ -1175,7 +1208,8 @@ testing hack
 if there are no args to the variant, it's a binding to a non lambda
 value, not a lambda
 
->    makeVarnt (VariantDecl vnm []) = pure $ LetDecl (patName vnm) (appI "make-variant-0" [Text vnm])
+>    makeVarnt (VariantDecl vnm []) =
+>        pure $ LetDecl (patName vnm) (appI "make-variant-0" [Text vnm])
 
   | pt(x,y) ->
 pt = lam (x,y): I.App "make-variant" ["pt",[list: {false, "x";x},{false, "y";y}]]

@@ -44,6 +44,7 @@
 > import qualified Variants2
 > import qualified Expr1Catch
 > import qualified DesugarListBetter
+> import qualified OpaqueFFIValues
 
 > import qualified Front
 
@@ -94,6 +95,7 @@
 >        ,Variants2.tests
 >        ,Expr1Catch.tests
 >        ,DesugarListBetter.tests
+>        ,OpaqueFFIValues.tests
 >  
 >        ,Front.tests
 >        ]
