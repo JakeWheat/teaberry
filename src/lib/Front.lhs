@@ -30,6 +30,11 @@ they diff nicely? (and document the connections betwen them)
 >              ,Value
 >              ,valueToString) where
 
+> import Prelude hiding ((<>))
+> import Text.PrettyPrint (render, text, (<>), (<+>), -- empty, parens,
+>                          nest, Doc, punctuate, {-comma,-} sep {-,quotes-}
+>                          {-,doubleQuotes-}
+>                          {-,braces, ($$), ($+$),-} {-vcat-})
 
 
 > import qualified Parse as P
@@ -41,7 +46,7 @@ they diff nicely? (and document the connections betwen them)
 > import Control.Monad.Trans.Class (lift)
 > import Control.Monad.IO.Class (liftIO)
 > import Control.Monad.Trans.Except (Except, runExcept, throwE)
-> import Control.Monad.Trans.RWS (RWST, evalRWST, ask, local, get, gets, state, put, modify)
+> import Control.Monad.Trans.RWS (RWST, evalRWST, ask, local, get, gets, state, put, modify, asks)
 > import Control.Exception.Safe (Exception, throwM, catch)
 > import Control.Concurrent (threadDelay)
 
@@ -49,7 +54,7 @@ they diff nicely? (and document the connections betwen them)
 > import Data.Data (Data)
 
 > import Control.Monad (when)
-> import Data.Maybe (isJust, mapMaybe)
+> import Data.Maybe (mapMaybe)
 >
 > import Data.Char (isAlphaNum)
 
@@ -62,8 +67,9 @@ they diff nicely? (and document the connections betwen them)
 > import Data.IORef (IORef, newIORef, readIORef, writeIORef)
 
 > import Paths_teaberry
-> import System.FilePath ((</>))
+> import System.FilePath ((</>), takeDirectory)
 
+> import Data.Dynamic (Dynamic, toDyn, fromDynamic)
 
 ------------------------------------------------------------------------------
 
@@ -174,7 +180,7 @@ hacky top level evaluate. not really sure if it will pay its way once
 >                      _ -> throwInterp $ "bad value for dump-desugar, expected t or f, got " ++ v
 >               | otherwise -> throwInterp $ "unrecognised set key: " ++ k
 >             Left _ -> do
->                 (ast,srcs) <- loadSourceFiles d src
+>                 (ast,srcs) <- loadSourceFiles fnm d src
 >                 y <- either throwInterp pure $ runDesugar (maybe "toplevel.x" id fnm) ast srcs
 >                 let z = simplify y
 >                 case executionStage ebs of
@@ -183,15 +189,19 @@ hacky top level evaluate. not really sure if it will pay its way once
 >                         v <- {-trace (pretty z) $-} interp z
 >                         t <- runAddedTests
 >                         case v of
->                             VariantV "tuple" [("0", v'), ("1", VariantV "record" e)] ->
+>                             VariantV "tuple" [("0", v')
+>                                              ,("1", VariantV "record" _)
+>                                              ,("2", VariantV "record" e)] ->
 >                                 let ne = (henv ebs) {envEnv = e}
 >                                 in pure (v',ebs {henv = ne}, t)
->                             _ -> throwInterp $ "expected 2 element tuple, second one record, got " ++ torepr' v
+>                             {-VariantV "tuple" [_,_,_] -> throwInterp $ "expected 3 element tuple, second and third elements records, got " ++ torepr' v
+>                             VariantV "tuple" xs -> throwInterp $ "expected 3 element tuple, got " ++ show (length xs) ++ " element tuple, " ++ torepr' v-}
+>                             _ -> throwInterp $ "expected 3 element tuple, second one record, got " ++ torepr' v
 
 recursively load all the referenced modules in the source given
 
-> loadSourceFiles :: String -> String -> Interpreter (Module, [(String,Module)])
-> loadSourceFiles buildInModDir src = do
+> loadSourceFiles :: Maybe FilePath ->  String -> String -> Interpreter (Module, [(String,Module)])
+> loadSourceFiles mfnm buildInModDir src = do
 >     -- todo: memoize so loading a module twice doesn't read the
 >     -- file and parse it twice
 >     (ast,rs) <- parseMod src
@@ -204,11 +214,13 @@ recursively load all the referenced modules in the source given
 >     -- todo: assert the _ above is actually []
 >     pure (ast, ("built-ins", bast) : x)
 >   where
+>     fnm = maybe "" id mfnm
+>     cwd = takeDirectory fnm
 >     -- parse the file, get the imports
 >     -- recurse on these imports, returning the filename and the
 >     -- file contents
 >     parseMod s = either throwInterp pure $ do
->                  ast@(Module ps _) <- P.parseModule "" s -- todo: get the filename in here
+>                  ast@(Module ps _) <- P.parseModule fnm s -- todo: get the filename in here
 >                  let rs = mapMaybe getImp ps
 >                  pure (ast, rs)
 >     f nm s = do
@@ -227,12 +239,13 @@ recursively load all the referenced modules in the source given
 >     -- and the directory removed if there is one      
 >     loadAndRecurse is = do
 >         (fn,mn) <- case is of
->                   ImportSpecial "file" [n] -> pure (n,n)
+>                   ImportSpecial "file" [n] -> pure (cwd </> n,n)
 >                   ImportSpecial x _ -> throwInterp $ "import special with " ++ x ++ " not supported"
 >                   ImportName n -> pure (buildInModDir </> n ++ ".tea", n)
 >         x <- liftIO $ readFile fn
 >         f mn x
 >     getImp (Import fn _) = Just fn
+>     getImp (Include fn) = Just fn
 >     getImp _ = Nothing
 
 > getBuiltInModulesDir :: IO FilePath
@@ -261,6 +274,7 @@ values
 >            | BoxV Int
 >            | FunV [String] IExpr Env
 >            | ForeignFunV String
+>            | FFIVal Dynamic
 
 value type name is used for looking up overloaded foreign functions
 
@@ -272,6 +286,7 @@ value type name is used for looking up overloaded foreign functions
 > valueTypeName BoxV {} = "box"
 > valueTypeName FunV {} = "function"
 > valueTypeName ForeignFunV {} = "foreign-function"
+> valueTypeName FFIVal {} = "ffi-val"
 
 > instance Show Value where
 >   show (NumV n) = "NumV " ++ show n
@@ -281,6 +296,7 @@ value type name is used for looking up overloaded foreign functions
 >   show (BoxV n) = "BoxV " ++ show n
 >   show FunV {} = "FunV stuff"
 >   show (ForeignFunV n) = "ForeignFunV " ++ show n
+>   show (FFIVal n) = "FFIVal " ++ show n
 
 > instance Eq Value where
 >     NumV a == NumV b = a == b
@@ -333,7 +349,11 @@ store holds the values of variables
 
 > data InterpreterException = InterpreterException String
 >                           | ValueException Value
->                           deriving Show
+
+
+> instance Show InterpreterException where
+>     show (InterpreterException s) = s
+>     show (ValueException v) = torepr' v
 
 > instance Exception InterpreterException where
 >   --  displayException (InterpreterException msg) = msg
@@ -470,9 +490,39 @@ ffi catalog
 >    ,("log-test-pass", binaryOp unwrapNum unwrapText id logTestPass)
 >    ,("log-test-fail", ternaryOp unwrapNum unwrapText unwrapText id logTestFail)
 
+>    ,("provides", unaryOp anyIn id providesImpl)
+
+>    ,("mhs", unaryOp unwrapText pure makeHaskellString)
+>    ,("ghs", unaryOp anyIn id getHaskellString)
+
 >    ])
 >    $ emptyEnv {envEnv = [("true", BoolV True)
 >                         ,("false", BoolV False)]}
+
+> providesImpl :: Value -> Interpreter Value
+> providesImpl x = do
+>     pis <- teaToPIS x
+>     rd <- ask
+>     let r = envEnv $ ieEnv rd
+>     newR <- mapM (apPi r) pis
+>     pure $ VariantV "record" $ concat newR
+>   where
+>     apPi r IProvideAll = pure r
+>     apPi r (IProvide i a) = case lookup i r of
+>         Just v -> pure [(a,v)]
+>         Nothing -> throwInterp $ "provide item not found: " ++ i
+>         
+
+> makeHaskellString :: String -> Value
+> makeHaskellString s = FFIVal $ toDyn s
+
+> getHaskellString :: Value -> Interpreter Value
+> getHaskellString (FFIVal v) = case fromDynamic v of
+>     Just x -> pure $ TextV x
+>     Nothing -> throwInterp $ "expected string in dynamic val, got " ++ show v
+
+> getHaskellString x = throwInterp $ "expected FFIVal in ghs, got " ++ show x
+
 
 hardcoded nothing. There is also a syntax version. even though nothing
 is defined in built in, it needs bootstrapping like list because a
@@ -527,25 +577,32 @@ created
 > torepr x = TextV $ torepr' x
 
 > torepr' :: Value -> String
-> torepr' (NumV n) = case extractInt n of
->                              Just x -> show x
->                              Nothing ->  show n
-> torepr' (BoolV n) = if n then "true" else "false"
-> torepr' (FunV {}) = "<Function>"
-> torepr' (ForeignFunV {}) = "<Function>"
-> torepr' (TextV s) = "\"" ++ s ++ "\""
-> torepr' (BoxV {}) = "<Box>"
+> torepr' = render . toreprx
+> 
+> toreprx :: Value -> Doc
+> toreprx (NumV n) = case extractInt n of
+>                              Just x -> text $ show x
+>                              Nothing ->  text $ show n
+> toreprx (BoolV n) = text $ if n then "true" else "false"
+> toreprx (FunV {}) = text "<Function>"
+> toreprx (ForeignFunV {}) = text "<Function>"
+> toreprx (TextV s) = text $ "\"" ++ s ++ "\""
+> toreprx (BoxV {}) = text "<Box>"
 
-> torepr' (VariantV "tuple" fs) =
->     "{" ++ intercalate ";" (map (torepr' . snd) fs) ++ "}"
-> torepr' (VariantV "record" fs) =
->     "{" ++ intercalate "," (map f fs) ++ "}"
+> toreprx (VariantV "tuple" fs) =
+>     text "{" <> nest 2 (xSep ";" $ map (toreprx . snd) fs) <> text "}"
+> toreprx (VariantV "record" fs) =
+>     text "{" <> nest 2 (xSep "," $ map f fs) <> text "}"
 >   where
->     f (a,b) = a ++ " = " ++ torepr' b
-> torepr' (VariantV nm []) = nm
-> torepr' (VariantV nm fs) =
->     nm ++ "(" ++ intercalate "," (map (torepr' . snd) fs) ++ ")"
- 
+>     f (a,b) = text a <+> text "=" <+> toreprx b
+> toreprx (VariantV nm []) = text nm
+> toreprx (VariantV nm fs) =
+>     text nm <> text "(" <> nest 2 (xSep "," $ map (toreprx . snd) fs) <> text ")"
+> toreprx (FFIVal f) = text "ffi-val(" <> text (show f) <> text ")"
+
+> xSep :: String -> [Doc] -> Doc
+> xSep x ds = sep $ punctuate (text x) ds
+
 
 > tostring :: Value -> Value
 > tostring x@(TextV {}) = x
@@ -810,15 +867,16 @@ todo: combine
 desugaring
 ==========
 
-> type Desugarer = RWST () () DesugarState (Except String)
+> type Desugarer = RWST DesugarReader () DesugarState (Except String)
+
+> data DesugarReader = DesugarReader {currentCheckBlockIDName :: Maybe String}
 
 > data DesugarState = DesugarState {uniqueCtr :: Int
 >                                  ,nextUnusedCheckBlockID :: Int
->                                  ,nextAnonymousBlockNumber :: Int
->                                  ,currentCheckBlockIDName :: Maybe String}
+>                                  ,nextAnonymousBlockNumber :: Int}
   
 > startingDesugarState :: DesugarState
-> startingDesugarState = DesugarState 0 0 0 Nothing
+> startingDesugarState = DesugarState 0 0 0
 
 > makeUniqueVar :: String -> Desugarer String
 > makeUniqueVar pref = state $ \s ->
@@ -827,14 +885,14 @@ desugaring
 >        ,s {uniqueCtr = suff + 1})
 
 > runDesugar :: String -> Module -> [(String,Module)] -> Either String IExpr
-> runDesugar nm ast srcs = fst <$> runExcept (evalRWST go () startingDesugarState)
+> runDesugar nm ast srcs = fst <$> runExcept (evalRWST go (DesugarReader Nothing) startingDesugarState)
 >   where
 >     go = do
 >          srcs' <- desugarEm [] (srcs ++ [(nm,ast)])
 >          -- for repl support, splat out the contents of the last module
 >          -- and return the last value of this module plus the env           
 >          sf <- desugarStmts [LetSplatDecl (tg 1)
->                             ,StExpr $ TupleSel [tg 0, tg 1]]
+>                             ,StExpr $ TupleSel [tg 0, tg 1, tg 2]]
 >          let y = (combineEm srcs') sf
 >          pure y
 >     tg i = TupleGet (Iden ("module." ++ nm)) i
@@ -864,7 +922,8 @@ add the last statement which returns the last value and the env, for
 >     stmts' <- addTopRet stmts
 >     desugarStmts (ps' ++ stmts')
 >   where
->     mk x = StExpr $ TupleSel [x, App (Iden "env-to-record") []]
+>     pis = pisToTea $ getProvides ps
+>     mk x = StExpr $ TupleSel [x, App (Iden "provides") [pis], App (Iden "env-to-record") []]
 >     addTopRet [] = pure [mk nothingSyntaxHack]
 >     addTopRet [StExpr x] = do
 >         z <- makeUniqueVar "z"
@@ -873,9 +932,31 @@ add the last statement which returns the last value and the env, for
 >     builtins = if skipBuiltins
 >                then []
 >                else [Import (ImportName "built-ins") "built-ins"
->                     ,IncludeFrom "built-ins" (map (\a -> ProvideAlias a a) bs)]
->     -- temp before * is supported
->     bs = ["is-empty","is-link", "empty", "link", "is-List", "nothing", "is-Nothing", "is-nothing"]
+>                     ,IncludeFrom "built-ins" [ProvideAll]]
+
+> pisToTea :: [ProvideItem] -> Expr
+> pisToTea [] = Iden "empty"
+> pisToTea (x:xs) =
+>     let x' = case x of
+>                  ProvideAlias i a -> App (Iden "provide-alias") [Text i, Text a]
+>                  ProvideName n -> App (Iden "provide-alias") [Text n, Text n]
+>                  ProvideAll -> Iden "provide-all"
+>     in App (Iden "link") [x', pisToTea xs]
+
+> data IProvideItem = IProvideAll
+>                   | IProvide String String
+
+> teaToPIS :: Value -> Interpreter [IProvideItem]
+> teaToPIS x = do
+>     x' <- listToHaskellI x
+>     getPis x'
+>   where
+>     getPis [] = pure []
+>     getPis (VariantV "provide-all" [] : xs) = (IProvideAll:) <$> getPis xs
+>     getPis (VariantV "provide-alias" [("i",TextV i),("a",TextV a)] : xs) =
+>         (IProvide i a:) <$> getPis xs
+>     getPis z = throwInterp $ " bad value in provides list: " ++ show z
+
 
 > patName :: String -> PatName
 > patName x = PatName NoShadow x
@@ -889,11 +970,24 @@ add the last statement which returns the last value and the env, for
 >     pure [LetDecl (patName b) (TupleGet (Iden n) 1)]
 
 > desugarPreludeStmt (IncludeFrom nm is) =
->     pure $ flip map is $ \(ProvideAlias n1 n2) ->
->         LetDecl (patName n2) (DotExpr (TupleGet (Iden ("module." ++ nm)) 1) n1)
+>     pure $ flip map is $ \case
+>         ProvideAlias n1 n2 -> LetDecl (patName n2) (DotExpr (Iden nm) n1)
+>         ProvideName n -> LetDecl (patName n) (DotExpr (Iden nm) n)
+>         ProvideAll -> LetSplatDecl (Iden nm)
 
-> desugarPreludeStmt x = lift $ throwE $ "unsupported prelude statement: " ++ show x
+> desugarPreludeStmt (Provide {}) = pure []
 
+> desugarPreludeStmt (Include is) = do
+>     m <- makeUniqueVar "module"
+>     concat <$> mapM desugarPreludeStmt [Import is m, IncludeFrom m [ProvideAll]]
+
+> getProvides :: [PreludeStmt] -> [ProvideItem]
+> getProvides xs = case mapMaybe getPIs xs of
+>     [] -> [ProvideAll]
+>     ys -> concat ys
+>   where
+>     getPIs (Provide pis) = Just pis
+>     getPIs _ = Nothing
 
 > importSourceName :: ImportSource -> Desugarer String
 > importSourceName (ImportSpecial "file" [s]) = pure $ "module." ++ s
@@ -926,7 +1020,7 @@ add the last statement which returns the last value and the env, for
 >     uniqueV1 <- makeUniqueVar "is-v1"
 >     uniqueName <- makeUniqueVar "testname"
 >     checkBlockIDName <- (maybe (lift $ throwE "'is' test outside check block") pure)
->                         =<< (gets currentCheckBlockIDName)
+>                         =<< (asks currentCheckBlockIDName)
 >     desugar $ Block
 >               [LetDecl (patName uniqueV0) a
 >               ,LetDecl (patName uniqueV1) b
@@ -1071,28 +1165,30 @@ xxx.make([list: <elements>])
 > lam ps e = Lam (map f ps) e
 >   where
 >     f i = PatName NoShadow i
-  
-> desugarStmts :: [Stmt] -> Desugarer IExpr
 
+> desugarStmts :: [Stmt] -> Desugarer IExpr
 > desugarStmts (Check nm bdy : es) = do
->     (uniqueCheckBlockIDVarName,uniqueCheckBlockID) <- enterNewCheckBlock
->     blockName <- maybe getAnonBlockName pure nm
->     desugaredCheck <- desugar $
->         appI "add-tests"
->         [Lam [] (Block $
->                  [LetDecl (patName uniqueCheckBlockIDVarName) uniqueCheckBlockID
->                  ,StExpr $ appI "log-check-block"
->                              [Iden uniqueCheckBlockIDVarName
->                              ,Text blockName]]
->                  ++ bdy)]
->     exitCheckBlock
+>     uniqueCheckBlockIDVarName <- makeUniqueVar "check-block-id"
+>     desugaredCheck <- local (\x -> x {currentCheckBlockIDName = Just uniqueCheckBlockIDVarName}) $ do
+>       s <- get
+>       put $ s {nextUnusedCheckBlockID = nextUnusedCheckBlockID s + 1}
+>       let uniqueCheckBlockID = Num $ fromIntegral $ nextUnusedCheckBlockID s
+>       blockName <- maybe getAnonBlockName pure nm
+>       desugar $
+>           appI "add-tests"
+>           [Lam [] (Block $
+>                    [LetDecl (patName uniqueCheckBlockIDVarName) uniqueCheckBlockID
+>                    ,StExpr $ appI "log-check-block"
+>                                [Iden uniqueCheckBlockIDVarName
+>                                ,Text blockName]]
+>                    ++ bdy)]
 >     case es of
 >         [] -> pure desugaredCheck
 >         _ -> ISeq desugaredCheck <$> desugarStmts es
 >   where
 >     appI i as = App (Iden i) as
 
-> desugarStmts [] = lift $ throwE $ "empty block"
+> desugarStmts [] = desugar nothingSyntaxHack
 
 testing hack
   
@@ -1175,7 +1271,8 @@ testing hack
 if there are no args to the variant, it's a binding to a non lambda
 value, not a lambda
 
->    makeVarnt (VariantDecl vnm []) = pure $ LetDecl (patName vnm) (appI "make-variant-0" [Text vnm])
+>    makeVarnt (VariantDecl vnm []) =
+>        pure $ LetDecl (patName vnm) (appI "make-variant-0" [Text vnm])
 
   | pt(x,y) ->
 pt = lam (x,y): I.App "make-variant" ["pt",[list: {false, "x";x},{false, "y";y}]]
@@ -1248,7 +1345,7 @@ catch(
 >     let failMsg = "The test operation raises-satisfies failed for the test "
 >                   ++ Pr.prettyExpr e1
 >     checkBlockIDName <- (maybe (lift $ throwE "'is' test outside check block") pure)
->                         =<< (gets currentCheckBlockIDName)
+>                         =<< (asks currentCheckBlockIDName)
 >     
 >     nameit <- makeUniqueVar "isname"
 >     v1 <- makeUniqueVar "isv1"
@@ -1276,20 +1373,6 @@ catch(
 
 --------------------------------------
 
-testing support in the desugarer monad
-
-> enterNewCheckBlock :: Desugarer (String,Expr)
-> enterNewCheckBlock = do
->     s <- get
->     when (isJust $ currentCheckBlockIDName s) $ lift $ throwE "trying to enter nested check block"
->     let newID = nextUnusedCheckBlockID s
->     nm <- makeUniqueVar "check-block-id"
->     put $ s {nextUnusedCheckBlockID = newID + 1
->             ,currentCheckBlockIDName = Just nm}
->     pure (nm,Num $ fromIntegral newID)
-
-> exitCheckBlock :: Desugarer ()
-> exitCheckBlock = modify $ \s -> s {currentCheckBlockIDName = Nothing}
 
 > getAnonBlockName :: Desugarer String
 > getAnonBlockName = state $ \s ->
@@ -1524,7 +1607,7 @@ tests
 >     ["agdt.tea"
 >     ,"ahoy.tea"
 >     ,"arithmetic.tea"
->     --,"binding.tea"  tuple binding
+>     ,"binding.tea"
 >     ,"blocks.tea"
 >     ,"boolean.tea"
 >     ,"built-in-functions.tea"
@@ -1542,30 +1625,25 @@ tests
 >     ,"if_ask.tea"
 >     ,"let.tea"
 >     ,"lists-basics.tea"
->     --,"lists.tea" provides
->     --,"my-module-provide-all.tea"
->     --,"my-module-provide-x.tea"
->     --,"my-module.tea"
->     --,"my-module-two-provides.tea"
+>     ,"lists.tea"
 >     ,"nested_comment.tea"
->     --,"prelude-built-in-module.tea"
->     --,"prelude-combine-provides.tea"
->     --,"prelude-import-from.tea"
->     --,"prelude-include-module.tea"
->     --,"prelude-local-module.tea"
->     --,"prelude-provide-all.tea"
->     --,"prelude-provide-x.tea"
+
+>     ,"prelude-combine-provides.tea"
+>     ,"prelude-include-module.tea"
+>     ,"prelude-local-module.tea"
+>     ,"prelude-provide-all.tea"
+>     ,"prelude-provide-x.tea"
 >     --,"random.tea" -- change in letrec desugaring, possibly bug
 >     ,"records.tea"
 >     ,"recursive.tea"
 >     ,"ref.tea"
->     --,"tour.tea" -- next issue is provide
+>     ,"tour.tea"
 >     ,"trivial_is.tea"
->     --,"tuples.tea" tuple binding
+>     ,"tuples.tea"
 >     ,"two_same_name_check.tea"
 >     ,"vars.tea"
 >     ,"when.tea"
->     --,"where.tea" issue with where desugaring and nested functions
+>     ,"where.tea"
 >     ]
 
 > tests1 :: T.TestTree
