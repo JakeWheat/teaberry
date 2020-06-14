@@ -84,7 +84,7 @@ include
 > import Data.IORef (IORef, newIORef, readIORef, writeIORef)
 
 > import Paths_teaberry
-> import System.FilePath ((</>))
+> import System.FilePath ((</>), takeDirectory)
 
 > import Data.Dynamic (Dynamic, toDyn, fromDynamic)
 
@@ -197,7 +197,7 @@ hacky top level evaluate. not really sure if it will pay its way once
 >                      _ -> throwInterp $ "bad value for dump-desugar, expected t or f, got " ++ v
 >               | otherwise -> throwInterp $ "unrecognised set key: " ++ k
 >             Left _ -> do
->                 (ast,srcs) <- loadSourceFiles d src
+>                 (ast,srcs) <- loadSourceFiles fnm d src
 >                 y <- either throwInterp pure $ runDesugar (maybe "toplevel.x" id fnm) ast srcs
 >                 let z = simplify y
 >                 case executionStage ebs of
@@ -217,8 +217,8 @@ hacky top level evaluate. not really sure if it will pay its way once
 
 recursively load all the referenced modules in the source given
 
-> loadSourceFiles :: String -> String -> Interpreter (Module, [(String,Module)])
-> loadSourceFiles buildInModDir src = do
+> loadSourceFiles :: Maybe FilePath ->  String -> String -> Interpreter (Module, [(String,Module)])
+> loadSourceFiles mfnm buildInModDir src = do
 >     -- todo: memoize so loading a module twice doesn't read the
 >     -- file and parse it twice
 >     (ast,rs) <- parseMod src
@@ -231,11 +231,13 @@ recursively load all the referenced modules in the source given
 >     -- todo: assert the _ above is actually []
 >     pure (ast, ("built-ins", bast) : x)
 >   where
+>     fnm = maybe "" id mfnm
+>     cwd = takeDirectory fnm
 >     -- parse the file, get the imports
 >     -- recurse on these imports, returning the filename and the
 >     -- file contents
 >     parseMod s = either throwInterp pure $ do
->                  ast@(Module ps _) <- P.parseModule "" s -- todo: get the filename in here
+>                  ast@(Module ps _) <- P.parseModule fnm s -- todo: get the filename in here
 >                  let rs = mapMaybe getImp ps
 >                  pure (ast, rs)
 >     f nm s = do
@@ -254,12 +256,14 @@ recursively load all the referenced modules in the source given
 >     -- and the directory removed if there is one      
 >     loadAndRecurse is = do
 >         (fn,mn) <- case is of
->                   ImportSpecial "file" [n] -> pure (n,n)
+>                   ImportSpecial "file" [n] -> pure (cwd </> n,n)
 >                   ImportSpecial x _ -> throwInterp $ "import special with " ++ x ++ " not supported"
 >                   ImportName n -> pure (buildInModDir </> n ++ ".tea", n)
 >         x <- liftIO $ readFile fn
 >         f mn x
 >     getImp (Import fn _) = Just fn
+>     getImp (Include fn) = Just fn
+>     getImp (ImportNames _ fn) = Just fn
 >     getImp _ = Nothing
 
 > getBuiltInModulesDir :: IO FilePath
@@ -979,11 +983,7 @@ add the last statement which returns the last value and the env, for
 >     builtins = if skipBuiltins
 >                then []
 >                else [Import (ImportName "built-ins") "built-ins"
->                     ,IncludeFrom "built-ins" (map (\a -> ProvideAlias a a) bs)]
->     -- temp before * is supported
->     bs = ["is-empty","is-link", "empty", "link", "is-List"
->          , "nothing", "is-Nothing", "is-nothing"
->          , "provide-all", "provide-alias"]
+>                     ,IncludeFrom "built-ins" [ProvideAll]]
 
 > pisToTea :: [ProvideItem] -> Expr
 > pisToTea [] = Iden "empty"
@@ -1021,12 +1021,20 @@ add the last statement which returns the last value and the env, for
 >     pure [LetDecl (patName b) (TupleGet (Iden n) 1)]
 
 > desugarPreludeStmt (IncludeFrom nm is) =
->     pure $ flip map is $ \(ProvideAlias n1 n2) ->
->         LetDecl (patName n2) (DotExpr (TupleGet (Iden ("module." ++ nm)) 1) n1)
+>     pure $ flip map is $ \case
+>         ProvideAlias n1 n2 -> LetDecl (patName n2) (DotExpr (Iden nm) n1)
+>         ProvideName n -> LetDecl (patName n) (DotExpr (Iden nm) n)
+>         ProvideAll -> LetSplatDecl (Iden nm)
 
 > desugarPreludeStmt (Provide {}) = pure []
 
-> desugarPreludeStmt x = lift $ throwE $ "unsupported prelude statement: " ++ show x
+> desugarPreludeStmt (Include is) = do
+>     m <- makeUniqueVar "module"
+>     concat <$> mapM desugarPreludeStmt [Import is m, IncludeFrom m [ProvideAll]]
+
+> desugarPreludeStmt (ImportNames nms is) = do
+>     m <- makeUniqueVar "module"
+>     concat <$> mapM desugarPreludeStmt [Import is m, IncludeFrom m (map (\i -> ProvideName i) nms)]
 
 > getProvides :: [PreludeStmt] -> [ProvideItem]
 > getProvides xs = case mapMaybe getPIs xs of
@@ -1233,7 +1241,7 @@ xxx.make([list: <elements>])
 >   where
 >     appI i as = App (Iden i) as
 
-> desugarStmts [] = lift $ throwE $ "empty block"
+> desugarStmts [] = desugar nothingSyntaxHack
 
 testing hack
   
@@ -1659,7 +1667,7 @@ tests
 =====
 
 > tests :: T.TestTree
-> tests = T.testGroup "front" [tests1, tests4]
+> tests = T.testGroup "provide1" [tests1, tests4]
 
 > testFiles :: [FilePath]
 > testFiles =
@@ -1684,24 +1692,20 @@ tests
 >     ,"if_ask.tea"
 >     ,"let.tea"
 >     ,"lists-basics.tea"
->     --,"lists.tea" provides
->     --,"my-module-provide-all.tea"
->     --,"my-module-provide-x.tea"
->     --,"my-module.tea"
->     --,"my-module-two-provides.tea"
+>     ,"lists.tea"
 >     ,"nested_comment.tea"
->     --,"prelude-built-in-module.tea"
->     --,"prelude-combine-provides.tea"
->     --,"prelude-import-from.tea"
->     --,"prelude-include-module.tea"
->     --,"prelude-local-module.tea"
->     --,"prelude-provide-all.tea"
->     --,"prelude-provide-x.tea"
+
+>     ,"prelude-combine-provides.tea"
+>     ,"prelude-import-from.tea"
+>     ,"prelude-include-module.tea"
+>     ,"prelude-local-module.tea"
+>     ,"prelude-provide-all.tea"
+>     ,"prelude-provide-x.tea"
 >     --,"random.tea" -- change in letrec desugaring, possibly bug
 >     ,"records.tea"
 >     ,"recursive.tea"
 >     ,"ref.tea"
->     --,"tour.tea" -- next issue is provide
+>     --,"tour.tea" -- next issue is nested where function desugaring?
 >     ,"trivial_is.tea"
 >     --,"tuples.tea" tuple binding
 >     ,"two_same_name_check.tea"
@@ -1710,8 +1714,9 @@ tests
 >     --,"where.tea" issue with where desugaring and nested functions
 >     ]
 
+
 > tests1 :: T.TestTree
-> tests1 = T.testGroup "front1" $
+> tests1 = T.testGroup "provide11" $
 >     map (\f -> T.makeTestsIO ("front" ++ f)
 >             $ runFileTests ("examples/tests/fulltests" </> f))
 >     testFiles
@@ -1724,7 +1729,7 @@ tests
 
 
 > tests4 :: T.TestTree
-> tests4 = T.testGroup "front4"
+> tests4 = T.testGroup "provide14"
 >     [testSanityArith
 >     ,testEnvKept
 >     ,testEnvOverridden
