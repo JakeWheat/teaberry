@@ -16,7 +16,7 @@
 
 > import qualified Test.Tasty as T
 > import qualified Test.Tasty.HUnit as T
-> import Control.Monad (when)
+> --import Control.Monad (when)
 > import Data.List (partition, intercalate)
 > import Data.Maybe (isNothing)
 

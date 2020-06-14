@@ -11,6 +11,7 @@
 > import qualified Test.Tasty.HUnit as T
 
 > import Syntax (Stmt(..)
+>               ,Type(..)
 >               ,Expr(..)
 >               ,VariantDecl(..)
 >               ,Pat(..)
@@ -456,6 +457,31 @@ end
 >      ,LetDecl (TupleP [idenPatShadow "x12", idenPatShadow "y12"])
 >       (Iden "x"))-}
 
+
+>     ,("a :: Number"
+>      ,Contract "a" $ TName "Number")
+>     ,("a :: X.Something"
+>      ,Contract "a" $ TQName "X" "Something")
+>     ,("a :: {Number; Boolean}"
+>      ,Contract "a" $ TTuple [TName "Number", TName "Boolean"])
+>     ,("a :: {Number}"
+>      ,Contract "a" $ TTuple [TName "Number"])
+>     ,("a :: List<Number>"
+>      ,Contract "a" $ TParam (TName "List") [TName "Number"])
+>     ,("a :: Stuff<Number, Number>"
+>      ,Contract "a" $ TParam (TName "Stuff") [TName "Number", TName "Number"])
+>     ,("a :: {x :: Number, y :: String}"
+>      ,Contract "a" $ TRecord [("x", TName "Number"),("y", TName "String")])
+>     ,("a :: String, (String -> String) -> String"
+>      ,Contract "a" $ TArrow [TName "String", TParens (TArrow [TName "String"] $ TName "String")] $ TName "String")
+> 
+>     ,("a :: String, String -> String"
+>      ,Contract "a" $ TArrow [TName "String", TName "String"] $ TName "String")
+>     ,("a :: String -> String"
+>      ,Contract "a" $ TArrow [TName "String"] $ TName "String")
+>     ,("a :: (s :: String, t :: String) -> String"
+>      ,Contract "a" $ TNamedArrow [("s",TName "String"), ("t", TName "String")] $ TName "String")
+> 
 >     ]
 >  where
 >    idenPat x = PatName NoShadow x

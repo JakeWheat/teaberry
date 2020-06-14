@@ -24,12 +24,12 @@ cabal run RunTests --disable-optimization -- --hide-successes --ansi-tricks=fals
 
 and how I use the command line interface:
 
-cabal run -v0 teaberry --disable-optimization -- -g examples/tests/fulltests/tour.tea
+cabal run teaberry --disable-optimization -- -g examples/tests/fulltests/tour.tea
 
-(disabling the optimsation doesn't seem to make anything slower for
-this code, and makes ghc compile it much faster)
+(disabling the optimsation makes ghc compile it much faster)
 
-# About Pyret
+About Pyret
+-----------
 
 Pyret is a really nice functional language with an optional type
 checker designed for teaching programming.
@@ -48,144 +48,3 @@ https://www.plai.org/
 
 I found PLAI and PAPL to be much easier for learning how to implement
 programming languages than the other usual suspects.
-
-This language will diverge from Pyret.
-
-# sketch of early approximate target
-
-mostly pyret syntax to start with
-strict/eager
-basic functional programming: functions as values + closures
-algebraic data types + pattern binding
-typed only, with inference
-parametric polymorphism
-type classes
-non indentation significant
-some whitespace significance from pyret (requiring whitespace/newline
-  or the opposite between two tokens in some places)
-no effects tracking in the type system (to be reviewed)
-exceptions (to be reviewed)
-garbage collection
-resource management
-control flow: break, continue, goto (to be reviewed)
-no implicit casting
-no pragmas, javadoc in comment syntax
-good error messages
-extensible records
-
-# sketch of possible roadmap
-
-This list mostly uses Pyret terminology for the things that are also in Pyret.
-
-## Completed (no rigorous testing or completeness checks yet)
-
-quick hack command line interface
-
-lambda values, app
-closures
-letrec
-
-tuples
-records
-vars
-lists
-algebraic data types
-recursive data types (cheating slightly without types)
-pattern binding in let
-cases
-references (mutable fields)
-construct expressions
-
-check, where
-
-shadow (syntax only, no enforcement of shadowing/not shadowing)
-
-usable subset of import, provide, include
-
-## planned
-
-full import, provide, include support
-  provide: type x end
-  provide: data x end
-  provide:
-    data MyPosn hiding (pos2d, pos3d)
-  end
-
-  the non-file non-built in import sources? not sure if will do any of them
-
-  provide:
-    * hiding (concat-helper)
-  end
-  provide from SD: * end
-  provide:
-    module SD
-  end
-
-  provide *
-  provide-types *
-    not sure if these are deprecated
-
-contracts and annotations
-
-critical whitespace issues
-  1. no space between expr and () in app
-  2. no multiple statements without newline
-
-extended pattern binding
-
-types
-  needs a todo list
-  algebraic data types
-    field access in a case
-  recursive functions
-  recursive data types
-  parametric polymorphism
-  type classes
-  extensible records
-  ...
-
-type inference
-
-a better command line interface
-
-a bit more of an ffi
-
-## smaller planned items
-
-check additional features:
-  is-not
-  is%
-  is-not%
-  satisfies
-  violates
-  raises-other-than
-  raises-violates
-
-shadow (actually does something)
-
-lambda shorthand
-for loops
-curried application
-block shorthands
-non blocky blocks
-
-pattern binding in lambda, functions arguments
-record binding
-
-... and variations (like with a message)
-
-doc strings
-
-type and new type
-
-improved set of builtin/basic types
-
-program output fixed to match pyret
-
-fixity handling
-
-source location information available to code
-  (__FILE__, etc.)
-
-spy statement
-

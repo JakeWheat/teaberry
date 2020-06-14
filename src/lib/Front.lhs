@@ -1228,6 +1228,10 @@ xxx.make([list: <elements>])
 >   where
 >     appI i as = App (Iden i) as
 
+contracts are ignored
+
+> desugarStmts (Contract {} : xs) = desugarStmts xs
+
 > desugarStmts [] = desugar nothingSyntaxHack
 
 testing hack
