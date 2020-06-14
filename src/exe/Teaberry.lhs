@@ -49,6 +49,10 @@ todo: config files, init files, etc.
 >                                   ,runScript
 >                                   ,valueToString)
 
+> import qualified Provide1 (newTeaberryHandle
+>                                   ,runScript
+>                                   ,valueToString)
+
 
 > import qualified Front (newTeaberryHandle
 >                        ,runScript
@@ -204,6 +208,9 @@ main
 >         opaqueFFIValues = Backend {xNewHandle = OpaqueFFIValues.newTeaberryHandle
 >                               ,xRunScript = OpaqueFFIValues.runScript
 >                               ,xValueToString = OpaqueFFIValues.valueToString}
+>         provide1 = Backend {xNewHandle = Provide1.newTeaberryHandle
+>                               ,xRunScript = Provide1.runScript
+>                               ,xValueToString = Provide1.valueToString}
 >         records1Embedded = Backend {xNewHandle = Records1Embedded.newTeaberryHandle
 >                                    ,xRunScript = \h _ e s ->
 >                                            either error id <$> Records1Embedded.runScript h e s
@@ -214,6 +221,7 @@ main
 >         Just "Front" -> runWithBackend os front
 >         Just "Import4Repl" -> runWithBackend os import4Repl
 >         Just "OpaqueFFIValues" -> runWithBackend os opaqueFFIValues
+>         Just "Provide1" -> runWithBackend os provide1
 >         Just "DumpDesugared" -> runWithBackend os dumpDesugared
 >         Just "Records1Embedded" -> runWithBackend os records1Embedded
 >         Just x -> error $ "backend not recognised: " ++ x

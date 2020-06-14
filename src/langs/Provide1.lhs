@@ -1,31 +1,35 @@
 
+First pass as provides
 
-add opaque ffi values which can be accessed in ffi functions, and
- passed around but nothing else in language
+what it supports is
+provide:
+  *,
+  a,
+  b as c
+end
 
-simple plan: use Dynamic as an extra ctor in the Value
-extend the numpty type lookup and unwrap/wrap thing in the ffi
+a single provides statement per module (or provide: * end is the default)
+and it supports *, bindings, aliased bindings
+todo later: types, hiding
 
-work on a better ffi system:
-review the wrap and unwrap system
-add a standard way to do opaque ffi wrappers
-what's the api for ffi functions:
-a way to raise exceptions
-a value wrapper which hides the important stuff?
-a way to execute teaberry code from within an ffi function
-what are the options for autogenerating wrappers around haskell agdt
-and for autogenerating conversion functions to convert between
-  haskell and teaberry values
-can it do non messy pattern matching on haskell adgt in teaberry?
+add the second call to env to record
+the second one will be used when loading a module in the repl
+  fix it to use this one
+then the first one will become the provides desugaring
 
-also start thinking about the c and python ffi, how will they work?
-try to do a complete design next?
+replace env-to-record with provides ffi function
+this takes a list of provideitems
+and then filters the current env with this before returning it
 
-start thinking about the ux:
-how do I run a teaberry program that accesses some custom ffi code
-how do I run embedded teaberry which uses custom ffi
-the second case is a little easier?
+then figure out how to update/support include
+a as b can work as it does now, should it?
+* can use letsplat
+is there something more to do here?
+just desugar a to a as a?
 
+TODO:
+tests
+include
 
 
 
@@ -500,6 +504,8 @@ ffi catalog
 >    ,("log-test-pass", binaryOp unwrapNum unwrapText id logTestPass)
 >    ,("log-test-fail", ternaryOp unwrapNum unwrapText unwrapText id logTestFail)
 
+>    ,("provides", unaryOp anyIn id providesImpl)
+
 >    ,("mhs", unaryOp unwrapText pure makeHaskellString)
 >    ,("ghs", unaryOp anyIn id getHaskellString)
 
@@ -507,6 +513,19 @@ ffi catalog
 >    $ emptyEnv {envEnv = [("true", BoolV True)
 >                         ,("false", BoolV False)]}
 
+> providesImpl :: Value -> Interpreter Value
+> providesImpl x = do
+>     pis <- teaToPIS x
+>     rd <- ask
+>     let r = envEnv $ ieEnv rd
+>     newR <- mapM (apPi r) pis
+>     pure $ VariantV "record" $ concat newR
+>   where
+>     apPi r IProvideAll = pure r
+>     apPi r (IProvide i a) = case lookup i r of
+>         Just v -> pure [(a,v)]
+>         Nothing -> throwInterp $ "provide item not found: " ++ i
+>         
 
 > makeHaskellString :: String -> Value
 > makeHaskellString s = FFIVal $ toDyn s
@@ -950,7 +969,8 @@ add the last statement which returns the last value and the env, for
 >     stmts' <- addTopRet stmts
 >     desugarStmts (ps' ++ stmts')
 >   where
->     mk x = StExpr $ TupleSel [x, App (Iden "env-to-record") [], App (Iden "env-to-record") []]
+>     pis = pisToTea $ getProvides ps
+>     mk x = StExpr $ TupleSel [x, App (Iden "provides") [pis], App (Iden "env-to-record") []]
 >     addTopRet [] = pure [mk nothingSyntaxHack]
 >     addTopRet [StExpr x] = do
 >         z <- makeUniqueVar "z"
@@ -964,6 +984,30 @@ add the last statement which returns the last value and the env, for
 >     bs = ["is-empty","is-link", "empty", "link", "is-List"
 >          , "nothing", "is-Nothing", "is-nothing"
 >          , "provide-all", "provide-alias"]
+
+> pisToTea :: [ProvideItem] -> Expr
+> pisToTea [] = Iden "empty"
+> pisToTea (x:xs) =
+>     let x' = case x of
+>                  ProvideAlias i a -> App (Iden "provide-alias") [Text i, Text a]
+>                  ProvideName n -> App (Iden "provide-alias") [Text n, Text n]
+>                  ProvideAll -> Iden "provide-all"
+>     in App (Iden "link") [x', pisToTea xs]
+
+> data IProvideItem = IProvideAll
+>                   | IProvide String String
+
+> teaToPIS :: Value -> Interpreter [IProvideItem]
+> teaToPIS x = do
+>     x' <- listToHaskellI x
+>     getPis x'
+>   where
+>     getPis [] = pure []
+>     getPis (VariantV "provide-all" [] : xs) = (IProvideAll:) <$> getPis xs
+>     getPis (VariantV "provide-alias" [("i",TextV i),("a",TextV a)] : xs) =
+>         (IProvide i a:) <$> getPis xs
+>     getPis z = throwInterp $ " bad value in provides list: " ++ show z
+
 
 > patName :: String -> PatName
 > patName x = PatName NoShadow x
