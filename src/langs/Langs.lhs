@@ -46,6 +46,7 @@
 > import qualified DesugarListBetter
 > import qualified OpaqueFFIValues
 > import qualified Provide1
+> import qualified FixWhere
 
 > import qualified Front
 
@@ -98,6 +99,7 @@
 >        ,DesugarListBetter.tests
 >        ,OpaqueFFIValues.tests
 >        ,Provide1.tests
+>        ,FixWhere.tests
 >  
 >        ,Front.tests
 >        ]

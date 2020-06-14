@@ -96,6 +96,7 @@ common libfiles
                        DesugarListBetter
                        OpaqueFFIValues
                        Provide1
+                       FixWhere
 
 common libfilesextra
   other-modules:     Syntax

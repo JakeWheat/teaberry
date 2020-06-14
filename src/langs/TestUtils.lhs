@@ -73,8 +73,8 @@ organised data structure to view the results
 >         f res [] = pure $ map reverseResults $ map snd $ reverse res
 >         -- new check block, make sure it's id hasn't been seen already
 >         f res ((TestBlock cid nm) : xs) = do
->             when (any (== cid) $ map fst res)
->                 $ Left $ "multiple check result name for check block with id " ++ show cid
+>             --when (any (== cid) $ map fst res)
+>             --    $ Left $ "multiple check result name for check block with id " ++ show cid
 >             f ((cid, CheckResult nm []) : res) xs
 >         -- if we see a pass or a fail without having see a testblock
 >         -- then it's a bug

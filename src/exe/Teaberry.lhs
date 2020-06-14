@@ -53,6 +53,10 @@ todo: config files, init files, etc.
 >                                   ,runScript
 >                                   ,valueToString)
 
+> import qualified FixWhere (newTeaberryHandle
+>                                   ,runScript
+>                                   ,valueToString)
+
 
 > import qualified Front (newTeaberryHandle
 >                        ,runScript
@@ -211,6 +215,9 @@ main
 >         provide1 = Backend {xNewHandle = Provide1.newTeaberryHandle
 >                               ,xRunScript = Provide1.runScript
 >                               ,xValueToString = Provide1.valueToString}
+>         fixWhere = Backend {xNewHandle = FixWhere.newTeaberryHandle
+>                               ,xRunScript = FixWhere.runScript
+>                               ,xValueToString = FixWhere.valueToString}
 >         records1Embedded = Backend {xNewHandle = Records1Embedded.newTeaberryHandle
 >                                    ,xRunScript = \h _ e s ->
 >                                            either error id <$> Records1Embedded.runScript h e s
@@ -222,6 +229,7 @@ main
 >         Just "Import4Repl" -> runWithBackend os import4Repl
 >         Just "OpaqueFFIValues" -> runWithBackend os opaqueFFIValues
 >         Just "Provide1" -> runWithBackend os provide1
+>         Just "FixWhere" -> runWithBackend os fixWhere
 >         Just "DumpDesugared" -> runWithBackend os dumpDesugared
 >         Just "Records1Embedded" -> runWithBackend os records1Embedded
 >         Just x -> error $ "backend not recognised: " ++ x
