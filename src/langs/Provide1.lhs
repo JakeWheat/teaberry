@@ -1,5 +1,5 @@
 
-First pass as provides
+Provides (and includes and a couple of shorthands)
 
 what it supports is
 provide:
@@ -7,6 +7,9 @@ provide:
   a,
   b as c
 end
+
+include supports the same
+it also supports include from
 
 a single provides statement per module (or provide: * end is the default)
 and it supports *, bindings, aliased bindings
@@ -29,7 +32,6 @@ just desugar a to a as a?
 
 TODO:
 tests
-include
 
 
 
@@ -263,7 +265,6 @@ recursively load all the referenced modules in the source given
 >         f mn x
 >     getImp (Import fn _) = Just fn
 >     getImp (Include fn) = Just fn
->     getImp (ImportNames _ fn) = Just fn
 >     getImp _ = Nothing
 
 > getBuiltInModulesDir :: IO FilePath
@@ -1032,10 +1033,6 @@ add the last statement which returns the last value and the env, for
 >     m <- makeUniqueVar "module"
 >     concat <$> mapM desugarPreludeStmt [Import is m, IncludeFrom m [ProvideAll]]
 
-> desugarPreludeStmt (ImportNames nms is) = do
->     m <- makeUniqueVar "module"
->     concat <$> mapM desugarPreludeStmt [Import is m, IncludeFrom m (map (\i -> ProvideName i) nms)]
-
 > getProvides :: [PreludeStmt] -> [ProvideItem]
 > getProvides xs = case mapMaybe getPIs xs of
 >     [] -> [ProvideAll]
@@ -1696,7 +1693,6 @@ tests
 >     ,"nested_comment.tea"
 
 >     ,"prelude-combine-provides.tea"
->     ,"prelude-import-from.tea"
 >     ,"prelude-include-module.tea"
 >     ,"prelude-local-module.tea"
 >     ,"prelude-provide-all.tea"

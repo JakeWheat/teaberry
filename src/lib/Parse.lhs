@@ -829,15 +829,6 @@ a dotted identifier will parse as a variant with no args, it's a bit hacky
 >     bchoice [ImportSpecial a <$> parens (commaSep stringRaw)
 >             ,pure $ ImportName a]
 
-
-todo: try remove this try
-
 > importStmt :: Parser PreludeStmt
-> importStmt = keyword_ "import" *> (try importFrom <|> importAs)
->   where
->     importFrom = ImportNames
->                 <$> commaSep1 identifier
->                 <*> (keyword_ "from" *> importSource)
->                 
->     importAs = Import <$> importSource
->                       <*> (keyword_ "as" *> identifier)
+> importStmt = keyword_ "import" *> (Import <$> importSource
+>                       <*> (keyword_ "as" *> identifier))

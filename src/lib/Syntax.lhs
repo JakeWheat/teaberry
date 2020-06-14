@@ -30,15 +30,7 @@ The high level syntax which the parser produces
 >                  | Import ImportSource String
 >                  | Include ImportSource
 >                  | IncludeFrom String [ProvideItem]
->                  | ImportNames [String] ImportSource
 >                  deriving (Eq,Show,Data)
-
-import n1, n2, ... from <import-source>
-so:
-import n1 as n2 from <import-source>
-  not supported?
-import * from <import-source>
-  not supported? OK, this is very redundant with include <import-source>
 
 
 > data ProvideItem = ProvideAll

@@ -519,10 +519,6 @@ end
 >       \1"
 >      ,Module [IncludeFrom "X" [ProvideAlias "a" "b"]] [StExpr $ Num 1])
 
->     ,("import n1, n2 from my-module\n\
->       \1"
->      ,Module [ImportNames ["n1", "n2"] (ImportName "my-module")] [StExpr $ Num 1])
-
 
 >     ]
 
