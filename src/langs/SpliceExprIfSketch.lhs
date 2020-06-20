@@ -14,8 +14,8 @@ sketch of implementing if on top of expr1ffi using splices
 
 -> 
 
- > import qualified OldParse as P
- > import qualified OldSyntax as S
+ > import qualified Parse1 as P
+ > import qualified Syntax1 as S
  > import SimpleExpr (simpleInterpreterExamples
  >                   ,TestTree
  >                   ,makeSimpleTests

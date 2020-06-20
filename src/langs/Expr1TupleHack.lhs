@@ -26,8 +26,8 @@ language, also trivial)
 
 > import Scientific1 (Scientific)
 
-> import qualified OldParse as P
-> import qualified OldSyntax as S
+> import qualified Parse1 as P
+> import qualified Syntax1 as S
 
 ------------------------------------------------------------------------------
 

@@ -15,9 +15,9 @@ except purely what is needed for the testing implementation
 >                   ,makeSimpleTests
 >                   ,simpleInterpreterExamples)
 
-> import qualified OldParse as P
-> import qualified OldSyntax as S
-> import qualified OldPretty as Pr
+> import qualified Parse1 as P
+> import qualified Syntax1 as S
+> import qualified Pretty1 as Pr
 
 
 > import Control.Monad.Trans.Class (lift)

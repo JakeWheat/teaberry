@@ -19,9 +19,9 @@ It has multi arg functions + lambdas, and multi bind lets.
 >                   ,T.TestTree
 >                   ) where
 > 
-> import qualified OldParse as P
-> import qualified OldSyntax as S
-> import qualified OldPretty as Pr
+> import qualified Parse1 as P
+> import qualified Syntax1 as S
+> import qualified Pretty1 as Pr
 > import Scientific1 (Scientific)
 
 > import qualified Test.Tasty as T

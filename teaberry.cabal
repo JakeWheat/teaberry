@@ -109,9 +109,9 @@ library langfiles
                        Construct
                        Variants2
                        Expr1Catch
-                       OldParse
-                       OldPretty
-                       OldSyntax
+                       Parse1
+                       Pretty1
+                       Syntax1
                        DesugarListBetter
                        OpaqueFFIValues
                        Provide1

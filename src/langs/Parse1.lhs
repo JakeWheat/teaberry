@@ -56,7 +56,7 @@ for things like expressions, patterns, terms, etc.
 
 
 > {-# LANGUAGE TupleSections,ScopedTypeVariables, MultiWayIf, LambdaCase #-}
-> module OldParse (parseExpr
+> module Parse1 (parseExpr
 >              ,parseStmt
 >              ,parseModule) where
 
@@ -102,7 +102,7 @@ for things like expressions, patterns, terms, etc.
 > import Data.Char (isAlphaNum,isDigit)
 
 
-> import OldSyntax (Stmt(..), Expr(..), Selector(..), VariantDecl(..)
+> import Syntax1 (Stmt(..), Expr(..), Selector(..), VariantDecl(..)
 >               ,Shadow(..)
 >               ,Binding(..)
 >               ,Pat(..)

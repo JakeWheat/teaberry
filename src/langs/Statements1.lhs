@@ -35,8 +35,8 @@ programs and imports and stuff
 >                   ,makeSimpleTests
 >                   ,simpleInterpreterExamples)
 
-> import qualified OldParse as P
-> import qualified OldSyntax as S
+> import qualified Parse1 as P
+> import qualified Syntax1 as S
 
 
 > import Control.Monad.Trans.Class (lift)

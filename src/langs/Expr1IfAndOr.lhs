@@ -12,8 +12,8 @@ todo: import almost everything from simpleexprifandor
 > module Expr1IfAndOr (tests) where
 
 
-> import qualified OldParse as P
-> import qualified OldSyntax as S
+> import qualified Parse1 as P
+> import qualified Syntax1 as S
 > import SimpleExpr (simpleInterpreterExamples
 >                   ,TestTree
 >                   ,makeSimpleTests

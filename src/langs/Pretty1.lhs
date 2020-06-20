@@ -1,6 +1,6 @@
 
 > {-# LANGUAGE ScopedTypeVariables #-}
-> module OldPretty (prettyExpr
+> module Pretty1 (prettyExpr
 >               ,prettyStmts
 >               ,prettyModule
 >               ) where
@@ -11,7 +11,7 @@
 >                          doubleQuotes,
 >                          {-braces, ($$), ($+$),-} vcat)
 
-> import OldSyntax (Stmt(..)
+> import Syntax1 (Stmt(..)
 >               ,Expr(..)
 >               ,Selector(..)
 >               ,VariantDecl(..)

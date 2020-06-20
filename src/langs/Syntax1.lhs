@@ -3,7 +3,7 @@
 The high level syntax which the parser produces
 
 > {-# LANGUAGE DeriveDataTypeable,DeriveGeneric, ScopedTypeVariables #-}
-> module OldSyntax (Stmt(..)
+> module Syntax1 (Stmt(..)
 >               ,Shadow(..)
 >               ,Binding(..)
 >               ,Expr(..)
