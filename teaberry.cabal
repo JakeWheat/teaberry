@@ -25,25 +25,49 @@ source-repository head
 
 common shared-properties
   default-language:    Haskell2010
-  build-depends:       base >= 4 && < 5,
-                       megaparsec >= 8.0 && < 8.1,
-                       scientific >= 0.3 && < 0.4,
-                       pretty >= 1.1 && < 1.2,
-                       transformers >= 0.5 && < 0.6,
-                       mtl >= 2.2 && < 2.3,
-                       safe-exceptions >= 0.1 && < 0.2,
-                       filepath >= 1.4 && < 1.5,
-                       tasty >= 1.1 && < 1.4,
-                       tasty-hunit >= 0.10 && < 0.11,
-                       raw-strings-qq,
-                       uniplate >= 1.6 && < 1.7
+  build-depends:       base,
+                       megaparsec,
+                       scientific,
+                       pretty,
+                       transformers,
+                       mtl,
+                       safe-exceptions,
+                       filepath,
+                       uniplate,
   ghc-options:         -Wall
+  hs-source-dirs:      src/lib
 
-common libfiles
+
+
+
+
+library
+  import:              shared-properties
+  build-depends:       tasty,
+                       tasty-hunit,
+                       raw-strings-qq
   autogen-modules:     Paths_teaberry
-  hs-source-dirs:      src/langs, src/lib, src/tests, src/oldlib
+  other-modules:       Paths_teaberry
+                       -- temp
+                       ParserExtra
+                       TestUtils
+  exposed-modules:     Syntax
+                       Parse
+                       Pretty
+                       Scientific
+                       Front
+  hs-source-dirs:      src/lib
 
-  other-modules:       TestUtils
+
+common langfiles
+--library langfiles
+  import:              shared-properties
+  build-depends:       tasty,
+                       tasty-hunit,
+                       raw-strings-qq,
+                       teaberry
+  --autogen-modules:     Paths_teaberry
+  exposed-modules:     TestUtils
                        Langs
                        ParserExtra
                        SimpleExpr
@@ -88,8 +112,6 @@ common libfiles
                        Construct
                        Variants2
                        Expr1Catch
-                       Paths_teaberry
-                       ParseTests
                        OldParse
                        OldPretty
                        OldSyntax
@@ -99,37 +121,27 @@ common libfiles
                        FixWhere
                        RunScriptInterp
 
-common libfilesextra
-  other-modules:     Syntax
-                       Parse
-                       Pretty
-                       Scientific
-                       Front
-                       
-library
-  import:              shared-properties, libfiles
-  exposed-modules:     Syntax
-                       Parse
-                       Pretty
-                       Scientific
-                       Front
-  hs-source-dirs:      src/lib
-  
- 
-
+  hs-source-dirs:      src/langs
+                         
 Test-Suite RunTests
-  import:              shared-properties, libfiles, libfilesextra
+  import:              shared-properties,langfiles
   type:                exitcode-stdio-1.0
   main-is:             RunTests.lhs
-  other-modules:       
-  build-depends:       teaberry
+  other-modules:       ParseTests
+  build-depends:       teaberry,
+                       tasty,
+                       tasty-hunit
   ghc-options:         -threaded
   hs-source-dirs:      src/tests
 
+-- todo: separate out a teaberry-dev exe for the langfiles stuff
 executable teaberry
-  import:              shared-properties, libfiles, libfilesextra
+  import:              shared-properties,langfiles
   main-is:             Teaberry.lhs
   build-depends:       haskeline,
-                       optparse-applicative
+                       optparse-applicative,
+                       teaberry,
+                       tasty,
+                       tasty-hunit
   ghc-options:         -threaded
   hs-source-dirs:      src/exe

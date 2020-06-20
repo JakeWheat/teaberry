@@ -1,16 +1,11 @@
 
-A learning project to implement a dialect of Pyret.
+A learning project to implement a typed functional programming
+language/ dialect of ML, which aims to be accessible and usable like
+Python is.
 
-Goal is to implement a dialect of Pyret in Haskell, with a high level
-interpreter, to learn how to implement functional programming + a
-basic type system. The original goal was to implement a language
-roughly along the lines of 'Python, but with proper functional
-programming and types', and Pyret is very close to this, so I'm mostly
-copying Pyret for the time being.
+The starting point is a variation of Pyret.
 
-Not ready for human consumption yet.
-
-Demonstration of most supported features:
+Source file showing a bunch of supported features:
 https://github.com/JakeWheat/teaberry/tree/master/examples/tests/fulltests/tour.tea
 
 See the examples and built in modules directories for more:
@@ -18,33 +13,29 @@ See the examples and built in modules directories for more:
 https://github.com/JakeWheat/teaberry/tree/master/examples/tests/fulltests
 https://github.com/JakeWheat/teaberry/tree/master/built-in-modules
 
-This is how I compile and run the code from source:
+Compile and run the tests:
 
 cabal run RunTests --disable-optimization -- --hide-successes --ansi-tricks=false
 
-and how I use the command line interface:
+Use the command line interface:
 
-cabal run teaberry --disable-optimization -- -g examples/tests/fulltests/tour.tea
+cabal run teaberry --disable-optimization -- -f examples/tests/fulltests/tour.tea
+cabal run teaberry --disable-optimization -- -c "3 + 4"
 
-(disabling the optimsation makes ghc compile it much faster)
+repl:
+cabal run teaberry --disable-optimization
 
 About Pyret
 -----------
 
-Pyret is a really nice functional language with an optional type
+Pyret is a functional programming language with an optional type
 checker designed for teaching programming.
 
-Homepage:
-https://www.pyret.org/
 Manual:
 https://www.pyret.org/docs/latest/index.html
-PAPL, a tutorial for Pyret, programming, and implementing programming languages:
+
+Tutorial:
 https://papl.cs.brown.edu/2019/index.html
 
-The other big source of knowledge was PLAI, a book about implementing
-programming languages (there is some overlap with the second half of
-PAPL):
+PLAI, a book about implementing programming languages:
 https://www.plai.org/
-
-I found PLAI and PAPL to be much easier for learning how to implement
-programming languages than the other usual suspects.
