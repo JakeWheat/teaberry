@@ -140,8 +140,15 @@ executable teaberry
   hs-source-dirs:      src/exe
   build-depends:       haskeline,
                        optparse-applicative,
+                       teaberry
+  ghc-options:         -threaded
+
+executable teaberry-dev
+  import:              shared-properties
+  main-is:             TeaberryDev.lhs
+  hs-source-dirs:      src/exe
+  build-depends:       haskeline,
+                       optparse-applicative,
                        teaberry,
-                       tasty,
-                       tasty-hunit,
                        langfiles
   ghc-options:         -threaded
