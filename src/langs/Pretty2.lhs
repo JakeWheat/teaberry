@@ -1,6 +1,6 @@
 
 > {-# LANGUAGE ScopedTypeVariables #-}
-> module OldPretty (prettyExpr
+> module Pretty2 (prettyExpr
 >               ,prettyStmts
 >               ,prettyModule
 >               ) where
@@ -11,14 +11,13 @@
 >                          doubleQuotes,
 >                          {-braces, ($$), ($+$),-} vcat)
 
-> import OldSyntax (Stmt(..)
+> import Syntax2 (Stmt(..)
+>               ,Type(..)
 >               ,Expr(..)
->               ,Selector(..)
 >               ,VariantDecl(..)
 >               ,Pat(..)
 >               ,PatName(..)
 >               ,Stmt(..)
->               ,Binding(..)
 >               ,Shadow(..)
 >               ,Module(..)
 >               ,PreludeStmt(..)
@@ -38,10 +37,10 @@
 
 
 > expr :: Expr -> Doc
-> expr (Sel (Num n)) = text $ showScientific n
-> expr (Sel (Text s)) = doubleQuotes (text s)
-> expr (Sel (TupleSel es)) = text "{" <> nest 2 (xSep ";" (map expr es) <> text "}")
-> expr (Sel (RecordSel flds)) = text "{" <> nest 2 (commaSep (map fld flds) <> text "}")
+> expr (Num n) = text $ showScientific n
+> expr (Text s) = doubleQuotes (text s)
+> expr (TupleSel es) = text "{" <> nest 2 (xSep ";" (map expr es) <> text "}")
+> expr (RecordSel flds) = text "{" <> nest 2 (commaSep (map fld flds) <> text "}")
 >   where
 >     fld (n,e) = text n <> text ":" <+> expr e
 > 
@@ -72,7 +71,7 @@
 > expr (UnaryMinus e) = text "-" <> expr e
 > expr (BinOp a op b) = expr a <+> text op <+> expr b
 > expr (Lam bs e) = vcat
->     [text "lam" <> parens (commaSep $ map pat bs) <> text ":"
+>     [text "lam" <> parens (commaSep $ map patName bs) <> text ":"
 >     ,nest 2 (expr e)
 >     ,text "end"]
 > expr (Let bs e) =
@@ -80,10 +79,10 @@
 >          ,nest 2 (expr e)
 >          ,text "end"]
 >   where
->     bs' | [b] <- bs = binding b
->         | otherwise = vcommaSep $ map binding bs
+>     bs' | [(n,v)] <- bs = binding n v
+>         | otherwise = vcommaSep $ map (uncurry binding) bs
 > expr (LetRec bs e) = vcat
->     [text "letrec" <+> nest 2 (commaSep $ map binding bs) <> text ":"
+>     [text "letrec" <+> nest 2 (commaSep $ map (uncurry binding) bs) <> text ":"
 >     ,nest 2 (expr e)
 >     ,text "end"]
 > expr (Block ss) = vcat [text "block:", nest 2 (stmts ss), text "end"]
@@ -102,47 +101,40 @@
 >   where
 >     mf (p, e1) = text "|" <+> pat p <+> text "=>" <+> expr e1
 
-> expr (Unbox e f) = expr e <> text "!" <> text f
+> expr (UnboxRef e f) = expr e <> text "!" <> text f
 
-> binding :: Binding -> Doc
-> binding (Binding n e) =
->     pat n <+> text "=" <+> nest 2 (expr e)
+> binding :: PatName -> Expr -> Doc
+> binding n e =
+>     patName n <+> text "=" <+> nest 2 (expr e)
 
 
 > pat :: Pat -> Doc
-> pat (IdenP s p) = (case s of
->                        NoShadow -> empty
->                        Shadow -> text "shadow")
->                   <+> patName p
-> pat (VariantP c ps) = patName c <> parens (commaSep $ map pat ps)
-> pat (TupleP ps) = text "{" <> (xSep ";" $ map pat ps) <> text "}"
-> pat (AsP p s nm) =
->     pat p
->     <+> text "as"
->     <+> (case s of
->                 NoShadow -> empty
->                 Shadow -> text "shadow")
->     <+> text nm
+> pat (IdenP pn) = patName pn
+> pat (VariantP q c ps) = maybe empty (\a -> text a <> text ".") q
+>                         <> text c <> parens (commaSep $ map pat ps)
+> pat (AsP p pn) = pat p <+> text "as" <+> patName pn
 
 > patName :: PatName -> Doc
-> patName (PatName s) = text s
-> patName (QPatName q s) = text q <> text "." <> text s
+> patName (PatName s p) = (case s of
+>                              NoShadow -> empty
+>                              Shadow -> text "shadow")
+>                         <+> text p
 
 > stmt :: Stmt -> Doc
 > stmt (StExpr e) = expr e
 > stmt (When c t) = text "when" <+> expr c <> text ":" <+> nest 2 (expr t) <+> text "end"
 
-> stmt (LetDecl b) = binding b
+> stmt (LetDecl n e) = binding n e
 
-> stmt (VarDecl b) = text "var" <+> binding b
+> stmt (VarDecl pn e) = text "var" <+> patName pn <+> text "=" <+> expr e
 > stmt (SetVar n e) = text n <+> text ":=" <+> nest 2 (expr e)
 > stmt (SetRef e fs) = expr e <> text "!{" <> commaSep (map f fs) <> text "}"
 >   where
 >     f (n,v) = text n <> text ":" <+> expr v
 
-> stmt (RecDecl b) = text "rec" <+> binding b
-> stmt (FunDecl n as e w) = vcat
->      [text "fun" <+> text n <+> parens (commaSep $ map pat as) <> text ":"
+> stmt (RecDecl n e) = text "rec" <+> binding n e
+> stmt (FunDecl pn as e w) = vcat
+>      [text "fun" <+> patName pn <+> parens (commaSep $ map patName as) <> text ":"
 >      ,nest 2 (expr e)
 >      ,maybe empty whereBlock w
 >      ,text "end"]
@@ -162,6 +154,9 @@
 >                      _ -> empty)
 >                  <+> text x
 
+> stmt (Contract nm ty) = text nm <+> text "::" <+> typ ty
+
+
 > stmt (Check nm ts) =
 >     vcat [text "check" <+> maybe empty (doubleQuotes . text) nm <> text ":"
 >          ,nest 2 (stmts ts)
@@ -169,6 +164,20 @@
 
 > stmt (TPred e0 t pr e1) = expr e0 <+> text t <> parens (expr pr) <+> expr e1
 > stmt (TPostfixOp e o) = expr e <+> text o
+
+> typ :: Type -> Doc
+> typ (TName nm) = text nm
+> typ (TQName q nm) = text q <> text "." <> text nm
+> typ (TTuple ts) = text "{" <> nest 2 (xSep ";" $ map typ ts) <> text "}"
+> typ (TRecord fs) = text "{" <> nest 2 (xSep "," $ map f fs) <> text "}"
+>   where
+>     f(n,t) = text n <+> text "::" <+> typ t
+> typ (TParam t as) = typ t <> text "<" <> nest 2 (xSep "," $ map typ as) <> text ">"
+> typ (TArrow ts t) = xSep "," (map typ ts) <+> text "->" <+> typ t
+> typ (TNamedArrow ts t) = text "(" <> xSep "," (map f ts) <> text ")" <+> text "->" <+> typ t
+>   where
+>     f(n,u) = text n <+> text "::" <+> typ u
+> typ (TParens t) = text "(" <> typ t <> text ")"
 
 > stmts :: [Stmt] -> Doc
 > stmts = vcat . map stmt
@@ -205,8 +214,6 @@
 >          ,nest 2 $ commaSep $ map provideItem pis
 >          ,text "end"]
 > preludeStmt (Import is a) = text "import" <+> importSource is <+> text "as" <+> text a
-> preludeStmt (ImportNames nms is) = text "import" <+> commaSep (map text nms)
->                                   <+> text "from" <+> importSource is
 
 > provideItem :: ProvideItem -> Doc
 > provideItem ProvideAll = text "*"

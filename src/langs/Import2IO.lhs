@@ -29,7 +29,7 @@ Import demo 2 (simple imports) with IO in the interpreter stack
 >
 > import Data.Char (isAlphaNum)
 
-> import Scientific (Scientific, extractInt)
+> import Scientific1 (Scientific, extractInt)
 > import Data.List (intercalate, sortBy)
 > import Data.Ord (comparing)
 >

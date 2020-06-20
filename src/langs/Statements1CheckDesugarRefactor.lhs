@@ -36,7 +36,7 @@ one exception: take the current base simple statements with the non
 >
 > import Data.Char (isAlphaNum)
 
-> import Scientific (Scientific, extractInt)
+> import Scientific1 (Scientific, extractInt)
 > import Data.List (intercalate)
 
 > --import Debug.Trace (trace)

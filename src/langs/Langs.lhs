@@ -49,7 +49,7 @@
 > import qualified FixWhere
 > import qualified RunScriptInterp
 
-> import qualified Front
+> -- import qualified Front
 
 > import qualified Test.Tasty as T
 
@@ -103,5 +103,5 @@
 >        ,FixWhere.tests
 >        ,RunScriptInterp.tests
 >  
->        ,Front.tests
+>        --,Front.tests
 >        ]

@@ -100,7 +100,7 @@ or all tests for all code that is used
 >
 > import Data.Char (isAlphaNum)
 
-> import Scientific (Scientific, extractInt)
+> import Scientific1 (Scientific, extractInt)
 > import Data.List (intercalate, partition)
 >
 > --import Debug.Trace (trace)

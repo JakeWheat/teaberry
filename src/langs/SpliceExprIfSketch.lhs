@@ -25,7 +25,7 @@ sketch of implementing if on top of expr1ffi using splices
  > import Control.Monad.Trans.Class (lift)
  > import Control.Monad.Trans.Except (Except, runExcept, throwE)
  > import Control.Monad.Trans.Reader (ReaderT, runReaderT, ask, local)
- > import Scientific (Scientific, extractInt)
+ > import Scientific1 (Scientific, extractInt)
 
  > import Data.List (intercalate)
 

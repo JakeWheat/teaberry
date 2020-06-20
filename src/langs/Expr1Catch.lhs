@@ -31,7 +31,7 @@ simple expressions with catch:
 
 > import System.IO.Unsafe (unsafePerformIO)
 > 
-> import Scientific (Scientific)
+> import Scientific1 (Scientific)
 > import Data.List (intercalate)
 
 ------------------------------------------------------------------------------

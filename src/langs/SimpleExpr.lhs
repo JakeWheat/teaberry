@@ -22,7 +22,7 @@ It has multi arg functions + lambdas, and multi bind lets.
 > import qualified OldParse as P
 > import qualified OldSyntax as S
 > import qualified OldPretty as Pr
-> import Scientific (Scientific)
+> import Scientific1 (Scientific)
 
 > import qualified Test.Tasty as T
 > import qualified Test.Tasty.HUnit as T

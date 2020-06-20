@@ -22,7 +22,7 @@
 
 > --import Debug.Trace (trace)
 
-> import Scientific (Scientific)
+> import Scientific1 (Scientific)
 
 > -- used for creating the test lists for tasty to run
 > import System.IO.Unsafe (unsafePerformIO)

@@ -30,7 +30,7 @@ implement slightly more of tuples, make em, get fields, compare
 >
 > import Data.Char (isAlphaNum)
 
-> import Scientific (Scientific, extractInt)
+> import Scientific1 (Scientific, extractInt)
 > import Data.List (intercalate)
 >
 > --import Debug.Trace (trace)

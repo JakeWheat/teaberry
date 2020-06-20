@@ -32,7 +32,7 @@ the error handling is poor.
 >
 > import Data.Char (isAlphaNum)
 
-> import Scientific (Scientific, extractInt)
+> import Scientific1 (Scientific, extractInt)
 > import Data.List (intercalate, sortBy)
 > import Data.Ord (comparing)
 >

@@ -48,7 +48,7 @@ what if it's just a function? why have new syntax?
 >
 > import Data.Char (isAlphaNum)
 
-> import Scientific (Scientific, extractInt, divideScientific)
+> import Scientific1 (Scientific, extractInt, divideScientific)
 > import Data.List (intercalate, sortBy, nubBy)
 > import Data.Ord (comparing)
 >

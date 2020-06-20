@@ -26,9 +26,9 @@ function, so it can be used in the implementation of ffi functions
 
 > import Text.Read (readMaybe)
 
-> import qualified Parse as P
-> import Syntax
-> import qualified Pretty as Pr
+> import qualified Parse2 as P
+> import Syntax2
+> import qualified Pretty2 as Pr
 
 > import qualified ParserExtra as Px
 
@@ -47,7 +47,7 @@ function, so it can be used in the implementation of ffi functions
 >
 > import Data.Char (isAlphaNum)
 
-> import Scientific (Scientific, divideScientific, showScientific)
+> import Scientific1 (Scientific, divideScientific, showScientific)
 > import Data.List (intercalate, nubBy, sortOn, findIndex, isPrefixOf, tails)
 
 > --import Debug.Trace (trace, traceStack)

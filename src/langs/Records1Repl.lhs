@@ -30,7 +30,7 @@ Records1 adjusted for a repl demo
 >
 > import Data.Char (isAlphaNum)
 
-> import Scientific (Scientific, extractInt, divideScientific)
+> import Scientific1 (Scientific, extractInt, divideScientific)
 > import Data.List (intercalate, sortBy)
 > import Data.Ord (comparing)
 >

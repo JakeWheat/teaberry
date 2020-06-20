@@ -51,7 +51,7 @@ this should be ready now
 >
 > import Data.Char (isAlphaNum)
 
-> import Scientific (Scientific, extractInt)
+> import Scientific1 (Scientific, extractInt)
 > import Data.List (intercalate, sortBy, nubBy)
 > import Data.Ord (comparing)
 >

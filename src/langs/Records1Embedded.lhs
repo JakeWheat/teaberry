@@ -58,7 +58,7 @@ do demo of opaque ffi values
 >
 > import Data.Char (isAlphaNum)
 
-> import Scientific (Scientific, extractInt, divideScientific)
+> import Scientific1 (Scientific, extractInt, divideScientific)
 > import Data.List (intercalate, sortBy)
 > import Data.Ord (comparing)
 >

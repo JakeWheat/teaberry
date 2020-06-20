@@ -27,7 +27,7 @@ Implement records as variants properly
 >
 > import Data.Char (isAlphaNum)
 
-> import Scientific (Scientific, extractInt)
+> import Scientific1 (Scientific, extractInt)
 > import Data.List (intercalate, sortOn)
 >
 > --import Debug.Trace (trace)

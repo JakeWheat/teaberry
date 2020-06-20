@@ -49,9 +49,9 @@ and link could be defined in terms of themselves
 
 
 
-> import qualified Parse as P
-> import Syntax
-> import qualified Pretty as Pr
+> import qualified Parse2 as P
+> import Syntax2
+> import qualified Pretty2 as Pr
 
 > import qualified ParserExtra as Px
 
@@ -70,7 +70,7 @@ and link could be defined in terms of themselves
 >
 > import Data.Char (isAlphaNum)
 
-> import Scientific (Scientific, divideScientific)
+> import Scientific1 (Scientific, divideScientific)
 > import Data.List (intercalate, nubBy, sortOn)
 
 > --import Debug.Trace (trace, traceStack)

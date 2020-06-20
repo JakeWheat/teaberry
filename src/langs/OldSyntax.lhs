@@ -20,7 +20,7 @@ The high level syntax which the parser produces
 >               ) where
 
 > import Data.Data (Data,Typeable)
-> import Scientific (Scientific,extractInt)
+> import Scientific1 (Scientific,extractInt)
 > import GHC.Generics (Generic)
 
 ------------------------------------------------------------------------------

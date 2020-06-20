@@ -62,12 +62,14 @@ library langfiles
   import:              shared-properties
   build-depends:       tasty,
                        tasty-hunit,
-                       raw-strings-qq,
-                       --todo: get rid of this
-                       teaberry
+                       raw-strings-qq
   autogen-modules:     Paths_teaberry
   hs-source-dirs:      src/langs
-  exposed-modules:     TestUtils
+  exposed-modules:     Scientific1
+                       Syntax2
+                       Parse2
+                       Pretty2
+                       TestUtils
                        Paths_teaberry
                        Langs
                        ParserExtra

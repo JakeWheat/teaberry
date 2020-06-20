@@ -26,7 +26,7 @@ except purely what is needed for the testing implementation
 
 > import Data.Char (isAlphaNum)
 
-> import Scientific (Scientific, extractInt)
+> import Scientific1 (Scientific, extractInt)
 > import Data.List (intercalate)
 
 ------------------------------------------------------------------------------

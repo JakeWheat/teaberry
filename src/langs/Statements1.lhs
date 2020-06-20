@@ -43,7 +43,7 @@ programs and imports and stuff
 > import Control.Monad.Trans.Except (Except, runExcept, throwE)
 > import Control.Monad.Trans.Reader (ReaderT, runReaderT, ask, local)
 
-> import Scientific (Scientific)
+> import Scientific1 (Scientific)
 > import Data.List (intercalate)
 
 ------------------------------------------------------------------------------
