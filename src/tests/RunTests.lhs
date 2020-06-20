@@ -17,6 +17,8 @@
 >                      ,testDetailedSourceFile)-}
 > import Langs (langTests)
 
+> import qualified FrontTests
+
 > main :: IO ()
 > main = do
 >     -- todo: if there is a failure here, it stops all the tests from running
@@ -34,4 +36,5 @@
 >         --,T.testGroup "test tests" $ map testDetailedSourceFile detailedSourceFileTests
 >         --,sourceFileTests
 >         ,langTests
+>         ,FrontTests.tests
 >         ]

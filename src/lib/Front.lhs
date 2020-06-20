@@ -22,13 +22,15 @@ they diff nicely? (and document the connections betwen them)
 > {-# LANGUAGE MultiWayIf #-}
 > {-# LANGUAGE DeriveDataTypeable #-}
 
-> module Front (tests
->              ,TeaberryHandle
+> module Front (TeaberryHandle
 >              ,newTeaberryHandle
 >              ,runScript
+>              ,runScriptWithTests
 >              ,runFunction
->              ,Value
->              ,valueToString) where
+>              ,Value(..)
+>              ,valueToString
+>              ,CheckResult(..)
+>              ) where
 
 > import Prelude hiding ((<>))
 > import Text.PrettyPrint (render, text, (<>), (<+>), -- empty, parens,
@@ -42,7 +44,7 @@ they diff nicely? (and document the connections betwen them)
 > import Syntax
 > import qualified Pretty as Pr
 
-> import qualified ParserExtra as Px
+> -- import qualified ParserExtra as Px
 
 > import Control.Monad.Trans.Class (lift)
 > import Control.Monad.IO.Class (liftIO)
@@ -55,15 +57,15 @@ they diff nicely? (and document the connections betwen them)
 > import Data.Data (Data)
 
 > import Control.Monad (when)
-> import Data.Maybe (mapMaybe)
+> import Data.Maybe (mapMaybe, isNothing)
 >
 > import Data.Char (isAlphaNum)
 
 > import Scientific (Scientific, divideScientific, showScientific)
-> import Data.List (intercalate, nubBy, sortOn, findIndex, isPrefixOf, tails)
+> import Data.List (intercalate, nubBy, sortOn, findIndex, isPrefixOf, tails, partition)
 
 > --import Debug.Trace (trace, traceStack)
-> import qualified TestUtils as T
+> --import qualified TestUtils as T
 
 > import Data.IORef (IORef, newIORef, readIORef, writeIORef)
 
@@ -132,12 +134,27 @@ embedded api
 >     (v,ebs'',t) <- evaluate fnm ebs' src
 >     case t of
 >         [] -> pure ()
->         _ -> putStrLn $ T.renderCheckResults t
+>         _ -> putStrLn $ renderCheckResults t
 >     -- if you press ctrl-c in between the start of
 >     -- writeioref and if finishing, or even at another time,
 >     -- can this write become corrupted?
 >     writeIORef (tbh h) ebs''
 >     pure v
+
+> runScriptWithTests :: TeaberryHandle -> Maybe String -> [(String,Value)] -> String -> IO [CheckResult]
+> runScriptWithTests h fnm lenv src = do
+>     ebs <- readIORef (tbh h)
+>     let ebs' = ebs {henv = extendEnv lenv $ henv ebs}
+>     (_v,ebs'',t) <- evaluate fnm ebs' src
+>     case t of
+>         [] -> pure ()
+>         _ -> putStrLn $ renderCheckResults t
+>     -- if you press ctrl-c in between the start of
+>     -- writeioref and if finishing, or even at another time,
+>     -- can this write become corrupted?
+>     writeIORef (tbh h) ebs''
+>     pure t
+
 
 > runFunction :: TeaberryHandle -> String -> [Value] -> IO Value
 > runFunction h f as = do
@@ -164,15 +181,15 @@ hacky top level evaluate. not really sure if it will pay its way once
 > evaluate :: Maybe String
 >           -> RuntimeState
 >           -> String
->           -> IO (Value, RuntimeState, [T.CheckResult])
+>           -> IO (Value, RuntimeState, [CheckResult])
 > evaluate fnm ebs src = do
 >     d <- getBuiltInModulesDir
 >     fst <$> evalRWST (f d) (makeInterpreterEnv $ henv ebs) emptyInterpreterState
 >   where
->     f :: FilePath -> Interpreter (Value, RuntimeState, [T.CheckResult])
+>     f :: FilePath -> Interpreter (Value, RuntimeState, [CheckResult])
 >     f d =
 >         -- quick hack for set
->         case Px.parseSet src of
+>         case P.parseSet src of
 >             Right (k,v)
 >               | k == "dump-desugar" -> do
 >                 case v of
@@ -341,7 +358,7 @@ store holds the values of variables
 > data InterpreterState =
 >     InterpreterState
 >     {addedTests :: [Value]
->     ,testResultLog :: [T.TestResultLog]
+>     ,testResultLog :: [TestResultLog]
 >     ,isStore :: Store
 >     }
 
@@ -1443,28 +1460,28 @@ says there is a new test block with a unique id and it's name
 
 > logCheckBlock :: Scientific -> String -> Interpreter Value
 > logCheckBlock n nm =
->     nothingWrapper $ \s -> s {testResultLog = T.TestBlock n nm : testResultLog s}
+>     nothingWrapper $ \s -> s {testResultLog = TestBlock n nm : testResultLog s}
 
 log-test-pass(blockid, text of test)
 
 > logTestPass :: Scientific -> String -> Interpreter Value
 > logTestPass n msg =
->     nothingWrapper $ \s -> s {testResultLog = T.TestPass n msg : testResultLog s}
+>     nothingWrapper $ \s -> s {testResultLog = TestPass n msg : testResultLog s}
 
 log-test-fail(block,id, text of test, fail message)
 
 > logTestFail :: Scientific -> String -> String -> Interpreter Value
 > logTestFail n msg failmsg = nothingWrapper $ \s ->
->     s {testResultLog = T.TestFail n msg failmsg : testResultLog s}
+>     s {testResultLog = TestFail n msg failmsg : testResultLog s}
 
 this is run at the end of the script to run all the saved tests
 
-> runAddedTests :: Interpreter [T.CheckResult]
+> runAddedTests :: Interpreter [CheckResult]
 > runAddedTests = do
 >     ts <- reverse <$> gets addedTests
 >     mapM_ (`app` []) ts
 >     testLog <- reverse <$> gets testResultLog
->     either throwInterp pure $ T.testLogToCheckResults testLog
+>     either throwInterp pure $ testLogToCheckResults testLog
 
 
 ------------------------------------------------------------------------------
@@ -1638,165 +1655,91 @@ pretty interpreter syntax
 > unconvIPatName :: String -> PatName
 > unconvIPatName n = PatName NoShadow n
 
+
 ------------------------------------------------------------------------------
 
-tests
-=====
+in language testing support
 
-> tests :: T.TestTree
-> tests = T.testGroup "front" [tests1, tests4]
+> data TestResultLog = TestPass Scientific String -- check block id, test source
+>                    | TestFail Scientific String String -- check block id, test source, failure message
+>                    | TestBlock Scientific String
 
-> testFiles :: [FilePath]
-> testFiles =
->     ["agdt.tea"
->     ,"ahoy.tea"
->     ,"arithmetic.tea"
->     ,"binding.tea"
->     ,"blocks.tea"
->     ,"boolean.tea"
->     ,"built-in-functions.tea"
->     ,"catch.tea"
->
->     ,"check_block_closures.tea"
->     ,"check_closure.tea"
->     ,"check.tea"
->     ,"comparisons.tea"
->     ,"construct.tea"
->     ,"empty_check.tea"
->     ,"empty.tea"
->     ,"functions.tea"
->     ,"identifiers.tea"
->     ,"if_ask.tea"
->     ,"let.tea"
->     ,"lists-basics.tea"
->     ,"lists.tea"
->     ,"nested_comment.tea"
+this is run after that, to convert the log of test events, into a
+organised data structure to view the results
 
->     ,"prelude-combine-provides.tea"
->     ,"prelude-include-module.tea"
->     ,"prelude-local-module.tea"
->     ,"prelude-provide-all.tea"
->     ,"prelude-provide-x.tea"
->     --,"random.tea" -- change in letrec desugaring, possibly bug
->     ,"records.tea"
->     ,"recursive.tea"
->     ,"ref.tea"
->     ,"tour.tea"
->     ,"trivial_is.tea"
->     ,"tuples.tea"
->     ,"two_same_name_check.tea"
->     ,"vars.tea"
->     ,"when.tea"
->     ,"where.tea"
->
->     ,"option.tea"
->     ,"either.tea"
->     ]
+> testLogToCheckResults :: [TestResultLog] -> Either String [CheckResult]
+> testLogToCheckResults trls = do
+>     -- 'streaming' algorithm, very efficient
+>     -- but the reason to do it is because it's an easy
+>     -- way to catch a test result without a matching check block
+>     -- relies on the test results being in the order you write
+>     -- the corresponding tests in the source file
+>     let f :: [(Scientific, CheckResult)] -> [TestResultLog] -> Either String [CheckResult]
+>         -- finished, reverse the check results
+>         f res [] = pure $ map reverseResults $ map snd $ reverse res
+>         -- new check block, make sure it's id hasn't been seen already
+>         f res ((TestBlock cid nm) : xs) = do
+>             --when (any (== cid) $ map fst res)
+>             --    $ Left $ "multiple check result name for check block with id " ++ show cid
+>             f ((cid, CheckResult nm []) : res) xs
+>         -- if we see a pass or a fail without having see a testblock
+>         -- then it's a bug
+>         f [] (TestPass {} : _) = Left $ "unmatched check block id in test result"
+>         f [] (TestFail {} : _) = Left $ "unmatched check block id in test result"
+>         -- pass or fail, the id should match the id of the last testblock entry
+>         -- not sure if this extra checking is really needed
+>         -- maybe it will be useful if try to run tests in multiple threads
+>         -- in the future?
+>         f ((cid, CheckResult cnm ts):cs) ((TestPass tid tnm) : xs)
+>             | cid == tid =
+>               f ((cid,CheckResult cnm ((tnm, Nothing):ts)):cs) xs
+>             | otherwise = Left $ "unmatched check block id in test result"
+>         f ((cid, CheckResult cnm ts):cs) ((TestFail tid tnm fmsg) : xs)
+>             | cid == tid =
+>               f ((cid,CheckResult cnm ((tnm, Just fmsg):ts)):cs) xs
+>             | otherwise = Left $ "unmatched check block id in test result"
+>     f [] trls
+>   where
+>     reverseResults (CheckResult nm ts) = CheckResult nm $ reverse ts
 
-> tests1 :: T.TestTree
-> tests1 = T.testGroup "front1" $
->     map (\f -> T.makeTestsIO ("front" ++ f)
->             $ runFileTests ("examples/tests/fulltests" </> f))
->     testFiles
+function to convert the check result data structure into a nicely
+formatted string
 
-> runFileTests :: FilePath -> IO (Either String [T.CheckResult])
-> runFileTests fp = do
->     src <- readFile fp
->     (_,_,ts) <- evaluate (Just fp) defaultRuntimeState src
->     pure $ Right ts
-
-
-> tests4 :: T.TestTree
-> tests4 = T.testGroup "front4"
->     [testSanityArith
->     ,testEnvKept
->     ,testEnvOverridden
->     ,testAScript
->     ,testRunScriptWithValues
->     ,testRunFunctionSimple
->     --,testRunFunctionPartialApp
->     ]
-
-> testSanityArith :: T.TestTree
-> testSanityArith = T.testCase "testSanityArith4" $ do
->     h <- newTeaberryHandle
->     v <- runScript h Nothing [] "1 + 2"
->     T.assertEqual "" (NumV 3) v
+> renderCheckResults :: [CheckResult] -> String
+> renderCheckResults cs =
+>     let bs = map renderCheck cs
+>         totalPasses = sum $ map (\(n,_,_) -> n) bs
+>         totalFails = sum $ map (\(_,n,_) -> n) bs
+>         msgs = map (\(_,_,m) -> m) bs
+>     in intercalate "\n\n" msgs
+>        ++ "\n\n" ++ (show totalPasses) ++ "/" ++ show (totalPasses + totalFails)
+>        ++ " tests passed in all check blocks"
+>   where
+>     renderCheck (CheckResult nm ts) =
+>         let (ps,fs) = partition (isNothing . snd) ts
+>             msgs = map renderTest ts
+>         in (length ps
+>            ,length fs
+>            ,"Check block: " ++ nm ++ "\n"
+>            ++ intercalate "\n" (map indent msgs)
+>            ++ "\n  " ++ show (length ps) ++ "/" ++ show (length ts) ++ " tests passed in check block: " ++ nm
+>            )
+>     renderTest (a,b) =
+>         "test (" ++ a ++ "): "
+>         ++ case b of
+>                Nothing -> "OK"
+>                Just msg -> "failed, reason:\n" ++ indent msg
+>     indent [] = []
+>     indent x = "  " ++ indent' x
+>     indent' [] = []
+>     indent' x@[_] = x
+>     indent' ('\n':y@(_:_)) = "\n  " ++ indent' y
+>     indent' (x:y) = x : indent' y
 
 
-> testEnvKept :: T.TestTree
-> testEnvKept = T.testCase "testEnvKept" $ do
->     h <- newTeaberryHandle
->     _ <- runScript h Nothing [] "a = 1"
->     v <- runScript h Nothing [] "a"
->     T.assertEqual "" (NumV 1) v
+test results
 
-> testEnvOverridden :: T.TestTree
-> testEnvOverridden = T.testCase "testEnvOverridden" $ do
->     h <- newTeaberryHandle
->     _ <- runScript h Nothing [] "a = 1"
->     _ <- runScript h Nothing [] "a = 4"
->     v <- runScript h Nothing [] "a"
->     T.assertEqual "" (NumV 4) v
-
-*****
-TODO: test running something with tests and there's a test failure
-
-
-> testAScript :: T.TestTree
-> testAScript = T.testCase "testAScript" $ do
->     let script = "a = 3\nb = 4\na + b"
->     h <- newTeaberryHandle
->     v <- runScript h Nothing [] script
->     T.assertEqual "" (NumV 7) v
-
-todo: lots of boilerplate and abstraction details to work out
-
-> {-testFFI :: T.TestTree
-> testFFI = T.testCase "testFFI" $ do
->     let myFFI :: [Value] -> Interpreter Value
->         myFFI = \case
->             [NumV a] = pure $ NumV $ a + 1
->             _ = lift $ throwE $ "expected num"
->     h <- newTeaberryHandle
->     addFFI h ("myfun", myFFI)
->     v <- runScript h "myfun(3)"
->     T.assertEqual "" (Right (NumV 4)) v-}
-
-> testRunScriptWithValues :: T.TestTree
-> testRunScriptWithValues = T.testCase "testRunScriptWithValues" $ do
->     h <- newTeaberryHandle
->     v <- runScript h Nothing
->                      [("a", NumV 3)
->                      ,("b", NumV 11)] "a + b"
->     T.assertEqual "" (NumV 14) v
-
-how to implement this without it staying in the env?
-todo: fix this, for now, they will stay in the env
-
-when should stuff stay in the env generally?
-"a = 1"
-a should stay in the env
-"a = 1
-a + 2"
-should a stay in the env? not sure
-
-
-> testRunFunctionSimple :: T.TestTree
-> testRunFunctionSimple = T.testCase "testRunFunctionSimple" $ do
->     h <- newTeaberryHandle
->     _ <- runScript h Nothing [] "f = lam(x,y): x + y end"
->     v <- runFunction h "f" [NumV 5, NumV 11]
->     T.assertEqual "" (NumV 16) v
-
-the next test should work as soon as partial application is
-implemented
-
-> {-testRunFunctionPartialApp :: T.TestTree
-> testRunFunctionPartialApp = T.testCase "testRunFunctionPartialApp" $ do
->     h <- newTeaberryHandle
->     _ <- runScript h [] "f = lam(x,y): x + y end"
->     v <- runFunction h "f(_,4)" [NumV 5]
->     T.assertEqual "" (Right (NumV 9)) v-}
-
+> data CheckResult = CheckResult String -- the test block name
+>                               [(String, Maybe String)]
+>                  deriving Show
 

@@ -58,7 +58,9 @@ for things like expressions, patterns, terms, etc.
 > {-# LANGUAGE TupleSections,ScopedTypeVariables, MultiWayIf, LambdaCase #-}
 > module Parse (parseExpr
 >              ,parseStmt
->              ,parseModule) where
+>              ,parseModule
+>              ,parseSet
+>              ) where
 
 > --import Debug.Trace(trace)
 > --import Text.Show.Pretty (ppShow)
@@ -901,3 +903,22 @@ a dotted identifier will parse as a variant with no args, it's a bit hacky
 > importStmt :: Parser PreludeStmt
 > importStmt = keyword_ "import" *> (Import <$> importSource
 >                       <*> (keyword_ "as" *> identifier))
+
+---------
+
+temp hack
+
+todo: decide on what syntax to use, maybe just something in language
+incorporate this into the syntax and parsing properly
+
+> parseSet :: String -> Either String (String,String)
+> parseSet src = either (Left . errorBundlePretty) Right $
+>                    parse (whiteSpace *> pSet <* eof) "" src
+
+> pSet :: Parser (String,String)
+> pSet = lexeme $ do
+>     lexeme_ $ string ":set"
+>     k <- identifier
+>     symbol_ "="
+>     v <- identifier
+>     pure (k,v)

@@ -33,7 +33,7 @@ common shared-properties
                        mtl,
                        safe-exceptions,
                        filepath,
-                       uniplate,
+                       uniplate
   ghc-options:         -Wall
 
 
@@ -42,15 +42,9 @@ common shared-properties
 
 library
   import:              shared-properties
-  build-depends:       tasty,
-                       tasty-hunit,
-                       raw-strings-qq
   hs-source-dirs:      src/lib
   autogen-modules:     Paths_teaberry
   other-modules:       Paths_teaberry
-                       -- temp
-                       ParserExtra
-                       TestUtils
   exposed-modules:     Syntax
                        Parse
                        Pretty
@@ -131,6 +125,7 @@ Test-Suite RunTests
   main-is:             RunTests.lhs
   hs-source-dirs:      src/tests
   other-modules:       ParseTests
+                       FrontTests
 
   build-depends:       teaberry,
                        tasty,
