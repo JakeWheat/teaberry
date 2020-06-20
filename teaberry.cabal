@@ -1,13 +1,9 @@
 cabal-version:       2.2
-
 name:                teaberry
 version:             0.1
-
 synopsis:            experiment to implement a dialect of pyret
-
 description:         experiment to implement a dialect of pyret
                      https://github.com/JakeWheat/teaberry/
-
 license:             BSD-3-Clause
 license-file:        LICENSE
 author:              Jake Wheat
@@ -22,7 +18,6 @@ source-repository head
   type:                git
   location:            https://github.com/JakeWheat/teaberry.git
 
-
 common shared-properties
   default-language:    Haskell2010
   build-depends:       base,
@@ -36,10 +31,6 @@ common shared-properties
                        uniplate
   ghc-options:         -Wall
 
-
-
-
-
 library
   import:              shared-properties
   hs-source-dirs:      src/lib
@@ -51,15 +42,33 @@ library
                        Scientific
                        Front
 
-
-library langfiles
+executable teaberry
   import:              shared-properties
-  build-depends:       tasty,
+  main-is:             Teaberry.lhs
+  hs-source-dirs:      src/exe
+  build-depends:       haskeline,
+                       optparse-applicative,
+                       teaberry
+  ghc-options:         -threaded
+
+-- teaberry-dev has command line for a few of the langs
+-- and can also run the tasty tests
+Test-Suite teaberry-dev
+  import:              shared-properties
+  type:                exitcode-stdio-1.0
+  main-is:             TeaberryDev.lhs
+  hs-source-dirs:      src/tests,src/langs
+  other-modules:       ParseTests
+                       FrontTests
+  build-depends:       haskeline,
+                       optparse-applicative,
+                       teaberry,
+                       tasty,
                        tasty-hunit,
                        raw-strings-qq
+  ghc-options:         -threaded
   autogen-modules:     Paths_teaberry
-  hs-source-dirs:      src/langs
-  exposed-modules:     Scientific1
+  other-modules:       Scientific1
                        Syntax2
                        Parse2
                        Pretty2
@@ -117,38 +126,3 @@ library langfiles
                        Provide1
                        FixWhere
                        RunScriptInterp
-
-                         
-Test-Suite RunTests
-  import:              shared-properties
-  type:                exitcode-stdio-1.0
-  main-is:             RunTests.lhs
-  hs-source-dirs:      src/tests
-  other-modules:       ParseTests
-                       FrontTests
-
-  build-depends:       teaberry,
-                       tasty,
-                       tasty-hunit,
-                       langfiles
-  ghc-options:         -threaded
-
--- todo: separate out a teaberry-dev exe for the langfiles stuff
-executable teaberry
-  import:              shared-properties
-  main-is:             Teaberry.lhs
-  hs-source-dirs:      src/exe
-  build-depends:       haskeline,
-                       optparse-applicative,
-                       teaberry
-  ghc-options:         -threaded
-
-executable teaberry-dev
-  import:              shared-properties
-  main-is:             TeaberryDev.lhs
-  hs-source-dirs:      src/exe
-  build-depends:       haskeline,
-                       optparse-applicative,
-                       teaberry,
-                       langfiles
-  ghc-options:         -threaded

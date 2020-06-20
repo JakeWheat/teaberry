@@ -15,7 +15,7 @@ https://github.com/JakeWheat/teaberry/tree/master/built-in-modules
 
 Compile and run the tests:
 
-cabal run RunTests --disable-optimization -- --hide-successes --ansi-tricks=false
+cabal run teaberry-dev --disable-optimization -- test --hide-successes --ansi-tricks=false
 
 Use the command line interface:
 
