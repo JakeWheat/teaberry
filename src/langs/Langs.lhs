@@ -48,6 +48,7 @@
 > import qualified Provide1
 > import qualified FixWhere
 > import qualified RunScriptInterp
+> import qualified Anomaly1
 
 > -- import qualified Front
 
@@ -102,6 +103,5 @@
 >        ,Provide1.tests
 >        ,FixWhere.tests
 >        ,RunScriptInterp.tests
->  
->        --,Front.tests
+>        ,Anomaly1.tests
 >        ]

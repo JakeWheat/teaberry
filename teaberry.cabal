@@ -126,3 +126,4 @@ Test-Suite teaberry-dev
                        Provide1
                        FixWhere
                        RunScriptInterp
+                       Anomaly1
