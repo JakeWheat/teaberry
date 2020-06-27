@@ -5,7 +5,6 @@ The high level syntax which the parser produces
 > {-# LANGUAGE DeriveDataTypeable #-}
 > {-# LANGUAGE ScopedTypeVariables #-}
 > module Syntax2 (Stmt(..)
->               ,Type(..)
 >               ,Shadow(..)
 >               ,Expr(..)
 >               ,VariantDecl(..)
@@ -56,22 +55,11 @@ The high level syntax which the parser produces
 >           | SetVar String Expr
 >           | SetRef Expr [(String,Expr)]
 >           | DataDecl String [VariantDecl] (Maybe [Stmt])
->           | Contract String Type
 >           | TPred Expr String Expr Expr -- is%, is-not%
 >           | TPostfixOp Expr String --- does-not-raise
 >           | Check (Maybe String) [Stmt]
 >           -- todo: part of the interpreter syntax, remove from here
 >           | LetSplatDecl Expr
->           deriving (Eq,Show,Data) 
-
-> data Type = TName String
->           | TQName String String
->           | TTuple [Type]
->           | TRecord [(String,Type)]
->           | TParam Type [Type]
->           | TArrow [Type] Type
->           | TNamedArrow [(String,Type)] Type
->           | TParens Type
 >           deriving (Eq,Show,Data) 
 
 > data VariantDecl = VariantDecl String [(Ref,String)]

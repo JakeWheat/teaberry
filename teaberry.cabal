@@ -128,4 +128,5 @@ Test-Suite teaberry-dev
                        RunScriptInterp
                        Anomaly1
                        Parse1Tests
+                       Parse2Tests
 

@@ -103,7 +103,6 @@ for things like expressions, patterns, terms, etc.
 
 
 > import Syntax2 (Stmt(..)
->               ,Type(..)
 >               ,Expr(..)
 >               ,VariantDecl(..)
 >               ,Shadow(..)
@@ -670,7 +669,6 @@ and a test expression
 >     case ex of
 >         Iden i -> choice
 >             [SetVar i <$> ((symbol_ ":=" <?> "") *> expr)
->             ,Contract i <$> ((symbol_ "::" <?> "") *> typ)
 >             ,LetDecl (PatName NoShadow i) <$> ((symbol_ "=" <?> "") *> expr)
 >             ,handleExpr ex]
 >         _ -> handleExpr ex
@@ -682,72 +680,6 @@ and a test expression
 >         ,exprSuffix ex <**> bchoice [testPost, pure StExpr]]
 >            
 
-when it's parsing a commaSep typ,
-it can't parse an a -> b type
-there must be a parens
-
-> typ :: Parser Type
-> typ = startsWithIden <|> parensOrNamedArrow <|> ttupleOrRecord
->   where
->     startsWithIden = do
->         i <- identifier
->         ctu i
->     ctu i = do
->         i1 <- choice
->               [TQName i <$> (symbol_ "." *> identifier)
->               ,pure $ TName i]
->         choice
->               [TParam i1 <$> (symbol_ "<" *> commaSep1 noarrow <* symbol_ ">")
->               ,(\is r -> TArrow (i1:is) r)
->               <$> (many (symbol_ "," *> noarrow))
->               <*> (symbol_ "->" *> noarrow)
->               ,pure i1]
->     noarrow = parensOrNamedArrow <|> do
->         i <- identifier
->         noarrowctu i
->     noarrowctu i = do
->         i1 <- choice
->               [TQName i <$> (symbol_ "." *> identifier)
->               ,pure $ TName i]
->         choice
->               [TParam i1 <$> (symbol_ "<" *> commaSep1 typ <* symbol_ ">")
->               ,pure i1]
->     parensOrNamedArrow = symbol_ "(" *> do
->         i <- identifier
->         choice [do
->                 x <- symbol_ "::" *> noarrow
->                 xs <- option [] $ symbol_ "," *> (commaSep1 ((,) <$> identifier <*> (symbol_ "::" *> noarrow)))
->                 r <- symbol_ ")" *> symbol_ "->" *> noarrow
->                 pure $ TNamedArrow ((i,x):xs) r
->                ,do
->                 i1 <- ctu i <* symbol_ ")"
->                 pure $ TParens i1]
->                
-> 
->     ttupleOrRecord = symbol_ "{" *> f <* symbol_ "}"
->       where
->         f = do
->             i <- identifier
->             choice
->                 [do
->                  t <- symbol_ "::" *> noarrow
->                  ts <- option [] $ symbol_ "," *> commaSep1 ((,) <$> identifier <*> (symbol_ "::" *> noarrow))
->                  pure $ TRecord ((i,t):ts)
->                 ,do
->                  i1 <- noarrowctu i
->                  ts <- option [] $ symbol_ ";" *> xSep1 ';' noarrow
->                  pure $ TTuple (i1:ts)]
-> 
-> 
-
-iden
-.iden -> qname
-<xs> -> param
-,args -> arrorw
--> -> arrow
-{ty;ty} -> TTuple
-{x :: ty, ..} -> TRecord
-(x :: Ty, ...) -> Ty -> TNamedArrow
 
 > shadowLet :: Parser Stmt
 > shadowLet = keyword_ "shadow" *>

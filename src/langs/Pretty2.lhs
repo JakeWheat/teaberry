@@ -12,7 +12,6 @@
 >                          {-braces, ($$), ($+$),-} vcat)
 
 > import Syntax2 (Stmt(..)
->               ,Type(..)
 >               ,Expr(..)
 >               ,VariantDecl(..)
 >               ,Pat(..)
@@ -155,8 +154,6 @@
 >                      _ -> empty)
 >                  <+> text x
 
-> stmt (Contract nm ty) = text nm <+> text "::" <+> typ ty
-
 
 > stmt (Check nm ts) =
 >     vcat [text "check" <+> maybe empty (doubleQuotes . text) nm <> text ":"
@@ -166,19 +163,6 @@
 > stmt (TPred e0 t pr e1) = expr e0 <+> text t <> parens (expr pr) <+> expr e1
 > stmt (TPostfixOp e o) = expr e <+> text o
 
-> typ :: Type -> Doc
-> typ (TName nm) = text nm
-> typ (TQName q nm) = text q <> text "." <> text nm
-> typ (TTuple ts) = text "{" <> nest 2 (xSep ";" $ map typ ts) <> text "}"
-> typ (TRecord fs) = text "{" <> nest 2 (xSep "," $ map f fs) <> text "}"
->   where
->     f(n,t) = text n <+> text "::" <+> typ t
-> typ (TParam t as) = typ t <> text "<" <> nest 2 (xSep "," $ map typ as) <> text ">"
-> typ (TArrow ts t) = xSep "," (map typ ts) <+> text "->" <+> typ t
-> typ (TNamedArrow ts t) = text "(" <> xSep "," (map f ts) <> text ")" <+> text "->" <+> typ t
->   where
->     f(n,u) = text n <+> text "::" <+> typ u
-> typ (TParens t) = text "(" <> typ t <> text ")"
 
 > stmts :: [Stmt] -> Doc
 > stmts = vcat . map stmt
