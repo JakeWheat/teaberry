@@ -313,6 +313,15 @@ and make sure it doesn't parse newlines when it shouldn't
 > stringE = Text <$> stringRaw
 >             <?> "string literal"
 
+> multilineString :: Parser Expr
+> multilineString = Text <$> (symbol_ "```" *> rest)
+>             <?> "string literal"
+>   where
+>     rest = ("" <$ symbol_ "```")
+>            <|> do
+>                x <- anySingle
+>                (x:) <$> rest
+
 > appSuffix :: Parser (Expr -> Expr)
 > appSuffix = flip App <$> parens (commaSep expr)
 
@@ -548,6 +557,7 @@ put all the parsers which start with a keyword first
 >                 ,Iden <$> identifier
 >                 ,numE
 >                 ,stringE
+>                 ,multilineString
 >                 ,parensE
 >                 ,construct
 >                 ,tupleOrRecord

@@ -37,7 +37,10 @@
 
 > expr :: Expr -> Doc
 > expr (Num n) = text $ showScientific n
-> expr (Text s) = doubleQuotes (text s)
+> expr (Text s) =
+>     if '\n' `elem` s
+>     then text "```" <> text s <> text "```"
+>     else doubleQuotes (text s)
 > 
 > expr (TupleSel es) = text "{" <> nest 2 (xSep ";" (map expr es) <> text "}")
 > expr (RecordSel flds) = text "{" <> nest 2 (commaSep (map fld flds) <> text "}")

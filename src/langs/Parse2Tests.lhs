@@ -45,7 +45,7 @@
 >     ,("\"String\"", Text "String")
 >     --,("\"St\\\"ri\\\"ng\"", Text "St\"ri\"ng")
 >     --,("'Str\"ing'", Text "Str\"ing")
->     --,("```multiline\nstring```", Text "multiline\nstring")
+>     ,("```multiline\nstring```", Text "multiline\nstring")
 
 >     ,("a(3)", App (Iden "a") [Num 3])
 
