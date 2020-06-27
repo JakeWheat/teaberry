@@ -72,9 +72,6 @@ assertion expression
 
 > import Text.RawString.QQ
 
- > import qualified Test.Tasty as T
- > import qualified Test.Tasty.HUnit as T
-
 > import qualified Parse2 as P
 > import qualified Syntax2 as S
 > import qualified Pretty2 as Pr
@@ -84,12 +81,11 @@ assertion expression
 > import Control.Monad.Trans.RWS (RWST, evalRWST, ask, local, get, gets,asks, state, put, modify)
 
 > import Control.Monad (when)
-> --import Data.Maybe (isNothing)
 >
 > import Data.Char (isAlphaNum)
 
-> import Scientific1 (Scientific) -- , extractInt)
-> import Data.List (intercalate) --, partition)
+> import Scientific1 (Scientific)
+> import Data.List (intercalate)
 >
 > --import Debug.Trace (trace)
 

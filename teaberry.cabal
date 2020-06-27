@@ -131,4 +131,5 @@ Test-Suite teaberry-dev
                        Parse2Tests
                        SimpleBase
                        Curried
+                       SimpleBaseCase
 

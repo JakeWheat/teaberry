@@ -216,10 +216,8 @@ ffi catalog
 > defaultFFI = either error id $ addForeignFuns' (
 >    [("+", binaryOp unwrapNum unwrapNum wrapNum (+))
 >    ,("*", binaryOp unwrapNum unwrapNum wrapNum (*))
+>    ,("==", binaryOp anyIn anyIn wrapBool (==))
 >    ,("+", binaryOp unwrapText unwrapText wrapText (++))
->    ,("==", binaryOp unwrapNum unwrapNum wrapBool (==))
->    ,("==", binaryOp unwrapText unwrapText wrapBool (==))
->    ,("==", binaryOp unwrapTuple unwrapTuple wrapBool (==))
 
 >    ,("add-tests", unarySimple "function" addTests)
 >    ,("log-check-block", binaryV unwrapNum unwrapText logCheckBlock)
@@ -228,7 +226,6 @@ ffi catalog
 >    ,("raise", unaryOp anyIn id raise)
 >    ,("tostring", unaryOp anyIn pure tostring)
 >    ,("to-string", unaryOp anyIn pure tostring)
->    ,("tostring-equals", binaryOp anyIn anyIn wrapBool tostringEqualsx)
 
 >    ,("torepr", unaryOp anyIn pure torepr)
 >    ,("to-repr", unaryOp anyIn pure torepr)
@@ -241,9 +238,6 @@ ffi catalog
 
 > raise :: Value -> Interpreter Value
 > raise v = throwM $ ValueException v
-
-> tostringEqualsx :: Value -> Value -> Bool
-> tostringEqualsx e0 e1 = e0 == tostring e1
 
 > tostring :: Value -> Value
 > tostring x@(TextV {}) = x
@@ -397,7 +391,11 @@ desugaring code
 >     eqIdens c d = appI "==" [Iden c, Iden d]
 >     appI i es = App (Iden i) es
 > desugar (App (Iden "raises") [e0, e1]) = do
->   desugar (App (Iden "raises-satisfies") [e0, lam ["a"] $ App (Iden "tostring-equals") [e1, Iden "a"]])
+>     desugar (App (Iden "raises-satisfies")
+>            [e0
+>            ,lam ["a"] $ (Iden "a" `eq` App (Iden "tostring") [e1])])
+>   where
+>     eq a b = App (Iden "==") [a,b]
 
 > desugar x@(App (Iden "raises-satisfies") [e0,e1]) =
 >   desugar =<< desugarRaises  (Pr.prettyExpr x) e0 e1
@@ -564,8 +562,8 @@ ffi boilerplate
 >                        y -> throwInterp $ "expected 1 arg, got " ++ show y)
 >                  
 
-> unwrapTuple :: (String, Value -> Interpreter [Value])
-> unwrapTuple = ("tuple", \case
+> _unwrapTuple :: (String, Value -> Interpreter [Value])
+> _unwrapTuple = ("tuple", \case
 >                           TupleV fs -> pure fs
 >                           x -> throwInterp $ "type: expected tuple, got " ++ show x)
 

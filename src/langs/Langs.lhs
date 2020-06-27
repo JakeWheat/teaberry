@@ -51,6 +51,7 @@
 > import qualified Anomaly1
 > import qualified SimpleBase
 > import qualified Curried
+> import qualified SimpleBaseCase
 
 
 > import qualified Test.Tasty as T
@@ -107,4 +108,5 @@
 >        ,Anomaly1.tests
 >        ,SimpleBase.tests
 >        ,Curried.tests
+>        ,SimpleBaseCase.tests
 >        ]
