@@ -129,4 +129,5 @@ Test-Suite teaberry-dev
                        Anomaly1
                        Parse1Tests
                        Parse2Tests
+                       SimpleBase
 

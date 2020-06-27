@@ -1,61 +1,23 @@
- 
-Anomaly testing version one:
 
-start with a simple language
+Simple base with statements to base other languages on
 
-try to figure out every mistake that could be made that isn't an
-internal error -> looking at anomalies caused by the user writing
-incorrect code and not other kinds
+supports:
 
-add tests for all of these to see them
-
-a big part of the goal is to develop the infrastructure to do this
-kind of testing
-
--------------------------
-prefactoring:
--------------
-
-diff it and think about how easy it is to compare and later port
- features back and forth
-
-create a haskell data type for runtime exceptions
-
-try adding the ffi wrapper for haskell values
-see if this looks good for testing
-another alternative is to make these errors into a variant in Value
-try to figure out if one approach will work better
-
-see if can import a simple test script instead of also having it inline
+check blocks
+catch, raises, raises satisfies
+num, text
+simple tuples for construction and equality only
+iden
+app
+lam
+let
+simple 3 arg if
+block
+letdecl
 
 
-rough list of things to test in this version, based on the interpreter
-syntax. could also think about errors from the surface syntax
 
-what can go wrong in a check block (apart from test failures?)
-  check what happens in pyret when you throw exceptions outside of a test predicate
-  also check e.g. what happens when you throw an exception on the left or right side
-   of an is predicate
-check for test predicates outside of check block
-
-iden -> name not found
-app -> not function value
-  wrong number of args
-  wrong types of args
-lam: arg names repeated
-let: same
-block: think about empty blocks and do some checking
-  maybe can catch only some empty blocks during desugaring and add a raise?
-  that way, the rest of the code can support empty blocks when they appear
-  as part of desugaring
-can think about making let at the end of a block an error
-if -> check type isn't bool
-
-todo: review this list again after work
-
-think about if any of these tests should use the runtime type
-assertion expression
-
+todo: refactor evaluate to fit it more in line with the embedded + testing?
 
 
 ------------------------------------------------------------------------------
@@ -68,12 +30,9 @@ assertion expression
 > {-# LANGUAGE DeriveDataTypeable #-}
 > {-# LANGUAGE MultiWayIf #-}
 
-> module Anomaly1 (tests) where
+> module SimpleBase (tests) where
 
 > import Text.RawString.QQ
-
- > import qualified Test.Tasty as T
- > import qualified Test.Tasty.HUnit as T
 
 > import qualified Parse2 as P
 > import qualified Syntax2 as S
@@ -84,12 +43,11 @@ assertion expression
 > import Control.Monad.Trans.RWS (RWST, evalRWST, ask, local, get, gets,asks, state, put, modify)
 
 > import Control.Monad (when)
-> --import Data.Maybe (isNothing)
 >
 > import Data.Char (isAlphaNum)
 
-> import Scientific1 (Scientific) -- , extractInt)
-> import Data.List (intercalate) --, partition)
+> import Scientific1 (Scientific)
+> import Data.List (intercalate)
 >
 > --import Debug.Trace (trace)
 
@@ -829,16 +787,10 @@ check "catches":
 
 end
 
-#check "simple anomaly":
-  #raise(my-check-a("test")) raises-satisfies _ == my-check-a("testa")
-#  b == 1 raises-satisfies _ == unbound-identifier("b")
-#  5(x) raises-satisfies _ == not-function-value(5)
-#end
-
 \end{code}
 >    |]
 
 
       
 > tests :: T.TestTree
-> tests = T.makeTestsIO "anomaly1" $ (Right <$> evaluateWithChecks simpleTestScript)
+> tests = T.makeTestsIO "simple base" $ (Right <$> evaluateWithChecks simpleTestScript)

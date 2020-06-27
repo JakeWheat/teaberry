@@ -49,8 +49,8 @@
 > import qualified FixWhere
 > import qualified RunScriptInterp
 > import qualified Anomaly1
+> import qualified SimpleBase
 
-> -- import qualified Front
 
 > import qualified Test.Tasty as T
 
@@ -104,4 +104,5 @@
 >        ,FixWhere.tests
 >        ,RunScriptInterp.tests
 >        ,Anomaly1.tests
+>        ,SimpleBase.tests
 >        ]
