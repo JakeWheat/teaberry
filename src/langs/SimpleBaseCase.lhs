@@ -105,8 +105,6 @@ values
 > data Value = NumV Scientific
 >            | BoolV Bool
 >            | TextV String
->            --  | TupleV [Value]
->            --  | NothingV
 >            | VariantV String -- variant name
 >                       [(String,Value)] -- fields
 >            | FunV [String] IExpr Env
@@ -116,9 +114,7 @@ values
 > valueTypeName (NumV {}) = "number"
 > valueTypeName (TextV {}) = "text"
 > valueTypeName (BoolV {}) = "boolean"
-> --valueTypeName (TupleV {}) = "tuple"
 > valueTypeName (FunV {}) = "function"
-> --valueTypeName (NothingV) = "nothing"
 > valueTypeName (VariantV {}) = "variant" -- or should it be the variant's type name?
 > valueTypeName (ForeignFunV {}) = "foreign-function"
 
@@ -126,9 +122,7 @@ values
 >   show (NumV n) = "NumV " ++ show n
 >   show (TextV n) = "TextV " ++ show n
 >   show (BoolV n) = "BoolV " ++ show n
->   -- show (TupleV fs) = "TupleV [" ++ intercalate "," (map show fs) ++ "]"
 >   show (VariantV nm fs) = "VariantV " ++ nm ++ "[" ++ intercalate "," (map show fs) ++ "]"
->   -- show NothingV = "NothingV"
 >   show (FunV {}) = "FunV stuff"
 >   show (ForeignFunV n) = "ForeignFunV " ++ show n
 
@@ -241,8 +235,6 @@ ffi catalog
 >    ,("make-variant", binaryOp unwrapText unwrapList id makeVariant)
 >    ,("make-variant-0", unaryOp unwrapText id makeVariant0)
 >    ,("make-variant-2", ternaryOp anyIn anyIn anyIn id makeVariant2)
->    --,("call-construct-make", binaryOp variantIn variantIn id callConstructMake)
-
 
 >    ]
 
@@ -269,10 +261,6 @@ ffi catalog
 > torepr' (FunV {}) = "<Function>"
 > torepr' (ForeignFunV {}) = "<Function>"
 > torepr' (TextV s) = "\"" ++ s ++ "\""
-> --torepr' (TupleV fs) =
-> --    "{" ++ intercalate ";" (map torepr' fs) ++ "}"
-
-> --torepr' NothingV = "nothing"
 
 > torepr' (VariantV nm []) = nm
 > torepr' (VariantV nm fs) =
@@ -504,7 +492,7 @@ desugaring code
 
 > desugar (DotExpr e f) = do
 >     desugar (App (Iden "variant-field-get") [Text f, e])
-  
+
 > desugar (Parens e) = desugar e
 > desugar (S.BinOp e f e1) = desugar $ App (Iden f) [e,e1]
 
@@ -867,7 +855,6 @@ pretty interpreter syntax
 
 > unconvI (INum n) = Num n
 > unconvI (IText n) = Text n
-> -- unconvI (ITupleSel n) = TupleSel $ map unconvI n
 
 > unconvI (IIden s) = Iden s
 > unconvI (IApp (IIden e) [a,b]) | isOp e = BinOp (unconvI a) e (unconvI b)
