@@ -80,7 +80,7 @@ assertion expression
 > import Control.Monad.Trans.Except (Except, runExcept, throwE)
 > import Control.Monad.Trans.RWS (RWST, evalRWST, ask, local, get, gets,asks, state, put, modify)
 
-> import Control.Monad (when)
+> import Control.Monad (when, void)
 >
 > import Data.Char (isAlphaNum)
 
@@ -119,12 +119,15 @@ interpreter
 
 evaluate
 
+> parse :: String -> Either String [Stmt]
+> parse src = case P.parseModule "" src of
+>     Right (S.Module [] sts) -> pure sts
+>     Right (S.Module x _) -> Left $ "prelude not supported " ++ show x
+>     Left e -> Left e
+  
 > evaluateWithChecks :: String -> IO [T.CheckResult]
 > evaluateWithChecks src = do
->     let ast = case P.parseModule "" (myFirstPrelude ++ src) of
->                   Right (S.Module [] sts) -> sts
->                   Right (S.Module x _) -> error $ "prelude not supported " ++ show x
->                   Left e -> error e
+>     let ast = either error id $ parse (myFirstPrelude ++ src)
 >         ast' = either error id $ runDesugar ast
 >         ast'' = simplify ast'
 >     when False $ putStrLn (prettyIExpr ast'')     
@@ -144,6 +147,7 @@ end
 
 data Language-error:
   | unbound-identifier(i)
+  | not-function-value(v)
 end
 
 
@@ -224,7 +228,25 @@ interpreter types
 > throwInterpE :: InterpreterException -> Interpreter a
 > throwInterpE e = throwM e
 
-      
+> eapp :: String -> [Expr] -> Expr
+> eapp f as = App (Iden f) as
+  
+> throwUnboundIdentifier :: String -> Interpreter a
+> throwUnboundIdentifier i = raiseValue $ eapp "unbound-identifier" [Text i]
+
+> raiseValue :: Expr -> Interpreter a
+> raiseValue e = do
+>     runAstInterp $ [StExpr $ eapp "raise" [e]]
+>     throwInterp "internal error: should have raised"
+
+> throwNotFunctionValue :: String -> Interpreter a
+> throwNotFunctionValue i = raiseValue $ eapp "not-function-value" [Text i]
+
+> runAstInterp :: [Stmt] -> Interpreter ()
+> runAstInterp ast = do
+>     y <- either throwInterp pure $ runDesugar ast
+>     void $ interp (simplify y)
+
 > data Env = Env
 >     {envEnv :: [(String,Value)]
 >     ,envForeignFuns :: [((String,[String]), [Value] -> Interpreter Value)]}
@@ -241,15 +263,7 @@ interpreter types
 > envLookup :: String -> Env -> Interpreter Value
 > envLookup nm env =
 >     maybe (throwUnboundIdentifier nm) pure $ lookup nm (envEnv env)
-
-> throwUnboundIdentifier :: String -> Interpreter a
-> throwUnboundIdentifier i = throwTError "unbound-identifier" [("i", TextV i)]
-  
-> throwTError :: String -> [(String,Value)] -> Interpreter a
-> throwTError ctor as =
->     let v = VariantV ctor as
->     in throwM $ ValueException v
-  
+ 
 > addForeignFun :: String -> [String] -> ([Value] -> Interpreter Value) -> Env -> Either String Env
 > addForeignFun nm tys f env =
 >     pure ((extendEnv [(nm, ForeignFunV nm)] env)
@@ -452,7 +466,7 @@ ffi catalog
 >             env <- ask
 >             hf <- lookupForeignFun nm tys env
 >             hf vs
->         _ -> throwInterp "non function value in app position"
+>         _ -> throwNotFunctionValue $ torepr' fv
 >   where
 >     safeZip ps xs | length xs == length ps = pure $ zip ps xs
 >                   | otherwise = throwInterp $ "wrong number of args to function"
@@ -1163,7 +1177,7 @@ end
 check "simple anomaly":
   #raise(my-check-a("test")) raises-satisfies _ == my-check-a("testa")
   b == 1 raises-satisfies _ == unbound-identifier("b")
-#  5(x) raises-satisfies _ == not-function-value(5)
+  5(1) raises-satisfies _ == not-function-value('5')
 end
 
 \end{code}
