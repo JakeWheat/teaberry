@@ -57,7 +57,7 @@ imports
 > import Scientific (Scientific, divideScientific, showScientific)
 > import Data.List (intercalate, nubBy, sortOn, findIndex, isPrefixOf, tails, partition, find, nub, (\\))
 
-> import Debug.Trace (trace, traceStack)
+> -- import Debug.Trace (trace, traceStack)
 > --import qualified TestUtils as T
 
 > import Data.IORef (IORef, newIORef, readIORef, writeIORef)
@@ -449,7 +449,7 @@ env
 >        -- check for matching function, but wrong number of args
 >        | Just f <- find ((== nm) . fst . fst) $ envForeignFuns env
 >          -> if length (snd $ fst f) == length tys
->             then trace (show (fst f,nm,tys)) $ throwWrongTypes (snd $ fst f) tys
+>             then throwWrongTypes (snd $ fst f) tys
 >             else throwWrongNumberOfArgs (length (snd $ fst f)) (length tys)
 >        | otherwise -> throwInterp $ "ffi function not found: " ++ nm ++ "(" ++ intercalate "," tys ++")"
 >   where
