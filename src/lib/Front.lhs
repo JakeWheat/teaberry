@@ -1067,7 +1067,7 @@ add the last statement which returns the last value and the env, for
 >     uniqueName <- makeUniqueVar "testname"
 >     checkBlockIDName <- (maybe (lift $ throwE "'is' test outside check block") pure)
 >                         =<< (asks currentCheckBlockIDName)
->     desugar $ Block
+>     desugarStmts
 >               [LetDecl (patName uniqueV0) a
 >               ,LetDecl (patName uniqueV1) b
 >               ,LetDecl (patName uniqueName) (Text $ Pr.prettyExpr a ++ " is " ++ Pr.prettyExpr b)

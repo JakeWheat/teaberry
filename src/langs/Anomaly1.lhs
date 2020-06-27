@@ -1,4 +1,4 @@
-
+ 
 Anomaly testing version one:
 
 start with a simple language
@@ -19,13 +19,10 @@ prefactoring:
 diff it and think about how easy it is to compare and later port
  features back and forth
 
-port the new test desugaring
 make desugaring errors use a function, and throw via runtime raise
   -> if your code parses, it will run, and you will only get
      runtime errors
 create a haskell data type for runtime exceptions
-add catch and throw, plus raises tests
-probably need raises-satisfies too
 
 try adding the ffi wrapper for haskell values
 see if this looks good for testing
@@ -56,6 +53,8 @@ block: think about empty blocks and do some checking
 can think about making let at the end of a block an error
 if -> check type isn't bool
 
+todo: review this list again after work
+
 think about if any of these tests should use the runtime type
 assertion expression
 
@@ -68,13 +67,15 @@ assertion expression
 > {-# LANGUAGE LambdaCase #-}
 > {-# LANGUAGE QuasiQuotes #-}
 > {-# LANGUAGE ScopedTypeVariables #-}
+> {-# LANGUAGE DeriveDataTypeable #-}
+> {-# LANGUAGE MultiWayIf #-}
 
 > module Anomaly1 (tests) where
 
 > import Text.RawString.QQ
 
-> import qualified Test.Tasty as T
-> import qualified Test.Tasty.HUnit as T
+ > import qualified Test.Tasty as T
+ > import qualified Test.Tasty.HUnit as T
 
 > import qualified Parse2 as P
 > import qualified Syntax2 as S
@@ -82,29 +83,30 @@ assertion expression
 
 > import Control.Monad.Trans.Class (lift)
 > import Control.Monad.Trans.Except (Except, runExcept, throwE)
-> import Control.Monad.Trans.RWS (RWST, evalRWST, ask, local, get, gets, state, put, modify)
+> import Control.Monad.Trans.RWS (RWST, evalRWST, ask, local, get, gets,asks, state, put, modify)
 
 > import Control.Monad (when)
-> import Data.Maybe (isNothing)
+> --import Data.Maybe (isNothing)
 >
-> -- import Data.Char (isAlphaNum)
+> import Data.Char (isAlphaNum)
 
 > import Scientific1 (Scientific) -- , extractInt)
-> import Data.List (intercalate, partition)
+> import Data.List (intercalate) --, partition)
 >
 > --import Debug.Trace (trace)
 
 > import Syntax2
+> import Data.Generics.Uniplate.Data (transformBi)
+> import Data.Data (Data)
+> import Control.Exception.Safe (Exception, throwM, catch)
+
+> import qualified TestUtils as T
+
   
 ------------------------------------------------------------------------------
 
 interpreter syntax
 ------------------
-
- > data Stmt = StExpr Expr
- >           | LetDecl String Expr
- >           | Check (Maybe String) [Stmt]
- >           deriving (Eq, Show)
 
 > data IExpr = INum Scientific
 >            | IText String
@@ -115,7 +117,7 @@ interpreter syntax
 >            | ILet [(String,IExpr)] IExpr
 >            | ISeq IExpr IExpr
 >            | IIf IExpr IExpr IExpr
->            deriving (Eq, Show)
+>            deriving (Eq, Show, Data)
 
 ------------------------------------------------------------------------------
 
@@ -123,25 +125,26 @@ interpreter
 
 evaluate
 
-> evaluateWithChecks :: String -> Either String [CheckResult]
-> evaluateWithChecks src =  do
->     ast <- case P.parseModule "" src of
->                Right (S.Module [] sts) -> pure sts
->                Right (S.Module x _) -> Left $ "prelude not supported " ++ show x
->                Left e -> Left e
->     ast' <- runDesugar ast
->     runInterp testEnv ast'
+> evaluateWithChecks :: String -> IO [T.CheckResult]
+> evaluateWithChecks src = do
+>     let ast = case P.parseModule "" src of
+>                   Right (S.Module [] sts) -> sts
+>                   Right (S.Module x _) -> error $ "prelude not supported " ++ show x
+>                   Left e -> error e
+>         ast' = either error id $ runDesugar ast
+>         ast'' = simplify ast'
+>     when False $ putStrLn (prettyIExpr ast'')     
+>     runInterp defaultFFI ast''
 
 
 ---------------------------------------
 
 simplify
 
- > simplify :: IExpr -> IExpr
- > simplify = transformBi $ \case
- >     ILet bs (ILet bs' x) -> ILet (bs ++ bs') x
- >     x1 -> x1
-
+> simplify :: IExpr -> IExpr
+> simplify = transformBi $ \case
+>     ILet bs (ILet bs' x) -> ILet (bs ++ bs') x
+>     x1 -> x1
 
 values
 ------
@@ -189,22 +192,25 @@ interpreter types
 > data InterpreterState =
 >     InterpreterState
 >     {addedTests :: [Value]
->     ,testResultLog :: [TestResultLog]
+>     ,testResultLog :: [T.TestResultLog]
 >     }
 
 > emptyInterpreterState :: InterpreterState
 > emptyInterpreterState = InterpreterState [] []
 
-> type Interpreter = RWST Env () InterpreterState (Except String)
+> type Interpreter = RWST Env () InterpreterState IO
 
-
-> {-data InterpreterException = InterpreterException String
+> data InterpreterException = ValueException Value
+>                           | UserException String
 >                           deriving Show
 
-> instance Exception InterpreterException where-}
+> instance Exception InterpreterException where
 
 > throwInterp :: String -> Interpreter a
-> throwInterp e = lift $ throwE e
+> throwInterp s = throwM $ UserException s
+
+> throwInterpE :: InterpreterException -> Interpreter a
+> throwInterpE e = throwM e
       
       
 > data Env = Env
@@ -232,9 +238,10 @@ interpreter types
 
 > lookupForeignFun :: String -> [String] -> Env -> Interpreter ([Value] -> Interpreter Value)
 > lookupForeignFun nm tys env =
->     maybe (throwInterp $ "ffi function not found: " ++ nm ++ "(" ++ intercalate "," tys ++")")
->       pure $ lookup (nm,tys) $ envForeignFuns env
-
+>     if | Just f <- lookup (nm,tys) $ envForeignFuns env -> pure f
+>        -- well dodgy "generic" functions, only works if all args are any
+>        | Just f <- lookup (nm, map (const "any") tys) $ envForeignFuns env -> pure f
+>        | otherwise -> throwInterp $ "ffi function not found: " ++ nm ++ "(" ++ intercalate "," tys ++")"
 
 
 > addForeignFun' :: String -> ([String], ([Value] -> Interpreter Value)) -> Env -> Either String Env
@@ -249,8 +256,8 @@ interpreter types
 
 ffi catalog
   
-> testEnv :: Env
-> testEnv = either error id $ addForeignFuns' (
+> defaultFFI :: Env
+> defaultFFI = either error id $ addForeignFuns' (
 >    [("+", binaryOp unwrapNum unwrapNum wrapNum (+))
 >    ,("*", binaryOp unwrapNum unwrapNum wrapNum (*))
 >    ,("+", binaryOp unwrapText unwrapText wrapText (++))
@@ -262,15 +269,33 @@ ffi catalog
 >    ,("log-check-block", binaryV unwrapNum unwrapText logCheckBlock)
 >    ,("log-test-pass", binaryV unwrapNum unwrapText logTestPass)
 >    ,("log-test-fail", ternaryV unwrapNum unwrapText unwrapText logTestFail)
+>    ,("raise", unaryOp anyIn id raise)
+>    ,("tostring", unaryOp anyIn pure tostring)
+>    ,("to-string", unaryOp anyIn pure tostring)
+>    ,("tostring-equals", binaryOp anyIn anyIn wrapBool tostringEqualsx)
 
+>    ,("torepr", unaryOp anyIn pure torepr)
+>    ,("to-repr", unaryOp anyIn pure torepr)
+     
 >    ]
->     ++ [("torepr", unarySimple x torepr) | x <- ["number", "text", "boolean", "tuple", "function", "foreign-function"]]
+
 >     )
 
 >    emptyEnv
 
-> torepr :: Value -> Interpreter Value
-> torepr x = pure $ TextV $ torepr' x
+> raise :: Value -> Interpreter Value
+> raise v = throwM $ ValueException v
+
+> tostringEqualsx :: Value -> Value -> Bool
+> tostringEqualsx e0 e1 = e0 == tostring e1
+
+> tostring :: Value -> Value
+> tostring x@(TextV {}) = x
+> tostring x = torepr x
+
+  
+> torepr :: Value -> Value
+> torepr x = TextV $ torepr' x
 
 > torepr' :: Value -> String
 > torepr' (NumV n) = case extractInt n of
@@ -288,15 +313,24 @@ ffi catalog
 
 ------------------------------------------------------------------------------
 
-> runInterp :: Env -> IExpr -> Either String [CheckResult]
+> runInterp :: Env -> IExpr -> IO [T.CheckResult]
 > runInterp env expr =
->     fst <$> runExcept (evalRWST scriptWithTestStuff env emptyInterpreterState)
+>     fst <$> evalRWST scriptWithTestStuff env emptyInterpreterState
 >   where
 >     scriptWithTestStuff = do
 >         _ <- interp expr
 >         runAddedTests
 
 > interp :: IExpr -> Interpreter Value
+
+> interp (IApp (IIden "catch") [e, c]) = interp e `catch` (\case
+>     ValueException v -> do
+>         cf <- interp c
+>         app cf [v]
+>     -- is rethrowing an exception like this bad in haskell?
+>     s -> throwInterpE s)
+
+
 > interp (INum n) = pure (NumV n)
 > interp (IText t) = pure (TextV t)
 > interp (ITupleSel es) = TupleV <$> mapM interp es
@@ -349,15 +383,16 @@ ffi catalog
 desugar
 -------
 
-> type Desugarer = RWST () () DesugarState (Except String)
+> type Desugarer = RWST DesugarReader () DesugarState (Except String)
+
+> data DesugarReader = DesugarReader {currentCheckBlockIDName :: Maybe String}
 
 > data DesugarState = DesugarState {uniqueCtr :: Int
 >                                  ,nextUnusedCheckBlockID :: Int
->                                  ,nextAnonymousBlockNumber :: Int
->                                  ,currentCheckBlockIDName :: Maybe String}
+>                                  ,nextAnonymousBlockNumber :: Int}
 
 > startingDesugarState :: DesugarState
-> startingDesugarState = DesugarState 0 0 0 Nothing
+> startingDesugarState = DesugarState 0 0 0
 
 > makeUniqueVar :: String -> Desugarer String
 > makeUniqueVar pref = state $ \s ->
@@ -368,83 +403,16 @@ desugar
 
 --------------------------------------
 
-testing support in the desugarer monad
-
-> enterNewCheckBlock :: Desugarer (String,Expr)
-> enterNewCheckBlock = do
->     s <- get
->     {-if (isJust $ currentCheckBlockIDName s)
->       then do
->            x <- throwDesugar "trying to enter nested check block"
->            pure ("error", x)
->       else do-}
->     let newID = nextUnusedCheckBlockID s
->     nm <- makeUniqueVar "check-block-id"
->     put $ s {nextUnusedCheckBlockID = newID + 1
->             ,currentCheckBlockIDName = Just nm}
->     pure (nm, Num $ fromIntegral $ newID)
-
-> exitCheckBlock :: Desugarer ()
-> exitCheckBlock = modify $ \s -> s {currentCheckBlockIDName = Nothing}
-
-> getAnonBlockName :: Desugarer String
-> getAnonBlockName = state $ \s ->
->     let blockNo = nextAnonymousBlockNumber s
->     in ("check-block-" ++ show blockNo
->        ,s {nextAnonymousBlockNumber = blockNo + 1})
-
---------------------------------------
-
 desugaring code
 
 > runDesugar :: [Stmt] -> Either String IExpr
 > runDesugar stmts =
->     fst <$> runExcept (evalRWST (desugarStmts stmts) () startingDesugarState)
+>     fst <$> runExcept (evalRWST (desugarStmts stmts) (DesugarReader Nothing) startingDesugarState)
 
 > throwDesugar :: String -> Desugarer Expr
 > throwDesugar e = lift $ throwE e
   
-> desugarStmts :: [Stmt] -> Desugarer IExpr
-
-> desugarStmts (Check nm bdy : es) = do
->     (uniqueCheckBlockIDVarName,uniqueCheckBlockID) <- enterNewCheckBlock
->     blockName <- maybe getAnonBlockName pure nm
->     desugaredCheck <- desugar $
->         appI "add-tests"
->         [Lam [] (Block $
->                  [letDecl uniqueCheckBlockIDVarName uniqueCheckBlockID
->                  ,StExpr $ appI "log-check-block"
->                              [Iden uniqueCheckBlockIDVarName
->                              ,Text blockName]]
->                  ++ bdy)]
->     exitCheckBlock
->     case es of
->         [] -> pure desugaredCheck
->         _ -> ISeq desugaredCheck <$> desugar (Block es)
->   where
->     appI i as = App (Iden i) as
-
-
---------------------------------------
-
-the rest of the desugaring
-
-  
-> desugarStmts [] = desugar =<< throwDesugar "empty block"
-  
-> desugarStmts [StExpr e] = desugar e
-> desugarStmts [LetDecl {}] = desugar =<< throwDesugar "block ends with let"
-  
-> desugarStmts (LetDecl n v : es) =
->     desugar (Let [(n,v)] $ Block es)
-
-> desugarStmts (StExpr e : es) =
->     ISeq <$> desugar e <*> desugar (Block es)
-
-> desugarStmts (x : _) = desugar =<< throwDesugar ("unsupported statement: " ++ show x)
-
-
-  
+ 
 > desugar :: Expr -> Desugarer IExpr
 > desugar (Block s) = desugarStmts s
 > desugar (App (Iden "is") [a,b]) = do
@@ -452,7 +420,7 @@ the rest of the desugaring
 >     uniqueV1 <- makeUniqueVar "is-v1"
 >     uniqueName <- makeUniqueVar "testname"
 >     checkBlockIDName <- (maybe (throwDesugar "'is' test outside check block") (pure . Iden))
->                         =<< (gets currentCheckBlockIDName)
+>                         =<< (asks currentCheckBlockIDName)
 >     desugarStmts
 >               [letDecl uniqueV0 a
 >               ,letDecl uniqueV1 b
@@ -472,6 +440,11 @@ the rest of the desugaring
 >     plus c d = appI "+" [c, d]
 >     eqIdens c d = appI "==" [Iden c, Iden d]
 >     appI i es = App (Iden i) es
+> desugar (App (Iden "raises") [e0, e1]) = do
+>   desugar (App (Iden "raises-satisfies") [e0, lam ["a"] $ App (Iden "tostring-equals") [e1, Iden "a"]])
+
+> desugar x@(App (Iden "raises-satisfies") [e0,e1]) =
+>   desugar =<< desugarRaises  (Pr.prettyExpr x) e0 e1
 
 > desugar (Num i) = pure $ INum i
 > desugar (Text i) = pure $ IText i
@@ -500,41 +473,90 @@ the rest of the desugaring
 
 > letDecl :: String -> Expr -> Stmt
 > letDecl n v = LetDecl (PatName NoShadow n) v
+
+> lam :: [String] -> Expr -> Expr
+> lam ps e = Lam (map f ps) e
+>   where
+>     f i = PatName NoShadow i
   
+> desugarStmts :: [Stmt] -> Desugarer IExpr
+
+> desugarStmts (Check nm bdy : es) = do
+>     uniqueCheckBlockIDVarName <- makeUniqueVar "check-block-id"
+>     desugaredCheck <- local (\x -> x {currentCheckBlockIDName = Just uniqueCheckBlockIDVarName}) $ do
+>       s <- get
+>       put $ s {nextUnusedCheckBlockID = nextUnusedCheckBlockID s + 1}
+>       let uniqueCheckBlockID = Num $ fromIntegral $ nextUnusedCheckBlockID s
+>       blockName <- maybe getAnonBlockName pure nm
+>       desugar $
+>           appI "add-tests"
+>           [Lam [] (Block $
+>                    [letDecl uniqueCheckBlockIDVarName uniqueCheckBlockID
+>                    ,StExpr $ appI "log-check-block"
+>                                [Iden uniqueCheckBlockIDVarName
+>                                ,Text blockName]]
+>                    ++ bdy)]
+>     case es of
+>         [] -> pure desugaredCheck
+>         _ -> ISeq desugaredCheck <$> desugarStmts es
+>   where
+>     appI i as = App (Iden i) as
+
+> desugarStmts [] = desugar =<< throwDesugar "empty block"
+  
+> desugarStmts [StExpr e] = desugar e
+> desugarStmts [LetDecl {}] = desugar =<< throwDesugar "block ends with let"
+  
+> desugarStmts (LetDecl n v : es) =
+>     desugar (Let [(n,v)] $ Block es)
+
+> desugarStmts (StExpr e : es) =
+>     ISeq <$> desugar e <*> desugar (Block es)
+
+> desugarStmts (x : _) = desugar =<< throwDesugar ("unsupported statement: " ++ show x)
+
+> desugarRaises :: String -> Expr -> Expr -> Desugarer Expr
+> desugarRaises syn e e1 = do
+>     let failMsg = "The test operation raises-satisfies failed for the test "
+>                   ++ Pr.prettyExpr e1
+>     checkBlockIDName <- (maybe (lift $ throwE "'is' test outside check block") pure)
+>                         =<< (asks currentCheckBlockIDName)
+>     
+>     nameit <- makeUniqueVar "isname"
+>     v1 <- makeUniqueVar "isv1"
+>     pure $ App (Iden "catch")[
+>         (Block [StExpr e
+>                ,LetDecl (patName nameit) $ Text syn
+>                ,StExpr $ appx "log-test-fail" [Iden checkBlockIDName
+>                                               ,Iden nameit
+>                                               ,Text "No exception raised"]])
+>         ,(lam ["a"] $ Block
+>          [LetDecl (patName v1) e1
+>          ,LetDecl (patName nameit) $ Text syn
+>          ,StExpr $ If [(appx v1 [Iden "a"]
+>                        ,appx "log-test-pass" [Iden checkBlockIDName, Iden nameit])]
+>                    $ Just $ appx "log-test-fail"
+>                             [Iden checkBlockIDName
+>                             ,Iden nameit
+>                             ,Text failMsg `plus`
+>                              Text ", value was " `plus`
+>                              appx "torepr" [Iden "a"]]])]
+>   where
+>       plus a b = appx "+" [a,b]
+>       appx nm es = App (Iden nm) es
+>       patName = PatName NoShadow
+
 ------------------------------------------------------------------------------
 
 
 test infra
 ==========
 
-haskell side testing infrastructure
------------------------------------
-
-checkresult:
-
-this is the user api. Is this as simple and direct as possible?
-
-todo: will extend the name with the package and module as well
-want to be able to do a filter on which tests to run
-maybe the filter is just a predicate on the package, module and check
-block name
-
-> data CheckResult = CheckResult String -- the test block name
->                               [(String, Maybe String)]
->                  deriving Show
-> -- the second is Nothing if it's a pass
-> -- if it is Just, it's a fail, and contains the failure message
-
---------------------------------------
-
-ffi functions used by the desugared test code
-
-TODO: use/write helpers for working with state monad, etc.
-create a wrapper to convert an Interpreter () into NothingV
-
-> data TestResultLog = TestPass Scientific String -- check block id, test source
->                    | TestFail Scientific String String -- check block id, test source, failure message
->                    | TestBlock Scientific String
+> getAnonBlockName :: Desugarer String
+> getAnonBlockName = state $ \s ->
+>     let blockNo = nextAnonymousBlockNumber s
+>     in ("check-block-" ++ show blockNo
+>        ,s {nextAnonymousBlockNumber = blockNo + 1})
 
 add-tests(fn)
 takes a function value
@@ -548,105 +570,29 @@ says there is a new test block with a unique id and it's name
 
 > logCheckBlock :: Scientific -> String -> Interpreter Value
 > logCheckBlock n nm =
->     nothingWrapper $ \s -> s {testResultLog = TestBlock n nm : testResultLog s}
+>     nothingWrapper $ \s -> s {testResultLog = T.TestBlock n nm : testResultLog s}
 
 log-test-pass(blockid, text of test)
 
 > logTestPass :: Scientific -> String -> Interpreter Value
 > logTestPass n msg =
->     nothingWrapper $ \s -> s {testResultLog = TestPass n msg : testResultLog s}
+>     nothingWrapper $ \s -> s {testResultLog = T.TestPass n msg : testResultLog s}
 
 log-test-fail(block,id, text of test, fail message)
 
 > logTestFail :: Scientific -> String -> String -> Interpreter Value
 > logTestFail n msg failmsg = nothingWrapper $ \s ->
->     s {testResultLog = TestFail n msg failmsg : testResultLog s}
+>     s {testResultLog = T.TestFail n msg failmsg : testResultLog s}
 
 > nothingWrapper :: (InterpreterState -> InterpreterState) -> Interpreter Value
 > nothingWrapper f = modify f *> pure NothingV
 
---------------------------------------
-
-this is run at the end of the script to run all the saved tests
-
-> runAddedTests :: Interpreter [CheckResult]
+> runAddedTests :: Interpreter [T.CheckResult]
 > runAddedTests = do
 >     ts <- reverse <$> gets addedTests
 >     mapM_ (\v -> app v []) ts
 >     testLog <- reverse <$> gets testResultLog
->     either throwInterp pure $ testLogToCheckResults testLog
-
-this is run after that, to convert the log of test events, into a
-organised data structure to view the results
-
-> testLogToCheckResults :: [TestResultLog] -> Either String [CheckResult]
-> testLogToCheckResults trls = do
->     -- 'streaming' algorithm, very efficient
->     -- but the reason to do it is because it's an easy
->     -- way to catch a test result without a matching check block
->     -- relies on the test results being in the order you write
->     -- the corresponding tests in the source file
->     let f :: [(Scientific, CheckResult)] -> [TestResultLog] -> Either String [CheckResult]
->         -- finished, reverse the check results
->         f res [] = pure $ map reverseResults $ map snd $ reverse res
->         -- new check block, make sure it's id hasn't been seen already
->         f res ((TestBlock cid nm) : xs) = do
->             when (any (== cid) $ map fst res)
->                 $ Left $ "multiple check result name for check block with id " ++ show cid
->             f ((cid, CheckResult nm []) : res) xs
->         -- if we see a pass or a fail without having see a testblock
->         -- then it's a bug
->         f [] (TestPass {} : _) = Left $ "unmatched check block id in test result"
->         f [] (TestFail {} : _) = Left $ "unmatched check block id in test result"
->         -- pass or fail, the id should match the id of the last testblock entry
->         -- not sure if this extra checking is really needed
->         -- maybe it will be useful if try to run tests in multiple threads
->         -- in the future?
->         f ((cid, CheckResult cnm ts):cs) ((TestPass tid tnm) : xs)
->             | cid == tid =
->               f ((cid,CheckResult cnm ((tnm, Nothing):ts)):cs) xs
->             | otherwise = Left $ "unmatched check block id in test result"
->         f ((cid, CheckResult cnm ts):cs) ((TestFail tid tnm fmsg) : xs)
->             | cid == tid =
->               f ((cid,CheckResult cnm ((tnm, Just fmsg):ts)):cs) xs
->             | otherwise = Left $ "unmatched check block id in test result"
->     f [] trls
->   where
->     reverseResults (CheckResult nm ts) = CheckResult nm $ reverse ts
-
-function to convert the check result data structure into a nicely
-formatted string
-
-> _renderCheckResults :: [CheckResult] -> String
-> _renderCheckResults cs =
->     let bs = map renderCheck cs
->         totalPasses = sum $ map (\(n,_,_) -> n) bs
->         totalFails = sum $ map (\(_,n,_) -> n) bs
->         msgs = map (\(_,_,m) -> m) bs
->     in intercalate "\n\n" msgs
->        ++ "\n\n" ++ (show totalPasses) ++ "/" ++ show (totalPasses + totalFails)
->        ++ " tests passed in all check blocks"
->   where
->     renderCheck (CheckResult nm ts) =
->         let (ps,fs) = partition (isNothing . snd) ts
->             msgs = map renderTest ts
->         in (length ps
->            ,length fs
->            ,"Check block: " ++ nm ++ "\n"
->            ++ intercalate "\n" (map indent msgs)
->            ++ "\n  " ++ show (length ps) ++ "/" ++ show (length ts) ++ " tests passed in check block: " ++ nm
->            )
->     renderTest (a,b) =
->         "test (" ++ a ++ "): "
->         ++ case b of
->                Nothing -> "OK"
->                Just msg -> "failed, reason:\n" ++ indent msg
->     indent [] = []
->     indent x = "  " ++ indent' x
->     indent' [] = []
->     indent' x@[_] = x
->     indent' ('\n':y@(_:_)) = "\n  " ++ indent' y
->     indent' (x:y) = x : indent' y
+>     either throwInterp pure $ T.testLogToCheckResults testLog
 
 ------------------------------------------------------------------------------
 
@@ -693,14 +639,17 @@ ffi boilerplate
 > wrapText :: String -> Interpreter Value
 > wrapText n = pure $ TextV n
 
-> _unaryOp :: (String, Value -> Interpreter a)
->         -> (a -> Interpreter Value)
->         -> (a -> a)
->         -> ([String], ([Value] -> Interpreter Value))
-> _unaryOp unwrap0 wrap f =
+> anyIn :: (String, Value -> Interpreter Value)
+> anyIn = ("any", pure)
+
+  
+> unaryOp :: (String, Value -> Interpreter a)
+>         -> (b -> Interpreter Value)
+>         -> (a -> b)
+>         -> ([String], [Value] -> Interpreter Value)
+> unaryOp unwrap0 wrap f =
 >     ([fst unwrap0]
->     ,\as -> do
->             case as of
+>     ,\as -> case as of
 >                 [a] -> do
 >                     ax <- (snd unwrap0) a
 >                     wrap (f ax)
@@ -754,6 +703,39 @@ ffi boilerplate
 >                     f ax bx cx
 >                 _ -> throwInterp $ "wrong number of args to function, expected 3, got " ++ show (length as))
 
+
+------------------------------------------------------------------------------
+
+pretty interpreter syntax
+=========================
+
+  
+> prettyIExpr :: IExpr -> String
+> prettyIExpr x = Pr.prettyExpr $ unconvI x
+
+> unconvI :: IExpr -> Expr
+
+> unconvI (INum n) = Num n
+> unconvI (IText n) = Text n
+> unconvI (ITupleSel n) = TupleSel $ map unconvI n
+
+> unconvI (IIden s) = Iden s
+> unconvI (IApp (IIden e) [a,b]) | isOp e = BinOp (unconvI a) e (unconvI b)
+>   where isOp x = not $ any (\z -> isAlphaNum z || z `elem` "_") x
+> 
+> unconvI (IApp e fs) = App (unconvI e) $ map unconvI fs
+> unconvI (ILam ns e) = Lam (map unconvIPatName ns) $ unconvI e
+> unconvI (ILet bs e) = Let (map (uncurry unconvIBinding) bs) (unconvI e)
+> unconvI (ISeq a b) = Block $ map (StExpr . unconvI) [a, b]
+> unconvI (IIf c t e) = If [(unconvI c, unconvI t)] (Just $ unconvI e)
+
+> unconvIBinding :: String -> IExpr -> (PatName, Expr)
+> unconvIBinding n v = (unconvIPatName n, unconvI v)
+
+> unconvIPatName :: String -> PatName
+> unconvIPatName n = PatName NoShadow n
+
+  
 ------------------------------------------------------------------------------
 
 tests
@@ -838,19 +820,21 @@ check "simple block stuff":
 
 end
 
+
+check "catches":
+  add1 = lam(a): a + 1 end
+  catch(1, add1) is 1
+  catch(raise(2), add1) is 3
+  raise("hello") raises "hello"
+  raise("hello") raises-satisfies lam(x): x == "hello" end
+
+end
+
+
 \end{code}
 >    |]
 
 
       
 > tests :: T.TestTree
-> tests =
->     let crs = either error id $ evaluateWithChecks simpleTestScript
->         f (CheckResult nm res) =
->             T.testGroup nm $ map g res
->         g (nm, fm) = T.testCase nm $
->             case fm of
->                 Nothing -> T.assertBool "" True
->                 Just fmx -> T.assertFailure fmx
->     in --trace (renderCheckResults crs) $
->        T.testGroup "simplestatementscheck" $ map f crs
+> tests = T.makeTestsIO "anomaly1" $ (Right <$> evaluateWithChecks simpleTestScript)
