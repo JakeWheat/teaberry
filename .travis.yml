@@ -39,9 +39,9 @@ install:
   - cabal update
   - cabal check
   - cabal outdated
-  - cabal build --enable-tests --enable-benchmarks
+  - cabal build --enable-tests --enable-benchmarks --disable-optimisation
 
 script:
-  - cabal run RunTests -- --ansi-tricks=false 
+  - cabal run teaberry-dev --disable-optimization -- test --hide-successes --ansi-tricks=false
   - cabal run teaberry -- -g examples/tests/fulltests/tour.tea
 
