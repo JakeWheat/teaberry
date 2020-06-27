@@ -43,5 +43,5 @@ install:
 
 script:
   - cabal run teaberry-dev --disable-optimization -- test --hide-successes --ansi-tricks=false
-  - cabal run teaberry -- -g examples/tests/fulltests/tour.tea
+  - cabal run teaberry -- -f examples/tests/fulltests/tour.tea
 
