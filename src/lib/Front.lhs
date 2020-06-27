@@ -2,19 +2,8 @@
 
 Represents the combination of all the ideas that made it
 
-cleanups:
-parser extra:
-  make an explicit module syntax to put multiple modules in one file
-  change the set syntax to be in language
-
 think about how to split this file:
 syntax, interpreter, desugarer, tests
-
-
-here's a question: what if you do 5 extra langs without merging any to
-front. then how do you merge them all successfully? diffs aren't
-really cutting it. maybe the only way is to refactor all the langs so
-they diff nicely? (and document the connections betwen them)
 
 > {-# LANGUAGE TupleSections #-}
 > {-# LANGUAGE LambdaCase #-}
