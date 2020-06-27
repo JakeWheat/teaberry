@@ -19,9 +19,6 @@ prefactoring:
 diff it and think about how easy it is to compare and later port
  features back and forth
 
-make desugaring errors use a function, and throw via runtime raise
-  -> if your code parses, it will run, and you will only get
-     runtime errors
 create a haskell data type for runtime exceptions
 
 try adding the ffi wrapper for haskell values
@@ -409,8 +406,8 @@ desugaring code
 > runDesugar stmts =
 >     fst <$> runExcept (evalRWST (desugarStmts stmts) (DesugarReader Nothing) startingDesugarState)
 
-> throwDesugar :: String -> Desugarer Expr
-> throwDesugar e = lift $ throwE e
+> throwDesugar :: String ->  Expr
+> throwDesugar e = App (Iden "raise") [Text e]
   
  
 > desugar :: Expr -> Desugarer IExpr
@@ -419,8 +416,8 @@ desugaring code
 >     uniqueV0 <- makeUniqueVar "is-v0"
 >     uniqueV1 <- makeUniqueVar "is-v1"
 >     uniqueName <- makeUniqueVar "testname"
->     checkBlockIDName <- (maybe (throwDesugar "'is' test outside check block") (pure . Iden))
->                         =<< (asks currentCheckBlockIDName)
+>     checkBlockIDName <- (maybe (throwDesugar "'is' test outside check block") Iden)
+>                         <$> (asks currentCheckBlockIDName)
 >     desugarStmts
 >               [letDecl uniqueV0 a
 >               ,letDecl uniqueV1 b
@@ -458,18 +455,18 @@ desugaring code
 >     let f (PatName _ n, v) = (n,) <$> desugar v
 >     ILet <$> mapM f bs <*> desugar e
 
-> desugar x@(RecordSel {}) = desugar =<< throwDesugar ("records not supported: " ++ show x)
+> desugar x@(RecordSel {}) = desugar $ throwDesugar ("records not supported: " ++ show x)
   
 
 
 > desugar (If [(c,t)] (Just e)) =
 >     IIf <$> desugar c <*> desugar t <*> desugar e
 
-> desugar x@(If {}) = desugar =<< (throwDesugar $ "only if with one branch and else supported: " ++ show x)
+> desugar x@(If {}) = desugar $ (throwDesugar $ "only if with one branch and else supported: " ++ show x)
 
 > desugar (Parens e) = desugar e
 > desugar (S.BinOp e f e1) = desugar $ App (Iden f) [e,e1]
-> desugar x = desugar =<< throwDesugar ("syntax not supported " ++ show x)
+> desugar x = desugar $ throwDesugar ("syntax not supported " ++ show x)
 
 > letDecl :: String -> Expr -> Stmt
 > letDecl n v = LetDecl (PatName NoShadow n) v
@@ -502,10 +499,10 @@ desugaring code
 >   where
 >     appI i as = App (Iden i) as
 
-> desugarStmts [] = desugar =<< throwDesugar "empty block"
+> desugarStmts [] = desugar $ throwDesugar "empty block"
   
 > desugarStmts [StExpr e] = desugar e
-> desugarStmts [LetDecl {}] = desugar =<< throwDesugar "block ends with let"
+> desugarStmts [LetDecl {}] = desugar $ throwDesugar "block ends with let"
   
 > desugarStmts (LetDecl n v : es) =
 >     desugar (Let [(n,v)] $ Block es)
@@ -513,7 +510,8 @@ desugaring code
 > desugarStmts (StExpr e : es) =
 >     ISeq <$> desugar e <*> desugar (Block es)
 
-> desugarStmts (x : _) = desugar =<< throwDesugar ("unsupported statement: " ++ show x)
+> desugarStmts (x : xs) = desugarStmts (StExpr (throwDesugar ("unsupported statement: " ++ show x)) : xs)
+
 
 > desugarRaises :: String -> Expr -> Expr -> Desugarer Expr
 > desugarRaises syn e e1 = do

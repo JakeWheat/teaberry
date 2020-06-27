@@ -77,21 +77,11 @@
 >                            )
 >
 
-> import ParseTests (testParseExpr
->                   ,parseExprExamples
->                   ,testParseStmt
->                   ,parseStmtExamples
->                   ,testParseModule
->                   ,parseModuleExamples)
-> {-import DesugarTests (testDesugarExpr
->                     ,desugarExprExamples)
-> import InterpreterTests (testInterpreter,interpreterTests)
-> import TeaberryTests (sourceFiles
->                      ,testSourceFile
->                      ,detailedSourceFileTests
->                      ,testDetailedSourceFile)-}
+> import qualified ParseTests
+> import qualified Parse1Tests
+>
 > import Langs (langTests)
-
+ 
 > import qualified FrontTests
 
 
@@ -222,13 +212,13 @@ main
 >     --sourceFileTests <- T.testGroup "source file tests" <$> mapM testSourceFile sourceFiles
 >     T.defaultMain $ T.testGroup "all"
 >         [T.testGroup "parse"
->             [T.testGroup "parseExpr" $ map testParseExpr parseExprExamples
->             ,T.testGroup "parseStmt" $ map testParseStmt parseStmtExamples
->             ,T.testGroup "parseProgram" $ map testParseModule parseModuleExamples]
->         --,T.testGroup "desugarExpr" $ map testDesugarExpr desugarExprExamples
->         --,T.testGroup "interpret" $ map testInterpreter interpreterTests
->         --,T.testGroup "test tests" $ map testDetailedSourceFile detailedSourceFileTests
->         --,sourceFileTests
+>             [T.testGroup "parseExpr" $ map ParseTests.testParseExpr ParseTests.parseExprExamples
+>             ,T.testGroup "parseStmt" $ map ParseTests.testParseStmt ParseTests.parseStmtExamples
+>             ,T.testGroup "parseProgram" $ map ParseTests.testParseModule ParseTests.parseModuleExamples]
+>         ,T.testGroup "parse1"
+>             [T.testGroup "parse1Expr" $ map Parse1Tests.testParseExpr Parse1Tests.parseExprExamples
+>             ,T.testGroup "parse1Stmt" $ map Parse1Tests.testParseStmt Parse1Tests.parseStmtExamples
+>             ,T.testGroup "parse1Program" $ map Parse1Tests.testParseModule Parse1Tests.parseModuleExamples]
 >         ,langTests
 >         ,FrontTests.tests
 >         ]
