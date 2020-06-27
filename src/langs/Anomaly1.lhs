@@ -87,7 +87,7 @@ evaluate
 >         ast' = either error id $ runDesugar ast
 >         ast'' = simplify ast'
 >     when False $ putStrLn (prettyIExpr ast'')     
->     runInterp defaultFFI ast''
+>     runInterp defaultEnv ast''
 >   where
 >      myFirstPrelude = [r|
 \begin{code} 
@@ -192,21 +192,27 @@ interpreter types
 > throwInterpE :: InterpreterException -> Interpreter a
 > throwInterpE e = throwM e
 
-> eapp :: String -> [Expr] -> Expr
-> eapp f as = App (Iden f) as
-  
-> throwUnboundIdentifier :: String -> Interpreter a
-> throwUnboundIdentifier i = raiseValue $ eapp "unbound-identifier" [Text i]
+-------------------------------------
+
+language exceptions
+
 
 > raiseValue :: Expr -> Interpreter a
 > raiseValue e = do
 >     runAstInterp $ [StExpr $ eapp "raise" [e]]
 >     throwInterp "internal error: should have raised"
 
+> eapp :: String -> [Expr] -> Expr
+> eapp f as = App (Iden f) as
+
+> throwUnboundIdentifier :: String -> Interpreter a
+> throwUnboundIdentifier i = raiseValue $ eapp "unbound-identifier" [Text i]
+
+
 todo: should this be a tostring, or should it store the actual value
 might be better to have the value, just have to port some more of the
 runscriptinterp infrastructure
-  
+
 > throwNotFunctionValue :: String -> Interpreter a
 > throwNotFunctionValue i = raiseValue $ eapp "not-function-value" [Text i]
 
@@ -236,6 +242,10 @@ runscriptinterp infrastructure
 > runAstInterp ast = do
 >     y <- either throwInterp pure $ runDesugar ast
 >     void $ interp (simplify y)
+
+-------------------------------------
+
+env
 
 > data Env = Env
 >     {envEnv :: [(String,Value)]
@@ -287,12 +297,14 @@ runscriptinterp infrastructure
 > addForeignFuns' ((x,y):xs) env = do
 >     env' <- addForeignFun' x y env
 >     addForeignFuns' xs env'
->     
+
+---------------------------------------
 
 ffi catalog
-  
-> defaultFFI :: Env
-> defaultFFI = either error id $ addForeignFuns' (
+===========
+
+> defaultEnv :: Env
+> defaultEnv = either error id $ addForeignFuns' (
 >    [("+", binaryOp unwrapNum unwrapNum wrapNum (+))
 >    ,("*", binaryOp unwrapNum unwrapNum wrapNum (*))
 >    ,("==", binaryOp anyIn anyIn wrapBool (==))
@@ -326,6 +338,9 @@ ffi catalog
 >     )
 >    $ emptyEnv {envEnv = [("true", BoolV True)
 >                         ,("false", BoolV False)]}
+
+> nothingValueHack :: Value
+> nothingValueHack = VariantV "nothing" []
 
 > raise :: Value -> Interpreter Value
 > raise v = throwM $ ValueException v
@@ -445,7 +460,7 @@ ffi catalog
 > interp (ISeq a b) = interp a *> interp b
 
 > interp (IIf [_] Nothing) = throwOnlyOneBranch
-        
+
 > interp (IIf bs e) = do
 >     let f ((c,t):bs') = do
 >             c' <- interp c
@@ -453,12 +468,9 @@ ffi catalog
 >                 BoolV True -> interp t
 >                 BoolV False -> f bs'
 >                 _ -> throwExpectedType "Boolean" (valueTypeName c')
->                      -- (throwInterp $ "expected bool in if test, got " ++ show c'
 >         f [] = case e of
 >                    Just x -> interp x
 >                    Nothing -> throwNoBranchesSatisfied
->                               --throwInterp $ "no if branches matched and no else:\n"
->                               -- ++ prettyIExpr z
 >     f bs
 
 > app :: Value -> [Value] -> Interpreter Value
@@ -477,7 +489,6 @@ ffi catalog
 >   where
 >     safeZip ps xs | length ps == length xs  = pure $ zip ps xs
 >                   | otherwise = throwWrongNumberOfArgs (length ps) (length xs)
->                     --throwInterp $ "wrong number of args to function"
 
 
 ------------------------------------------------------------------------------
@@ -502,6 +513,11 @@ desugaring
 >     in (pref ++ "-" ++ show suff
 >        ,s {uniqueCtr = suff + 1})
 
+> throwDesugar :: String ->  Expr
+> throwDesugar e = App (Iden "raise") [Text e]
+  
+> throwDesugarV :: Expr ->  Expr
+> throwDesugarV v = App (Iden "raise") [v]
 
 --------------------------------------
 
@@ -511,20 +527,13 @@ desugaring code
 > runDesugar stmts =
 >     fst <$> runExcept (evalRWST (desugarStmts stmts) (DesugarReader Nothing) startingDesugarState)
 
-> throwDesugar :: String ->  Expr
-> throwDesugar e = App (Iden "raise") [Text e]
-  
-> throwDesugarV :: Expr ->  Expr
-> throwDesugarV v = App (Iden "raise") [v]
-  
-
   
 > desugar :: Expr -> Desugarer IExpr
 > desugar (Block []) = desugar $ throwDesugarV (Iden "empty-block")
 > desugar (Block [x@LetDecl {}]) =
 >     desugarStmts [x, StExpr $ throwDesugarV (Iden "block-ends-with-let")]
-
 > desugar (Block sts) = desugarStmts sts
+
 > desugar (Num i) = pure $ INum i
 > desugar (Text i) = pure $ IText i
 > desugar (TupleSel fs) =
@@ -594,9 +603,9 @@ desugaring code
 >     g as' las (x:xs) = do
 >         g (x:as') las xs
 
-> desugar (Lam ns e) = ILam (map f ns) <$> desugar e
->     where
->       f (PatName _ n) = n
+> desugar (Lam ns e) = ILam (map b ns) <$> desugar e
+>   where
+>     b (PatName _ n) = n
 > desugar (Let bs e) = do
 >     let f (PatName _ n, v) = (n,) <$> desugar v
 >     ILet <$> mapM f bs <*> desugar e
@@ -808,24 +817,21 @@ log-test-fail(block,id, text of test, fail message)
 > logTestFail n msg failmsg = nothingWrapper $ \s ->
 >     s {testResultLog = T.TestFail n msg failmsg : testResultLog s}
 
-> nothingWrapper :: (InterpreterState -> InterpreterState) -> Interpreter Value
-> nothingWrapper f = modify f *> pure nothingValueHack
-
-> nothingValueHack :: Value
-> nothingValueHack = VariantV "nothing" []
-
 
 > runAddedTests :: Interpreter [T.CheckResult]
 > runAddedTests = do
 >     ts <- reverse <$> gets addedTests
->     mapM_ (\v -> app v []) ts
+>     mapM_ (`app` []) ts
 >     testLog <- reverse <$> gets testResultLog
 >     either throwInterp pure $ T.testLogToCheckResults testLog
 
 ------------------------------------------------------------------------------
 
 ffi boilerplate
---------------------
+===============
+
+> nothingWrapper :: (InterpreterState -> InterpreterState) -> Interpreter Value
+> nothingWrapper f = modify f *> pure nothingValueHack
 
 
 > unarySimple :: String -> (Value -> Interpreter Value) -> ([String], [Value] -> Interpreter Value)

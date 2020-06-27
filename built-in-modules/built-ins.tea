@@ -19,3 +19,16 @@ data ProvideItem:
   | provide-all
   | provide-alias(i,a)
 end
+
+data Language-error:
+  | unbound-identifier(i)
+  | not-function-value(v)
+  | function-wrong-num-args(e,r)
+  | function-wrong-types(e,r)
+  | duplicate-name(a)
+  | expected-type(e,r)
+  | no-branches-satisfied
+  | only-one-branch
+  | empty-block
+  | block-ends-with-let
+end

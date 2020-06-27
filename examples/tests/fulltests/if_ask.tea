@@ -2,24 +2,26 @@ check:
   a = true
 
   # todo: pyret rejects this
-  if a : 3 end is 3
-  
-  shadow a = false
-  if a : 4 else: 5 end is 5
+  # now this code does too
+  # if a : 3 end is 3
 
-  shadow a = 4
-  if a == 2: 1
-  else if a == 3: 2
-  else if a == 4: 3
+  # temporarily broken, all vars should be a
+  shadow a1 = false
+  if a1 : 4 else: 5 end is 5
+
+  shadow a2 = 4
+  if a2 == 2: 1
+  else if a2 == 3: 2
+  else if a2 == 4: 3
   end is 3
 
 
   ask: | otherwise: "hello" end is "hello"
 
   ask:
-    | a == 2 then: 1
-    | a == 3 then: 2
-    | a == 4 then: 3
+    | a2 == 2 then: 1
+    | a2 == 3 then: 2
+    | a2 == 4 then: 3
   end is 3
 
 end

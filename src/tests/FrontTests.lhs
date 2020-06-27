@@ -63,6 +63,7 @@ tests
 >     ,"when.tea"
 >     ,"where.tea"
 >     ,"curried.tea"
+>     ,"simple-anomaly.tea"
 >
 >     ,"option.tea"
 >     ,"either.tea"

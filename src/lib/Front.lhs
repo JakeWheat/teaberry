@@ -49,15 +49,15 @@ imports
 > import Data.Generics.Uniplate.Data (transformBi)
 > import Data.Data (Data)
 
-> import Control.Monad (when)
+> import Control.Monad (when,void)
 > import Data.Maybe (mapMaybe, isNothing)
 >
 > import Data.Char (isAlphaNum)
 
 > import Scientific (Scientific, divideScientific, showScientific)
-> import Data.List (intercalate, nubBy, sortOn, findIndex, isPrefixOf, tails, partition)
+> import Data.List (intercalate, nubBy, sortOn, findIndex, isPrefixOf, tails, partition, find, nub, (\\))
 
-> --import Debug.Trace (trace, traceStack)
+> import Debug.Trace (trace, traceStack)
 > --import qualified TestUtils as T
 
 > import Data.IORef (IORef, newIORef, readIORef, writeIORef)
@@ -290,14 +290,14 @@ values
 value type name is used for looking up overloaded foreign functions
 
 > valueTypeName :: Value -> String
-> valueTypeName NumV {} = "number"
-> valueTypeName TextV {} = "text"
-> valueTypeName BoolV {} = "boolean"
-> valueTypeName VariantV {} = "variant" -- or should it be the variant's type name?
-> valueTypeName BoxV {} = "box"
-> valueTypeName FunV {} = "function"
-> valueTypeName ForeignFunV {} = "foreign-function"
-> valueTypeName FFIVal {} = "ffi-val"
+> valueTypeName NumV {} = "Number"
+> valueTypeName TextV {} = "Text"
+> valueTypeName BoolV {} = "Boolean"
+> valueTypeName VariantV {} = "Variant" -- or should it be the variant's type name?
+> valueTypeName BoxV {} = "Box"
+> valueTypeName FunV {} = "Function"
+> valueTypeName ForeignFunV {} = "Foreign-function"
+> valueTypeName FFIVal {} = "FFI-val"
 
 > instance Show Value where
 >   show (NumV n) = "NumV " ++ show n
@@ -369,6 +369,49 @@ store holds the values of variables
 > instance Exception InterpreterException where
 >   --  displayException (InterpreterException msg) = msg
 
+-------------------------------------
+
+language exceptions
+
+> raiseValue :: Expr -> Interpreter a
+> raiseValue e = do
+>     runAstInterp $ Module [] [StExpr $ eapp "raise" [e]]
+>     throwInterp "internal error: should have raised"
+
+> eapp :: String -> [Expr] -> Expr
+> eapp f as = App (Iden f) as
+
+> throwUnboundIdentifier :: String -> Interpreter a
+> throwUnboundIdentifier i = raiseValue $ eapp "unbound-identifier" [Text i]
+
+> throwNotFunctionValue :: String -> Interpreter a
+> throwNotFunctionValue i = raiseValue $ eapp "not-function-value" [Text i]
+
+> throwWrongNumberOfArgs :: Int -> Int -> Interpreter a
+> throwWrongNumberOfArgs e g =
+>    raiseValue $ eapp "function-wrong-num-args" [Num $ fromIntegral e, Num $ fromIntegral g]
+
+> throwWrongTypes :: [String] -> [String] -> Interpreter a
+> throwWrongTypes e g =
+>    raiseValue $ eapp "function-wrong-types" [toList e, toList g]
+>   where
+>     toList = Construct (Iden "list") . map Text
+
+> throwDuplicateName :: String -> Interpreter a
+> throwDuplicateName i = raiseValue $ eapp "duplicate-name" [Text i]
+
+> throwExpectedType :: String -> String -> Interpreter a
+> throwExpectedType e g = raiseValue $ eapp "expected-type" [Text e, Text g]
+
+> throwNoBranchesSatisfied :: Interpreter a
+> throwNoBranchesSatisfied = raiseValue $ Iden "no-branches-satisfied"
+
+> throwOnlyOneBranch :: Interpreter a
+> throwOnlyOneBranch = raiseValue $ Iden "only-one-branch"
+
+-------------------------------------
+
+env
 
 > data Env = Env
 >     {envEnv :: [(String,Value)]
@@ -389,9 +432,10 @@ store holds the values of variables
 > envLookup :: String -> Env -> Interpreter Value
 > envLookup nm env =
 >     maybe
->       (--traceStack  "" -- \n----------\n" ++ _showEnvNames env ++"\n-----------\n"
->       throwInterp $ "Identifier not found: " ++ nm {-++ "\n" ++ showEnvNames env-})
->       pure $ lookup nm (envEnv env)
+>       --traceStack  "" -- \n----------\n" ++ _showEnvNames env ++"\n-----------\n"
+>       (throwUnboundIdentifier nm) pure $ lookup nm (envEnv env)
+>       -- throwInterp $ "Identifier not found: " ++ nm {-++ "\n" ++ showEnvNames env-})
+>       -- pure $ lookup nm (envEnv env)
 
 > addForeignFun :: String -> [String] -> ([Value] -> Interpreter Value) -> Env -> Either String Env
 > addForeignFun nm tys f env =
@@ -401,10 +445,22 @@ store holds the values of variables
 > lookupForeignFun :: String -> [String] -> Env -> Interpreter ([Value] -> Interpreter Value)
 > lookupForeignFun nm tys env =
 >     if | Just f <- lookup (nm,tys) $ envForeignFuns env -> pure f
->        -- well dodgy "generic" functions, only works if all args are any
->        | Just f <- lookup (nm, map (const "any") tys) $ envForeignFuns env -> pure f
+>        | Just f <- find (matchesAny . fst) $ envForeignFuns env -> pure $ snd f
+>        -- check for matching function, but wrong number of args
+>        | Just f <- find ((== nm) . fst . fst) $ envForeignFuns env
+>          -> if length (snd $ fst f) == length tys
+>             then trace (show (fst f,nm,tys)) $ throwWrongTypes (snd $ fst f) tys
+>             else throwWrongNumberOfArgs (length (snd $ fst f)) (length tys)
 >        | otherwise -> throwInterp $ "ffi function not found: " ++ nm ++ "(" ++ intercalate "," tys ++")"
-
+>   where
+>     matchesAny (nmx,tys') =
+>         if nm == nmx && length tys == length tys'
+>            && and (zipWith matchEqualOrAny tys tys')
+>         then True
+>         else False
+>     matchEqualOrAny "Any" _ = True          
+>     matchEqualOrAny _ "Any" = True          
+>     matchEqualOrAny a b = a == b
 
 
 > addForeignFun' :: String -> ([String], [Value] -> Interpreter Value) -> Env -> Either String Env
@@ -457,9 +513,7 @@ ffi catalog
 >    ,(">=", binaryOp anyIn anyIn id gte)
 >    ,("<>", binaryOp anyIn anyIn id neq)
 
->    -- todo: why doesn't this work?
->    --,("^", binaryOp anyIn functionIn id (\a f -> app f [a]))
->    ,("^", binaryOp anyIn anyIn id (\a f -> app f [a]))
+>    ,("^", binaryOp anyIn functionIn id (\a f -> app f [a]))
 >    ,("|>", binaryOp anyIn anyIn id (\f a -> app f [a]))
 
 
@@ -474,9 +528,7 @@ ffi catalog
 
 >    ,("variant-field-get", binaryOp unwrapText variantIn id variantFieldGet)
 >    ,("variant-field-get-ord", binaryOp unwrapNum variantIn id variantFieldGetOrd)
->    ,("safe-variant-name", unaryOp variantIn id safeVariantName)
->    -- hack to make it work for any data type     
->    ,("safe-variant-name", unaryOp anyIn pure (const $ nothingLiteralHack))
+>    ,("safe-variant-name", unaryOp anyIn id safeVariantName)
 >    ,("make-variant", binaryOp unwrapText unwrapList id makeVariant)
 >    ,("make-variant-0", unaryOp unwrapText id makeVariant0)
 >    ,("make-variant-2", ternaryOp anyIn anyIn anyIn id makeVariant2)
@@ -560,7 +612,18 @@ maybe also have one which takes an ast?
 >     let as' = zipWith (\i x -> ("aaa-" ++ show i, x)) [(0::Int)..] as
 >     runScriptInterp Nothing (("fff", v):as') $ "fff(" ++ intercalate "," (map fst as') ++ ")"
 
+> runAstInterp :: Module -> Interpreter ()
+> runAstInterp ast = do
+>     y <- either throwInterp pure $ runDesugar "" ast []
+>     void $ interp (simplify y)
 
+hardcoded nothing. There is also a syntax version. even though nothing
+is defined in built in, it needs bootstrapping like list because a
+bunch of the language machinery needs nothing before it's been
+created
+
+> nothingValueHack :: Value
+> nothingValueHack = VariantV "nothing" []
 
 
 > makeHaskellString :: String -> Value
@@ -572,15 +635,6 @@ maybe also have one which takes an ast?
 >     Nothing -> throwInterp $ "expected string in dynamic val, got " ++ show v
 
 > getHaskellString x = throwInterp $ "expected FFIVal in ghs, got " ++ show x
-
-
-hardcoded nothing. There is also a syntax version. even though nothing
-is defined in built in, it needs bootstrapping like list because a
-bunch of the language machinery needs nothing before it's been
-created
-
-> nothingLiteralHack :: Value
-> nothingLiteralHack = VariantV "nothing" []
 
 > envToRecord :: Interpreter Value
 > envToRecord = do
@@ -690,18 +744,18 @@ created
 >     liftIO $ putStrLn $ case v of
 >                             TextV u -> u
 >                             _ -> torepr' v
->     pure nothingLiteralHack
+>     pure nothingValueHack
 
 
 > ffisleep :: Scientific -> Interpreter Value
 > ffisleep v = do
 >     liftIO $ threadDelay (floor (v * 1000 * 1000))
->     pure nothingLiteralHack
+>     pure nothingValueHack
 
   
 > safeVariantName :: Value -> Interpreter Value
 > safeVariantName (VariantV x _) = pure $ TextV $ dropQualifiers x
-> safeVariantName _ = pure $ nothingLiteralHack
+> safeVariantName _ = pure $ nothingValueHack
 
 > dropQualifiers :: String -> String
 > dropQualifiers = reverse . takeWhile (/='.') . reverse
@@ -794,9 +848,16 @@ interp
 >     vs <- mapM interp es
 >     app fv vs
 > interp (ILam ps e) = do
+>     case ps \\ nub ps of
+>         (x:_) -> throwDuplicateName x        
+>         [] -> pure ()
 >     env <- ask
 >     pure $ FunV ps e $ ieEnv env
 > interp (ILet bs e) = do
+>     let ps = map fst bs      
+>     case ps \\ nub ps of
+>         (x:_) -> throwDuplicateName x        
+>         [] -> pure ()
 >     let newEnv [] = interp e
 >         newEnv ((b,ex):bs') = do
 >             traceIt 1 $ "let " ++ b ++ " = " ++ prettyIExpr ex
@@ -826,17 +887,18 @@ b = r.b
   
 > interp (ISeq a b) = interp a *> interp b
 
-> interp z@(IIf bs e) = do
+> interp (IIf [_] Nothing) = throwOnlyOneBranch
+
+> interp (IIf bs e) = do
 >     let f ((c,t):bs') = do
 >             c' <- interp c
 >             case c' of
 >                 BoolV True -> interp t
 >                 BoolV False -> f bs'
->                 _ -> throwInterp $ "expected bool in if test, got " ++ show c'
+>                 _ -> throwExpectedType "Boolean" (valueTypeName c')
 >         f [] = case e of
 >                    Just x -> interp x
->                    Nothing -> throwInterp $ "no if branches matched and no else:\n"
->                               ++ prettyIExpr z
+>                    Nothing -> throwNoBranchesSatisfied
 >     f bs
 
 > interp (IBox e) = do
@@ -892,10 +954,10 @@ todo: combine
 >             env <- ask
 >             hf <- lookupForeignFun nm tys $ ieEnv env
 >             hf vs
->         _ -> throwInterp "non function value in app position"
+>         _ -> throwNotFunctionValue $ torepr' fv
 >   where
->     safeZip ps xs | length xs == length ps = pure $ zip ps xs
->                   | otherwise = throwInterp "wrong number of args to function"
+>     safeZip ps xs | length ps == length xs  = pure $ zip ps xs
+>                   | otherwise = throwWrongNumberOfArgs (length ps) (length xs)
 
 > box :: Value -> Interpreter Value
 > box v = do
@@ -926,6 +988,16 @@ desugaring
 >     let suff = uniqueCtr s
 >     in (pref ++ "-" ++ show suff
 >        ,s {uniqueCtr = suff + 1})
+
+> throwDesugar :: String ->  Expr
+> throwDesugar e = App (Iden "raise") [Text e]
+  
+> throwDesugarV :: Expr ->  Expr
+> throwDesugarV v = App (Iden "raise") [v]
+
+--------------------------------------
+
+desugaring code
 
 > runDesugar :: String -> Module -> [(String,Module)] -> Either String IExpr
 > runDesugar nm ast srcs = fst <$> runExcept (evalRWST go (DesugarReader Nothing) startingDesugarState)
@@ -1038,8 +1110,11 @@ add the last statement which returns the last value and the env, for
 > importSourceName (ImportName n) = pure $ "module." ++ n  
   
 > desugar :: Expr -> Desugarer IExpr
-
+> desugar (Block []) = desugar $ throwDesugarV (Iden "empty-block")
+> desugar (Block [x@LetDecl {}]) =
+>     desugarStmts [x, StExpr $ throwDesugarV (Iden "block-ends-with-let")]
 > desugar (Block sts) = desugarStmts sts
+
 > desugar (Num i) = pure $ INum i
 > desugar (Text i) = pure $ IText i
 > desugar (TupleSel fs) =
@@ -1062,18 +1137,18 @@ add the last statement which returns the last value and the env, for
 >     uniqueV0 <- makeUniqueVar "is-v0"
 >     uniqueV1 <- makeUniqueVar "is-v1"
 >     uniqueName <- makeUniqueVar "testname"
->     checkBlockIDName <- (maybe (lift $ throwE "'is' test outside check block") pure)
->                         =<< (asks currentCheckBlockIDName)
+>     checkBlockIDName <- (maybe (throwDesugar "'is' test outside check block") Iden)
+>                         <$> (asks currentCheckBlockIDName)
 >     desugarStmts
 >               [LetDecl (patName uniqueV0) a
 >               ,LetDecl (patName uniqueV1) b
 >               ,LetDecl (patName uniqueName) (Text $ Pr.prettyExpr a ++ " is " ++ Pr.prettyExpr b)
 >               ,StExpr $
 >                If [(eqIdens uniqueV0 uniqueV1
->                   ,appI "log-test-pass" [Iden checkBlockIDName
+>                   ,appI "log-test-pass" [checkBlockIDName
 >                                         ,Iden uniqueName])]
 >                   (Just $ appI "log-test-fail"
->                    [Iden checkBlockIDName
+>                    [checkBlockIDName
 >                    ,Iden uniqueName
 >                    ,Text "Values not equal:\n"
 >                        `plus` appI "torepr" [Iden uniqueV0]
@@ -1114,11 +1189,11 @@ add the last statement which returns the last value and the env, for
 >         g (Iden n:as') (n:las) xs
 >     g as' las (x:xs) = do
 >         g (x:as') las xs
-> desugar (Lam ns e) = ILam <$> mapM b ns <*> desugar e
+> desugar (Lam ns e) = ILam (map b ns) <$> desugar e
 >   where
->     b (PatName _ x) = pure x
+>     b (PatName _ n) = n
 > desugar (Let bs e) = do
->     let f (PatName _ n,v) = (n,) <$> desugar v
+>     let f (PatName _ n, v) = (n,) <$> desugar v
 >     ILet <$> mapM f bs <*> desugar e
 
 > desugar (LetRec bs e) = do
@@ -1256,7 +1331,9 @@ testing hack
 > desugarStmts [x@(FunDecl {})] = desugarStmts [x, StExpr nothingSyntaxHack]
 > desugarStmts [x@(RecDecl {})] = desugarStmts [x, StExpr nothingSyntaxHack]
 
-> desugarStmts (LetDecl n v : es) = desugar (Let [(n,v)] (Block es))
+> desugarStmts (LetDecl (PatName _ n) v : es) = do
+>     v' <- desugar v      
+>     ILet [(n,v')] <$> desugarStmts es
 
 
 > desugarStmts (LetSplatDecl re : es) = do
@@ -1425,22 +1502,17 @@ catch(
 >       plus a b = appx "+" [a,b]
 >       appx nm es = App (Iden nm) es
 
+------------------------------------------------------------------------------
 
---------------------------------------
 
+test infra
+==========
 
 > getAnonBlockName :: Desugarer String
 > getAnonBlockName = state $ \s ->
 >     let blockNo = nextAnonymousBlockNumber s
 >     in ("check-block-" ++ show blockNo
 >        ,s {nextAnonymousBlockNumber = blockNo + 1})
-
-
-------------------------------------------------------------------------------
-
-
-test infra
-==========
 
 add-tests(fn)
 takes a function value
@@ -1486,15 +1558,15 @@ ffi boilerplate
 
 
 > nothingWrapper :: (InterpreterState -> InterpreterState) -> Interpreter Value
-> nothingWrapper f = modify f *> pure nothingLiteralHack
+> nothingWrapper f = modify f *> pure nothingValueHack
 
 > _unwrapTuple :: (String, Value -> Interpreter [Value])
-> _unwrapTuple = ("tuple", \case
+> _unwrapTuple = ("Tuple", \case
 >                           VariantV "tuple" fs -> pure $ map snd fs
 >                           x -> throwInterp $ "type: expected tuple, got " ++ show x)
 
 > unwrapNum :: (String, Value -> Interpreter Scientific)
-> unwrapNum = ("number", \case
+> unwrapNum = ("Number", \case
 >                           NumV n -> pure n
 >                           x -> throwInterp $ "type: expected number, got " ++ show x)
 
@@ -1505,7 +1577,7 @@ ffi boilerplate
 
 
 > unwrapBool :: (String, Value -> Interpreter Bool)
-> unwrapBool = ("boolean", \case
+> unwrapBool = ("Boolean", \case
 >                           BoolV n -> pure n
 >                           x -> throwInterp $ "type: expected boolean, got " ++ show x)
 
@@ -1514,7 +1586,7 @@ ffi boilerplate
 
 
 > unwrapText :: (String, Value -> Interpreter String)
-> unwrapText = ("text", \case
+> unwrapText = ("Text", \case
 >                           TextV n -> pure n
 >                           x -> throwInterp $ "type: expected text, got " ++ show x)
 
@@ -1522,12 +1594,12 @@ ffi boilerplate
 > wrapText n = pure $ TextV n
 
 > variantIn :: (String, Value -> Interpreter Value)
-> variantIn = ("variant", \case
+> variantIn = ("Variant", \case
 >                           x@(VariantV {}) -> pure x
 >                           x -> throwInterp $ "type: expected variant, got " ++ show x)
 
 > unwrapList :: (String, Value -> Interpreter [Value])
-> unwrapList = ("variant", listToHaskellI)
+> unwrapList = ("Variant", listToHaskellI)
 
 > listToHaskellI :: Value -> Interpreter [Value]
 > listToHaskellI x =
@@ -1542,12 +1614,12 @@ ffi boilerplate
 > listToHaskell (VariantV "empty" []) = pure []
 > listToHaskell (VariantV "link" [("first", v), ("rest", vs)]) = (v:) <$> listToHaskell vs
 > listToHaskell _ = Nothing
-  
+
 > anyIn :: (String, Value -> Interpreter Value)
-> anyIn = ("any", pure)
+> anyIn = ("Any", pure)
 
 > functionIn :: (String, Value -> Interpreter Value)
-> functionIn = ("function", \case
+> functionIn = ("Function", \case
 >                           x@(FunV {}) -> pure x
 >                           x@(ForeignFunV {}) -> pure x
 >                           x -> throwInterp $ "type: expected function, got " ++ show x)
