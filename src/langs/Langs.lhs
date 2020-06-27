@@ -50,6 +50,7 @@
 > import qualified RunScriptInterp
 > import qualified Anomaly1
 > import qualified SimpleBase
+> import qualified Curried
 
 
 > import qualified Test.Tasty as T
@@ -105,4 +106,5 @@
 >        ,RunScriptInterp.tests
 >        ,Anomaly1.tests
 >        ,SimpleBase.tests
+>        ,Curried.tests
 >        ]

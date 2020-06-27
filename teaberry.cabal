@@ -130,4 +130,5 @@ Test-Suite teaberry-dev
                        Parse1Tests
                        Parse2Tests
                        SimpleBase
+                       Curried
 
