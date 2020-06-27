@@ -3,63 +3,17 @@ Anomaly testing version one:
 
 start with a simple language
 
-try to figure out every mistake that could be made that isn't an
-internal error -> looking at anomalies caused by the user writing
-incorrect code and not other kinds
+do tests for every way you can mistakenly use the language (excluding
+parse errors)
 
 add tests for all of these to see them
 
 a big part of the goal is to develop the infrastructure to do this
 kind of testing
 
--------------------------
-prefactoring:
--------------
+=============================================================================
 
-diff it and think about how easy it is to compare and later port
- features back and forth
-
-create a haskell data type for runtime exceptions
-
-try adding the ffi wrapper for haskell values
-see if this looks good for testing
-another alternative is to make these errors into a variant in Value
-try to figure out if one approach will work better
-
-see if can import a simple test script instead of also having it inline
-
-
-rough list of things to test in this version, based on the interpreter
-syntax. could also think about errors from the surface syntax
-
-what can go wrong in a check block (apart from test failures?)
-  check what happens in pyret when you throw exceptions outside of a test predicate
-  also check e.g. what happens when you throw an exception on the left or right side
-   of an is predicate
-check for test predicates outside of check block
-
-iden -> name not found
-app -> not function value
-  wrong number of args
-  wrong types of args
-lam: arg names repeated
-let: same
-block: think about empty blocks and do some checking
-  maybe can catch only some empty blocks during desugaring and add a raise?
-  that way, the rest of the code can support empty blocks when they appear
-  as part of desugaring
-can think about making let at the end of a block an error
-if -> check type isn't bool
-
-todo: review this list again after work
-
-think about if any of these tests should use the runtime type
-assertion expression
-
-
-
-------------------------------------------------------------------------------
-
+imports
 
 > {-# LANGUAGE TupleSections #-}
 > {-# LANGUAGE LambdaCase #-}
@@ -100,18 +54,20 @@ assertion expression
 ------------------------------------------------------------------------------
 
 interpreter syntax
-------------------
+==================
 
-> data IExpr = INum Scientific
->            | IText String
->            | IVariantSel String [(String,IExpr)]
->            | IIden String
->            | IApp IExpr [IExpr]
->            | ILam [String] IExpr
->            | ILet [(String,IExpr)] IExpr
->            | ISeq IExpr IExpr
->            | IIf [(IExpr,IExpr)] (Maybe IExpr)
->            deriving (Eq, Show, Data)
+
+> data IExpr
+>     = INum Scientific
+>     | IText String
+>     | IVariantSel String [(String,IExpr)]
+>     | IIden String
+>     | IApp IExpr [IExpr]
+>     | ILam [String] IExpr
+>     | ILet [(String,IExpr)] IExpr
+>     | ISeq IExpr IExpr
+>     | IIf [(IExpr,IExpr)] (Maybe IExpr)
+>     deriving (Eq, Show, Data)
 
 ------------------------------------------------------------------------------
 
@@ -148,6 +104,7 @@ end
 data Language-error:
   | unbound-identifier(i)
   | not-function-value(v)
+  | function-wrong-num-args(e,r)
 end
 
 
@@ -239,6 +196,10 @@ interpreter types
 >     runAstInterp $ [StExpr $ eapp "raise" [e]]
 >     throwInterp "internal error: should have raised"
 
+todo: should this be a tostring, or should it store the actual value
+might be better to have the value, just have to port some more of the
+runscriptinterp infrastructure
+  
 > throwNotFunctionValue :: String -> Interpreter a
 > throwNotFunctionValue i = raiseValue $ eapp "not-function-value" [Text i]
 
@@ -253,8 +214,7 @@ interpreter types
 
 > emptyEnv :: Env
 > emptyEnv = Env
->     {envEnv = [("true", BoolV True)
->               ,("false", BoolV False)]
+>     {envEnv = []
 >     ,envForeignFuns = []}
 
 > extendEnv :: [(String,Value)] -> Env -> Env
@@ -274,13 +234,15 @@ interpreter types
 >     if | Just f <- lookup (nm,tys) $ envForeignFuns env -> pure f
 >        -- well dodgy "generic" functions, only works if all args are any
 >        | Just f <- lookup (nm, map (const "any") tys) $ envForeignFuns env -> pure f
+>        -- check for matching function, but wrong number of args
+>        -- check for matching functions, but wrong types
 >        | otherwise -> throwInterp $ "ffi function not found: " ++ nm ++ "(" ++ intercalate "," tys ++")"
 
 
-> addForeignFun' :: String -> ([String], ([Value] -> Interpreter Value)) -> Env -> Either String Env
+> addForeignFun' :: String -> ([String], [Value] -> Interpreter Value) -> Env -> Either String Env
 > addForeignFun' nm (tys, f) env = addForeignFun nm tys f env
 
-> addForeignFuns' :: [(String, ([String], ([Value] -> Interpreter Value)))] -> Env -> Either String Env
+> addForeignFuns' :: [(String, ([String], [Value] -> Interpreter Value))] -> Env -> Either String Env
 > addForeignFuns' [] env = pure env
 > addForeignFuns' ((x,y):xs) env = do
 >     env' <- addForeignFun' x y env
@@ -296,16 +258,11 @@ ffi catalog
 >    ,("==", binaryOp anyIn anyIn wrapBool (==))
 >    ,("+", binaryOp unwrapText unwrapText wrapText (++))
 
->    ,("add-tests", unarySimple "function" addTests)
->    ,("log-check-block", binaryOp unwrapNum unwrapText id logCheckBlock)
->    ,("log-test-pass", binaryOp unwrapNum unwrapText id logTestPass)
->    ,("log-test-fail", ternaryOp unwrapNum unwrapText unwrapText id logTestFail)
->    ,("raise", unaryOp anyIn id raise)
->    ,("tostring", unaryOp anyIn pure tostring)
->    ,("to-string", unaryOp anyIn pure tostring)
 
 >    ,("torepr", unaryOp anyIn pure torepr)
 >    ,("to-repr", unaryOp anyIn pure torepr)
+>    ,("tostring", unaryOp anyIn pure tostring)
+>    ,("to-string", unaryOp anyIn pure tostring)
 
 
 >    ,("variant-field-get", binaryOp unwrapText variantIn id variantFieldGet)
@@ -317,11 +274,19 @@ ffi catalog
 >    ,("make-variant-0", unaryOp unwrapText id makeVariant0)
 >    ,("make-variant-2", ternaryOp anyIn anyIn anyIn id makeVariant2)
 
+>    ,("raise", unaryOp anyIn id raise)
+
+>    ,("add-tests", unarySimple "function" addTests)
+>    ,("log-check-block", binaryOp unwrapNum unwrapText id logCheckBlock)
+>    ,("log-test-pass", binaryOp unwrapNum unwrapText id logTestPass)
+>    ,("log-test-fail", ternaryOp unwrapNum unwrapText unwrapText id logTestFail)
+
+
 >    ]
 
 >     )
-
->    emptyEnv
+>    $ emptyEnv {envEnv = [("true", BoolV True)
+>                         ,("false", BoolV False)]}
 
 > raise :: Value -> Interpreter Value
 > raise v = throwM $ ValueException v
@@ -347,6 +312,10 @@ ffi catalog
 > torepr' (VariantV nm fs) =
 >     nm ++ "(" ++ intercalate "," (map (torepr' . snd) fs) ++ ")"
 
+> safeVariantName :: Value -> Interpreter Value
+> safeVariantName (VariantV x _) = pure $ TextV x
+> safeVariantName _ = pure $ nothingLiteralHack
+
 > variantFieldGet :: String -> Value -> Interpreter Value
 > variantFieldGet fieldNm v@(VariantV _ fs) =
 >     maybe (throwInterp $ "variant field not found " ++ fieldNm ++ ": " ++ torepr' v)
@@ -368,7 +337,6 @@ ffi catalog
 > variantFieldGetOrd _ x =
 >     throwInterp $ "variant field get ord called on " ++ torepr' x
 
-  
 > makeVariant0 :: String -> Interpreter Value
 > makeVariant0 vnt = makeVariant vnt []
 
@@ -376,26 +344,15 @@ ffi catalog
 > makeVariant2 (TextV vnt) f0 f1 = makeVariant vnt [f0,f1]
 > makeVariant2 x _ _  = throwInterp $ "makeVariant2: expected text for first arg, got " ++ show x
 
-
 > makeVariant :: String -> [Value] -> Interpreter Value
 > makeVariant vnt listargs = do
 >     cd <- mapM unpackTuple listargs
 >     pure $ VariantV vnt cd
 >   where
->     unpackTuple (VariantV "tuple" [("0",BoolV _isRef), ("1", TextV nm), ("2", v)]) =
->         {-if isRef
->         then do
->             v' <- box v
->             pure (nm,v')
->         else-} pure (nm,v)
->     unpackTuple (VariantV "tuple" x) = throwInterp $ "value in list in make-variant, expected tuple of is-ref, name and val, got " ++ show (map (\(_,b) -> torepr' b) x)
+>     unpackTuple (VariantV "tuple" [("0", TextV nm), ("1", v)]) = pure (nm,v)
+>     unpackTuple (VariantV "tuple" x) = throwInterp $ "value in list in make-variant, expected tuple of name and val, got " ++ show (map (\(_,b) -> torepr' b) x)
 >     unpackTuple x = throwInterp $ "expected tuple in make-variant, got " ++ torepr' x
 
-> safeVariantName :: Value -> Interpreter Value
-> safeVariantName (VariantV x _) = pure $ TextV x
-> safeVariantName _ = pure $ nothingLiteralHack
-
-  
 
 ------------------------------------------------------------------------------
 
@@ -422,9 +379,9 @@ ffi catalog
 > interp (IVariantSel nm fs) = VariantV nm <$> mapM f fs
 >   where
 >     f (n,v) = (n,) <$> interp v
-> interp (IIden i) = do
+> interp (IIden a) = do
 >     env <- ask
->     envLookup i env
+>     envLookup a env
 > interp (IApp f es) = do
 >     fv <- interp f
 >     vs <- mapM interp es
@@ -474,8 +431,8 @@ ffi catalog
 
 ------------------------------------------------------------------------------
 
-desugar
--------
+desugaring
+==========
 
 > type Desugarer = RWST DesugarReader () DesugarState (Except String)
 
@@ -508,7 +465,23 @@ desugaring code
   
  
 > desugar :: Expr -> Desugarer IExpr
-> desugar (Block s) = desugarStmts s
+> desugar (Block sts) = desugarStmts sts
+> desugar (Num i) = pure $ INum i
+> desugar (Text i) = pure $ IText i
+> desugar (TupleSel fs) =
+>     desugar $ VariantSel "tuple" $ zipWith f [(0::Int)..] fs
+>   where
+>     f n v = (show n,v)
+> desugar (VariantSel nm fs) = IVariantSel nm <$> mapM f fs
+>   where
+>     f (n,v) = (n,) <$> desugar v
+> desugar x@(RecordSel {}) = desugar $ throwDesugar ("records not supported: " ++ show x)
+> desugar (Iden i) = pure $ IIden i
+
+> desugar (Parens e) = desugar e
+> desugar (BinOp e0 f e1) = desugar $ App (Iden f) [e0,e1]
+> desugar (UnaryMinus e) = desugar $ App (Iden "-") [e]
+
 > desugar (App (Iden "is") [a,b]) = do
 >     uniqueV0 <- makeUniqueVar "is-v0"
 >     uniqueV1 <- makeUniqueVar "is-v1"
@@ -547,13 +520,6 @@ desugaring code
 > desugar (App (Iden "or") [a,b]) =
 >     desugar (If [(a, Iden "true")] (Just b))
 
-> desugar (Num i) = pure $ INum i
-> desugar (Text i) = pure $ IText i
-> desugar (TupleSel fs) =
->     desugar $ VariantSel "tuple" $ zipWith f [(0::Int)..] fs
->   where
->     f n v = (show n,v)
-> desugar (Iden i) = pure $ IIden i
 
 > desugar (App f as) = do
 >     -- look for curried apps
@@ -576,7 +542,6 @@ desugaring code
 >     let f (PatName _ n, v) = (n,) <$> desugar v
 >     ILet <$> mapM f bs <*> desugar e
 
-> desugar x@(RecordSel {}) = desugar $ throwDesugar ("records not supported: " ++ show x)
   
 > desugar (If bs e) =
 >     IIf <$> mapM f bs <*> case e of
@@ -588,8 +553,11 @@ desugaring code
 > desugar (DotExpr e f) = do
 >     desugar (App (Iden "variant-field-get") [Text f, e])
 
-> desugar (Parens e) = desugar e
-> desugar (S.BinOp e f e1) = desugar $ App (Iden f) [e,e1]
+> desugar (Construct (Iden "list") es) = desugar $ f es
+>   where
+>     f [] = Iden "empty"
+>     f (v:vs) = App (Iden "link") [v,f vs]
+
 
 > desugar (Cases _ty t bs els) = do
 >     tv <- makeUniqueVar "casest"
@@ -610,14 +578,6 @@ desugaring code
 >     appI i as = App (Iden i) as
 >     equals a b = App (Iden "==") [a,b]
 
-> desugar (VariantSel nm fs) = IVariantSel nm <$> mapM f fs
->   where
->     f (n,v) = (n,) <$> desugar v
-
-> desugar (Construct (Iden "list") es) = desugar $ f es
->   where
->     f [] = Iden "empty"
->     f (v:vs) = App (Iden "link") [v,f vs]
 
 > desugar x = desugar $ throwDesugar ("syntax not supported " ++ show x)
 
@@ -631,9 +591,8 @@ desugaring code
 > lam ps e = Lam (map f ps) e
 >   where
 >     f i = PatName NoShadow i
-  
-> desugarStmts :: [Stmt] -> Desugarer IExpr
 
+> desugarStmts :: [Stmt] -> Desugarer IExpr
 > desugarStmts (Check nm bdy : es) = do
 >     uniqueCheckBlockIDVarName <- makeUniqueVar "check-block-id"
 >     desugaredCheck <- local (\x -> x {currentCheckBlockIDName = Just uniqueCheckBlockIDVarName}) $ do
@@ -666,6 +625,9 @@ desugaring code
 > desugarStmts (StExpr e : es) =
 >     ISeq <$> desugar e <*> desugar (Block es)
 
+
+todo: it ignores ref on fields, instead of giving an error
+  
 > desugarStmts (DataDecl nm varnts w : es) = do
 >     x <- (\a b -> a ++ [b]) <$> mapM makeIsVar varntNms <*> makeIsDat
 >     y <- mapM makeVarnt varnts
@@ -696,27 +658,21 @@ value, not a lambda
 >        pure $ LetDecl (patName vnm) (appI "make-variant-0" [Text vnm])
 
   | pt(x,y) ->
-pt = lam (x,y): I.App "make-variant" ["pt",[list: {false, "x";x},{false, "y";y}]]
+pt = lam (x,y): I.App "make-variant" ["pt",[list: {"x";x},{"y";y}]]
 
-  | pt(ref x,y) ->
-pt = lam (x,y): I.App "make-variant" ["pt",[list: {true, "x";x},{false, "y";y}]]
-  
 special case to bootstrap the variant constructor for list link
 
 >    makeVarnt (VariantDecl vnm [f0,f1]) =
 >        pure $ LetDecl (patName vnm)
 >        (lam [snd f0, snd f1] $ appI "make-variant-2"
->            [Text vnm, makeVField f0, makeVField f1])
+>            [Text vnm, makeVField $ snd f0, makeVField $ snd f1])
 
 
 >    makeVarnt (VariantDecl vnm fs) =
->        let fields = listSel $ map makeVField fs
+>        let fields = listSel $ map (makeVField . snd) fs
 >        in pure $ LetDecl (patName vnm)
 >                  (lam (map snd fs) $ appI "make-variant" [Text vnm, fields])
->    makeVField (x,f) = TupleSel [case x of
->                                     Ref -> Iden "true"
->                                     Con -> Iden "false"
->                                ,Text f, Iden f]
+>    makeVField f = TupleSel [Text f, Iden f]
 >    listSel xs = Construct (Iden "list") xs
 >    appI i as = App (Iden i) as
 >    equals a b = App (Iden "==") [a,b]
@@ -939,6 +895,9 @@ pretty interpreter syntax
 
 > unconvI (INum n) = Num n
 > unconvI (IText n) = Text n
+> unconvI (IVariantSel nm fs) = App (Iden nm) (map f fs)
+>   where
+>     f (n,v) = TupleSel $ map unconvI [IText n, v]
 
 > unconvI (IIden s) = Iden s
 > unconvI (IApp (IIden e) [a,b]) | isOp e = BinOp (unconvI a) e (unconvI b)
@@ -951,9 +910,6 @@ pretty interpreter syntax
 > unconvI (IIf bs e) = If (map f bs) (fmap unconvI e)
 >   where
 >     f (c,t) = (unconvI c, unconvI t)
-> unconvI (IVariantSel nm fs) = App (Iden nm) (map f fs)
->   where
->     f (n,v) = TupleSel $ map unconvI [IText n, v]
 
 > unconvIBinding :: String -> IExpr -> (PatName, Expr)
 > unconvIBinding n v = (unconvIPatName n, unconvI v)
@@ -1178,6 +1134,28 @@ check "simple anomaly":
   #raise(my-check-a("test")) raises-satisfies _ == my-check-a("testa")
   b == 1 raises-satisfies _ == unbound-identifier("b")
   5(1) raises-satisfies _ == not-function-value('5')
+  #tostring(2,3) raises-satisfies _ == function-wrong-num-args(1,2)
+  #f = lam(a,b,c): a + 1 end
+  #f(2,3) raises-satisfies _ == function-wrong-num-args(3,2)
+
+  # wrong number of args
+  # wrong arg types
+  # should it give a better/different error message for a misspelled
+  #   function name?
+
+  # lam: arg names repeated
+  # let: arg names repeated
+  # block: think about empty blocks and do some checking
+  # let at the end of a block
+  # check things which desugar to let which are ok at the end of a block
+  # if -> check type isn't bool
+  # if -> falls through with no else
+
+  # tests for curried:
+  # wrong number of args
+  # where can write a _ and it parse, but be an error?
+
+
 end
 
 \end{code}

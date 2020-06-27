@@ -301,13 +301,8 @@ ffi catalog
 >     cd <- mapM unpackTuple listargs
 >     pure $ VariantV vnt cd
 >   where
->     unpackTuple (VariantV "tuple" [("0",BoolV _isRef), ("1", TextV nm), ("2", v)]) =
->         {-if isRef
->         then do
->             v' <- box v
->             pure (nm,v')
->         else-} pure (nm,v)
->     unpackTuple (VariantV "tuple" x) = throwInterp $ "value in list in make-variant, expected tuple of is-ref, name and val, got " ++ show (map (\(_,b) -> torepr' b) x)
+>     unpackTuple (VariantV "tuple" [("0", TextV nm), ("1", v)]) = pure (nm,v)
+>     unpackTuple (VariantV "tuple" x) = throwInterp $ "value in list in make-variant, expected tuple of name and val, got " ++ show (map (\(_,b) -> torepr' b) x)
 >     unpackTuple x = throwInterp $ "expected tuple in make-variant, got " ++ torepr' x
 
 > safeVariantName :: Value -> Interpreter Value
@@ -571,6 +566,9 @@ desugaring code
 > desugarStmts (StExpr e : es) =
 >     ISeq <$> desugar e <*> desugar (Block es)
 
+
+todo: it ignores ref on fields, instead of giving an error
+  
 > desugarStmts (DataDecl nm varnts w : es) = do
 >     x <- (\a b -> a ++ [b]) <$> mapM makeIsVar varntNms <*> makeIsDat
 >     y <- mapM makeVarnt varnts
@@ -601,27 +599,21 @@ value, not a lambda
 >        pure $ LetDecl (patName vnm) (appI "make-variant-0" [Text vnm])
 
   | pt(x,y) ->
-pt = lam (x,y): I.App "make-variant" ["pt",[list: {false, "x";x},{false, "y";y}]]
+pt = lam (x,y): I.App "make-variant" ["pt",[list: {"x";x},{"y";y}]]
 
-  | pt(ref x,y) ->
-pt = lam (x,y): I.App "make-variant" ["pt",[list: {true, "x";x},{false, "y";y}]]
-  
 special case to bootstrap the variant constructor for list link
 
 >    makeVarnt (VariantDecl vnm [f0,f1]) =
 >        pure $ LetDecl (patName vnm)
 >        (lam [snd f0, snd f1] $ appI "make-variant-2"
->            [Text vnm, makeVField f0, makeVField f1])
+>            [Text vnm, makeVField $ snd f0, makeVField $ snd f1])
 
 
 >    makeVarnt (VariantDecl vnm fs) =
->        let fields = listSel $ map makeVField fs
+>        let fields = listSel $ map (makeVField . snd) fs
 >        in pure $ LetDecl (patName vnm)
 >                  (lam (map snd fs) $ appI "make-variant" [Text vnm, fields])
->    makeVField (x,f) = TupleSel [case x of
->                                     Ref -> Iden "true"
->                                     Con -> Iden "false"
->                                ,Text f, Iden f]
+>    makeVField f = TupleSel [Text f, Iden f]
 >    listSel xs = Construct (Iden "list") xs
 >    appI i as = App (Iden i) as
 >    equals a b = App (Iden "==") [a,b]

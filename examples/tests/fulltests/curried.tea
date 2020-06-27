@@ -1,0 +1,17 @@
+
+check "curried":
+
+  f = lam(x,y): x + y end
+
+  g = f(3,_)
+  h = _ + _
+  a = 5
+  j = a == _
+
+  g(4) is 7
+  f(_,1)(2) is 3
+  h(0,2) is 2
+  j(5) is true
+  j(4) is false
+  
+end

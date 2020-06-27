@@ -5,6 +5,10 @@ Represents the combination of all the ideas that made it
 think about how to split this file:
 syntax, interpreter, desugarer, tests
 
+=============================================================================
+
+imports
+
 > {-# LANGUAGE TupleSections #-}
 > {-# LANGUAGE LambdaCase #-}
 > {-# LANGUAGE ScopedTypeVariables #-}
@@ -587,9 +591,6 @@ created
 > raise :: Value -> Interpreter Value
 > raise v = throwM $ ValueException v
 
- > tostringEquals :: String -> Value -> Bool
- > tostringEquals e0 e1 = TextV e0 == tostring e1
-
 > tostringEqualsx :: Value -> Value -> Bool
 > tostringEqualsx e0 e1 = e0 == tostring e1
 
@@ -723,11 +724,8 @@ created
 >     safeIndex _ n | n < 0 = Nothing
 >     safeIndex (x:_) 0 = Just x
 >     safeIndex (_:xs) n = safeIndex xs (n - 1)
-     
-       
 > variantFieldGetOrd _ x =
 >     throwInterp $ "variant field get ord called on " ++ torepr' x
-
 
 > makeVariant0 :: String -> Interpreter Value
 > makeVariant0 vnt = makeVariant vnt []
@@ -735,7 +733,6 @@ created
 > makeVariant2 :: Value -> Value -> Value -> Interpreter Value
 > makeVariant2 (TextV vnt) f0 f1 = makeVariant vnt [f0,f1]
 > makeVariant2 x _ _  = throwInterp $ "makeVariant2: expected text for first arg, got " ++ show x
-
 
 > makeVariant :: String -> [Value] -> Interpreter Value
 > makeVariant vnt listargs = do
@@ -920,7 +917,7 @@ desugaring
 > data DesugarState = DesugarState {uniqueCtr :: Int
 >                                  ,nextUnusedCheckBlockID :: Int
 >                                  ,nextAnonymousBlockNumber :: Int}
-  
+
 > startingDesugarState :: DesugarState
 > startingDesugarState = DesugarState 0 0 0
 
@@ -1058,8 +1055,8 @@ add the last statement which returns the last value and the env, for
 > desugar (Iden i) = pure $ IIden i
 
 > desugar (Parens e) = desugar e
-> desugar (BinOp e0 f e1) = desugar (App (Iden f) [e0,e1])
-> desugar (UnaryMinus e) = desugar (App (Iden "-") [e])
+> desugar (BinOp e0 f e1) = desugar $ App (Iden f) [e0,e1]
+> desugar (UnaryMinus e) = desugar $ App (Iden "-") [e]
 
 > desugar (App (Iden "is") [a,b]) = do
 >     uniqueV0 <- makeUniqueVar "is-v0"
@@ -1090,11 +1087,8 @@ add the last statement which returns the last value and the env, for
 > desugar (App (Iden "raises") [e0, e1]) = do
 >   desugar (App (Iden "raises-satisfies") [e0, lam ["a"] $ App (Iden "tostring-equals") [e1, Iden "a"]])
 
-> desugar x@(App (Iden "raises-satisfies") [e0,e1]) = do
->   let p = Pr.prettyExpr x
->   y <- desugarRaises p e0 e1
->   desugar y
-
+> desugar x@(App (Iden "raises-satisfies") [e0,e1]) =
+>   desugar =<< desugarRaises  (Pr.prettyExpr x) e0 e1
 
 > desugar (App (Iden "or") [a,b]) =
 >     desugar (If [(a, Iden "true")] (Just b))
@@ -1107,7 +1101,19 @@ add the last statement which returns the last value and the env, for
 > desugar (Catch a b) = ICatch <$> desugar a <*> desugar b
 
 
-> desugar (App f as) = IApp <$> desugar f <*> mapM desugar as
+> desugar (App f as) = do
+>     -- look for curried apps
+>     (as', las) <- g [] [] as
+>     case las of
+>         [] -> IApp <$> desugar f <*> mapM desugar as
+>         _ -> desugar (lam las (App f as'))
+>   where
+>     g as' las [] = pure (reverse as', reverse las)
+>     g as' las (Iden "_":xs) = do
+>         n <- makeUniqueVar "c"
+>         g (Iden n:as') (n:las) xs
+>     g as' las (x:xs) = do
+>         g (x:as') las xs
 > desugar (Lam ns e) = ILam <$> mapM b ns <*> desugar e
 >   where
 >     b (PatName _ x) = pure x
@@ -1141,7 +1147,6 @@ add the last statement which returns the last value and the env, for
 > desugar (Seq a b) =
 >     ISeq <$> desugar a <*> desugar b
 
-
 > desugar (Ask bs e) = desugar (If bs e)
 
 > desugar (If bs e) =
@@ -1150,7 +1155,7 @@ add the last statement which returns the last value and the env, for
 >                              Just e1 -> Just <$> desugar e1
 >   where
 >     f (c,t) = (,) <$> desugar c <*> desugar t
-  
+
 > desugar (DotExpr e f) = do
 >     desugar (App (Iden "variant-field-get") [Text f, e])
 

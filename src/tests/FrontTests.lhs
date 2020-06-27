@@ -62,6 +62,7 @@ tests
 >     ,"vars.tea"
 >     ,"when.tea"
 >     ,"where.tea"
+>     ,"curried.tea"
 >
 >     ,"option.tea"
 >     ,"either.tea"

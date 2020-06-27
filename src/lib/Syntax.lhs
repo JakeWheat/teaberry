@@ -125,5 +125,4 @@ variant bindings can be nested
 >           | SetBox Expr Expr
 >           | Unbox Expr
 >           | Catch Expr Expr
->           deriving (Eq,Show,Data) 
-
+>           deriving (Eq,Show,Data)
