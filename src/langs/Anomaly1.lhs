@@ -39,7 +39,7 @@ imports
 > import Data.Char (isAlphaNum)
 
 > import Scientific1 (Scientific)
-> import Data.List (intercalate, sortOn)
+> import Data.List (intercalate, sortOn, nub, (\\), find)
 >
 > --import Debug.Trace (trace)
 
@@ -105,6 +105,13 @@ data Language-error:
   | unbound-identifier(i)
   | not-function-value(v)
   | function-wrong-num-args(e,r)
+  | function-wrong-types(e,r)
+  | duplicate-name(a)
+  | expected-type(e,r)
+  | no-branches-satisfied
+  | only-one-branch
+  | empty-block
+  | block-ends-with-let
 end
 
 
@@ -132,12 +139,12 @@ values
 >            | ForeignFunV String
 
 > valueTypeName :: Value -> String
-> valueTypeName (NumV {}) = "number"
-> valueTypeName (TextV {}) = "text"
-> valueTypeName (BoolV {}) = "boolean"
-> valueTypeName (FunV {}) = "function"
-> valueTypeName (VariantV {}) = "variant" -- or should it be the variant's type name?
-> valueTypeName (ForeignFunV {}) = "foreign-function"
+> valueTypeName (NumV {}) = "Number"
+> valueTypeName (TextV {}) = "Text"
+> valueTypeName (BoolV {}) = "Boolean"
+> valueTypeName (FunV {}) = "Function"
+> valueTypeName (VariantV {}) = "Variant" -- or should it be the variant's type name?
+> valueTypeName (ForeignFunV {}) = "Foreign-function"
 
 > instance Show Value where
 >   show (NumV n) = "NumV " ++ show n
@@ -203,6 +210,28 @@ runscriptinterp infrastructure
 > throwNotFunctionValue :: String -> Interpreter a
 > throwNotFunctionValue i = raiseValue $ eapp "not-function-value" [Text i]
 
+> throwWrongNumberOfArgs :: Int -> Int -> Interpreter a
+> throwWrongNumberOfArgs e g =
+>    raiseValue $ eapp "function-wrong-num-args" [Num $ fromIntegral e, Num $ fromIntegral g]
+
+> throwWrongTypes :: [String] -> [String] -> Interpreter a
+> throwWrongTypes e g =
+>    raiseValue $ eapp "function-wrong-types" [toList e, toList g]
+>   where
+>     toList = Construct (Iden "list") . map Text
+
+> throwDuplicateName :: String -> Interpreter a
+> throwDuplicateName i = raiseValue $ eapp "duplicate-name" [Text i]
+
+> throwExpectedType :: String -> String -> Interpreter a
+> throwExpectedType e g = raiseValue $ eapp "expected-type" [Text e, Text g]
+
+> throwNoBranchesSatisfied :: Interpreter a
+> throwNoBranchesSatisfied = raiseValue $ Iden "no-branches-satisfied"
+
+> throwOnlyOneBranch :: Interpreter a
+> throwOnlyOneBranch = raiseValue $ Iden "only-one-branch"
+
 > runAstInterp :: [Stmt] -> Interpreter ()
 > runAstInterp ast = do
 >     y <- either throwInterp pure $ runDesugar ast
@@ -232,11 +261,22 @@ runscriptinterp infrastructure
 > lookupForeignFun :: String -> [String] -> Env -> Interpreter ([Value] -> Interpreter Value)
 > lookupForeignFun nm tys env =
 >     if | Just f <- lookup (nm,tys) $ envForeignFuns env -> pure f
->        -- well dodgy "generic" functions, only works if all args are any
->        | Just f <- lookup (nm, map (const "any") tys) $ envForeignFuns env -> pure f
+>        | Just f <- find (matchesAny . fst) $ envForeignFuns env -> pure $ snd f
 >        -- check for matching function, but wrong number of args
->        -- check for matching functions, but wrong types
+>        | Just f <- find ((== nm) . fst . fst) $ envForeignFuns env
+>          -> if length (snd $ fst f) == length tys
+>             then throwWrongTypes (snd $ fst f) tys
+>             else throwWrongNumberOfArgs (length (snd $ fst f)) (length tys)
 >        | otherwise -> throwInterp $ "ffi function not found: " ++ nm ++ "(" ++ intercalate "," tys ++")"
+>   where
+>     matchesAny (nmx,tys') =
+>         if nm == nmx && length tys == length tys'
+>            && and (zipWith matchEqualOrAny tys tys')
+>         then True
+>         else False
+>     matchEqualOrAny "Any" _ = True          
+>     matchEqualOrAny _ "Any" = True          
+>     matchEqualOrAny a b = a == b
 
 
 > addForeignFun' :: String -> ([String], [Value] -> Interpreter Value) -> Env -> Either String Env
@@ -267,20 +307,19 @@ ffi catalog
 
 >    ,("variant-field-get", binaryOp unwrapText variantIn id variantFieldGet)
 >    ,("variant-field-get-ord", binaryOp unwrapNum variantIn id variantFieldGetOrd)
->    ,("safe-variant-name", unaryOp variantIn id safeVariantName)
->    -- hack to make it work for any data type     
->    ,("safe-variant-name", unaryOp anyIn pure (const $ nothingLiteralHack))
+>    ,("safe-variant-name", unaryOp anyIn id safeVariantName)
 >    ,("make-variant", binaryOp unwrapText unwrapList id makeVariant)
 >    ,("make-variant-0", unaryOp unwrapText id makeVariant0)
 >    ,("make-variant-2", ternaryOp anyIn anyIn anyIn id makeVariant2)
 
 >    ,("raise", unaryOp anyIn id raise)
 
->    ,("add-tests", unarySimple "function" addTests)
+>    ,("add-tests", unarySimple "Function" addTests)
 >    ,("log-check-block", binaryOp unwrapNum unwrapText id logCheckBlock)
 >    ,("log-test-pass", binaryOp unwrapNum unwrapText id logTestPass)
 >    ,("log-test-fail", ternaryOp unwrapNum unwrapText unwrapText id logTestFail)
 
+>    ,("test-string-ffi", unaryOp unwrapText pure (const nothingValueHack))
 
 >    ]
 
@@ -314,7 +353,7 @@ ffi catalog
 
 > safeVariantName :: Value -> Interpreter Value
 > safeVariantName (VariantV x _) = pure $ TextV x
-> safeVariantName _ = pure $ nothingLiteralHack
+> safeVariantName _ = pure $ nothingValueHack
 
 > variantFieldGet :: String -> Value -> Interpreter Value
 > variantFieldGet fieldNm v@(VariantV _ fs) =
@@ -387,9 +426,16 @@ ffi catalog
 >     vs <- mapM interp es
 >     app fv vs
 > interp (ILam ps e) = do
+>     case ps \\ nub ps of
+>         (x:_) -> throwDuplicateName x        
+>         [] -> pure ()
 >     env <- ask
 >     pure $ FunV ps e env
 > interp (ILet bs e) = do
+>     let ps = map fst bs      
+>     case ps \\ nub ps of
+>         (x:_) -> throwDuplicateName x        
+>         [] -> pure ()
 >     let newEnv [] = interp e
 >         newEnv ((b,ex):bs') = do
 >             v <- interp ex
@@ -398,17 +444,21 @@ ffi catalog
 
 > interp (ISeq a b) = interp a *> interp b
 
-> interp z@(IIf bs e) = do
+> interp (IIf [_] Nothing) = throwOnlyOneBranch
+        
+> interp (IIf bs e) = do
 >     let f ((c,t):bs') = do
 >             c' <- interp c
 >             case c' of
 >                 BoolV True -> interp t
 >                 BoolV False -> f bs'
->                 _ -> throwInterp $ "expected bool in if test, got " ++ show c'
+>                 _ -> throwExpectedType "Boolean" (valueTypeName c')
+>                      -- (throwInterp $ "expected bool in if test, got " ++ show c'
 >         f [] = case e of
 >                    Just x -> interp x
->                    Nothing -> throwInterp $ "no if branches matched and no else:\n"
->                               ++ prettyIExpr z
+>                    Nothing -> throwNoBranchesSatisfied
+>                               --throwInterp $ "no if branches matched and no else:\n"
+>                               -- ++ prettyIExpr z
 >     f bs
 
 > app :: Value -> [Value] -> Interpreter Value
@@ -425,8 +475,9 @@ ffi catalog
 >             hf vs
 >         _ -> throwNotFunctionValue $ torepr' fv
 >   where
->     safeZip ps xs | length xs == length ps = pure $ zip ps xs
->                   | otherwise = throwInterp $ "wrong number of args to function"
+>     safeZip ps xs | length ps == length xs  = pure $ zip ps xs
+>                   | otherwise = throwWrongNumberOfArgs (length ps) (length xs)
+>                     --throwInterp $ "wrong number of args to function"
 
 
 ------------------------------------------------------------------------------
@@ -463,8 +514,16 @@ desugaring code
 > throwDesugar :: String ->  Expr
 > throwDesugar e = App (Iden "raise") [Text e]
   
- 
+> throwDesugarV :: Expr ->  Expr
+> throwDesugarV v = App (Iden "raise") [v]
+  
+
+  
 > desugar :: Expr -> Desugarer IExpr
+> desugar (Block []) = desugar $ throwDesugarV (Iden "empty-block")
+> desugar (Block [x@LetDecl {}]) =
+>     desugarStmts [x, StExpr $ throwDesugarV (Iden "block-ends-with-let")]
+
 > desugar (Block sts) = desugarStmts sts
 > desugar (Num i) = pure $ INum i
 > desugar (Text i) = pure $ IText i
@@ -614,17 +673,14 @@ desugaring code
 >   where
 >     appI i as = App (Iden i) as
 
-> desugarStmts [] = desugar $ throwDesugar "empty block"
-  
+> desugarStmts [] = desugar nothingSyntaxHack
 > desugarStmts [StExpr e] = desugar e
-> desugarStmts [LetDecl {}] = desugar $ throwDesugar "block ends with let"
-  
-> desugarStmts (LetDecl n v : es) =
->     desugar (Let [(n,v)] $ Block es)
 
-> desugarStmts (StExpr e : es) =
->     ISeq <$> desugar e <*> desugar (Block es)
+> desugarStmts (LetDecl (PatName _ n) v : es) = do
+>     v' <- desugar v      
+>     ILet [(n,v')] <$> desugarStmts es
 
+> desugarStmts (StExpr e : es) = ISeq <$> desugar e <*> desugarStmts es
 
 todo: it ignores ref on fields, instead of giving an error
   
@@ -681,6 +737,8 @@ special case to bootstrap the variant constructor for list link
 
 > desugarStmts (x : xs) = desugarStmts (StExpr (throwDesugar ("unsupported statement: " ++ show x)) : xs)
 
+> nothingSyntaxHack :: Expr
+> nothingSyntaxHack = VariantSel "nothing" []
 
 > desugarRaises :: String -> Expr -> Expr -> Desugarer Expr
 > desugarRaises syn e e1 = do
@@ -751,10 +809,10 @@ log-test-fail(block,id, text of test, fail message)
 >     s {testResultLog = T.TestFail n msg failmsg : testResultLog s}
 
 > nothingWrapper :: (InterpreterState -> InterpreterState) -> Interpreter Value
-> nothingWrapper f = modify f *> pure nothingLiteralHack
+> nothingWrapper f = modify f *> pure nothingValueHack
 
-> nothingLiteralHack :: Value
-> nothingLiteralHack = VariantV "nothing" []
+> nothingValueHack :: Value
+> nothingValueHack = VariantV "nothing" []
 
 
 > runAddedTests :: Interpreter [T.CheckResult]
@@ -778,12 +836,12 @@ ffi boilerplate
 >                  
 
 > _unwrapTuple :: (String, Value -> Interpreter [Value])
-> _unwrapTuple = ("tuple", \case
+> _unwrapTuple = ("Tuple", \case
 >                           VariantV "tuple" fs -> pure $ map snd fs
 >                           x -> throwInterp $ "type: expected tuple, got " ++ show x)
 
 > unwrapNum :: (String, Value -> Interpreter Scientific)
-> unwrapNum = ("number", \case
+> unwrapNum = ("Number", \case
 >                           NumV n -> pure n
 >                           x -> throwInterp $ "type: expected number, got " ++ show x)
 
@@ -793,7 +851,7 @@ ffi boilerplate
 
 
 > _unwrapBool :: (String, Value -> Interpreter Bool)
-> _unwrapBool = ("boolean", \case
+> _unwrapBool = ("Boolean", \case
 >                           BoolV n -> pure n
 >                           x -> throwInterp $ "type: expected boolean, got " ++ show x)
 
@@ -802,7 +860,7 @@ ffi boilerplate
 
 
 > unwrapText :: (String, Value -> Interpreter String)
-> unwrapText = ("text", \case
+> unwrapText = ("Text", \case
 >                           TextV n -> pure n
 >                           x -> throwInterp $ "type: expected text, got " ++ show x)
 
@@ -810,13 +868,13 @@ ffi boilerplate
 > wrapText n = pure $ TextV n
 
 > variantIn :: (String, Value -> Interpreter Value)
-> variantIn = ("variant", \case
+> variantIn = ("Variant", \case
 >                           x@(VariantV {}) -> pure x
 >                           x -> throwInterp $ "type: expected variant, got " ++ show x)
 
   
 > unwrapList :: (String, Value -> Interpreter [Value])
-> unwrapList = ("variant", listToHaskellI)
+> unwrapList = ("Variant", listToHaskellI)
 
 > listToHaskellI :: Value -> Interpreter [Value]
 > listToHaskellI x =
@@ -834,7 +892,7 @@ ffi boilerplate
 
 
 > anyIn :: (String, Value -> Interpreter Value)
-> anyIn = ("any", pure)
+> anyIn = ("Any", pure)
 
 > unaryOp :: (String, Value -> Interpreter a)
 >         -> (b -> Interpreter Value)
@@ -1134,27 +1192,43 @@ check "simple anomaly":
   #raise(my-check-a("test")) raises-satisfies _ == my-check-a("testa")
   b == 1 raises-satisfies _ == unbound-identifier("b")
   5(1) raises-satisfies _ == not-function-value('5')
-  #tostring(2,3) raises-satisfies _ == function-wrong-num-args(1,2)
-  #f = lam(a,b,c): a + 1 end
-  #f(2,3) raises-satisfies _ == function-wrong-num-args(3,2)
 
   # wrong number of args
   # wrong arg types
-  # should it give a better/different error message for a misspelled
-  #   function name?
+  tostring(2,3) raises-satisfies _ == function-wrong-num-args(1,2)
+  f = lam(a,b,c): a + 1 end
+  f(2,3) raises-satisfies _ == function-wrong-num-args(3,2)
+
+  test-string-ffi(2) raises-satisfies _ == function-wrong-types([list: 'Text'],[list: 'Number'])
+
 
   # lam: arg names repeated
+  lam(a,b,a): a + b end(3,4,2) raises-satisfies _ == duplicate-name('a')
   # let: arg names repeated
-  # block: think about empty blocks and do some checking
-  # let at the end of a block
-  # check things which desugar to let which are ok at the end of a block
+  let a = 3, b = 4, a = 5: a + b end raises-satisfies _ == duplicate-name('a')
+
   # if -> check type isn't bool
+  if 'x': 1 else: 2 end raises-satisfies _ == expected-type('Boolean', 'Text')
+  # needs some more work to get the types of variants right
+  if false: 1 else if nothing: 2 else: 3 end raises-satisfies _ == expected-type('Boolean', 'Variant')
   # if -> falls through with no else
+  if 1 == 2: 1 else if 1 == 3: 2 end raises-satisfies _ == no-branches-satisfied
+  # if with only one branch
+  if 1 == 1: 1 end raises-satisfies _ == only-one-branch
+
+  # block: an empty block gives an error
+  block: end raises-satisfies _ == empty-block
+
+  # sanity check
+  block: 3 end is 3
+
+  # let at the end of a block
+  block: a = 3 end raises-satisfies _ == block-ends-with-let
 
   # tests for curried:
+  badc = lam(a,b): a + b end
   # wrong number of args
-  # where can write a _ and it parse, but be an error?
-
+  let g = badc(_): g(3) end raises-satisfies _ == function-wrong-num-args(2,1)
 
 end
 
