@@ -29,9 +29,10 @@ cabal:
 
 ghc:
   - 8.10.1
-  - 8.8.2
-  - 8.6.5
-  - 8.4.4
+# haskell says no
+#  - 8.8.2
+#  - 8.6.5
+#  - 8.4.4
 
 install:
   - ghc --version

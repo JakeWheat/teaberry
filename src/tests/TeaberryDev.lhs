@@ -2,7 +2,15 @@
 > {-# LANGUAGE ScopedTypeVariables #-}
 
 > import Control.Monad.Trans
-> import System.Console.Haskeline
+> import System.Console.Haskeline (InputT
+>                                 ,Interrupt
+>                                 ,historyFile
+>                                 ,withInterrupt
+>                                 ,getInputLine
+>                                 ,runInputT
+>                                 ,defaultSettings
+>                                 --,catch
+>                                 )
 
 > import Control.Exception.Safe (catch, SomeException, displayException)
 
@@ -134,7 +142,6 @@ repl
 >                 go)
 >         -- ctrl-c resets to the prompt, doesn't exit the repl
 >         `catch` (\(_::Interrupt) -> liftIO (putStr "^C") >> go)
-
 
 > doRepl :: Backend h v -> IO ()
 > doRepl be = do

@@ -23,7 +23,15 @@ todo: config files, init files, etc.
 > {-# LANGUAGE ScopedTypeVariables #-}
 
 > import Control.Monad.Trans
-> import System.Console.Haskeline
+> import System.Console.Haskeline (InputT
+>                                 ,Interrupt
+>                                 ,historyFile
+>                                 ,withInterrupt
+>                                 ,getInputLine
+>                                 ,runInputT
+>                                 ,defaultSettings
+>                                 --,catch
+>                                 )
 
 > import Control.Exception.Safe (catch, SomeException, displayException)
 
