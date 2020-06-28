@@ -132,4 +132,5 @@ Test-Suite teaberry-dev
                        SimpleBase
                        Curried
                        SimpleBaseCase
+                       SimpleEval
 

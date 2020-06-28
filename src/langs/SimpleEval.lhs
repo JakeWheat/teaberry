@@ -1,24 +1,5 @@
 
-Simple base with statements to base other languages on
-
-supports:
-
-check blocks
-catch, raises, raises satisfies
-num, text
-simple tuples for construction and equality only
-iden
-app
-lam
-let
-simple 3 arg if
-block
-letdecl
-
-
-
-todo: refactor evaluate to fit it more in line with the embedded + testing?
-
+simple base with eval function, to be used for testing for now
 
 ------------------------------------------------------------------------------
 
@@ -30,7 +11,7 @@ todo: refactor evaluate to fit it more in line with the embedded + testing?
 > {-# LANGUAGE DeriveDataTypeable #-}
 > {-# LANGUAGE MultiWayIf #-}
 
-> module SimpleBase (tests) where
+> module SimpleEval (tests) where
 
 > import Text.RawString.QQ
 
@@ -776,6 +757,12 @@ check "catches":
   catch(raise(2), add1) is 3
   raise("hello") raises "hello"
   raise("hello") raises-satisfies lam(x): x == "hello" end
+
+end
+
+check "eval":
+
+  # eval("1 + 2") is 3
 
 end
 

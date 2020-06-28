@@ -75,12 +75,7 @@ interpreter
 
 evaluate
 
-> parse :: String -> Either String [Stmt]
-> parse src = case P.parseModule "" src of
->     Right (S.Module [] sts) -> pure sts
->     Right (S.Module x _) -> Left $ "prelude not supported " ++ show x
->     Left e -> Left e
-  
+
 > evaluateWithChecks :: String -> IO [T.CheckResult]
 > evaluateWithChecks src = do
 >     let ast = either error id $ parse (myFirstPrelude ++ src)
@@ -117,6 +112,13 @@ end
 
 \end{code}
 >           |]
+
+> parse :: String -> Either String [Stmt]
+> parse src = case P.parseModule "" src of
+>     Right (S.Module [] sts) -> pure sts
+>     Right (S.Module x _) -> Left $ "prelude not supported " ++ show x
+>     Left e -> Left e
+
 
 ---------------------------------------
 
@@ -310,12 +312,10 @@ ffi catalog
 >    ,("==", binaryOp anyIn anyIn wrapBool (==))
 >    ,("+", binaryOp unwrapText unwrapText wrapText (++))
 
-
 >    ,("torepr", unaryOp anyIn pure torepr)
 >    ,("to-repr", unaryOp anyIn pure torepr)
 >    ,("tostring", unaryOp anyIn pure tostring)
 >    ,("to-string", unaryOp anyIn pure tostring)
-
 
 >    ,("variant-field-get", binaryOp unwrapText variantIn id variantFieldGet)
 >    ,("variant-field-get-ord", binaryOp unwrapNum variantIn id variantFieldGetOrd)
@@ -333,9 +333,7 @@ ffi catalog
 
 >    ,("test-string-ffi", unaryOp unwrapText pure (const nothingValueHack))
 
->    ]
-
->     )
+>    ])
 >    $ emptyEnv {envEnv = [("true", BoolV True)
 >                         ,("false", BoolV False)]}
 
@@ -527,7 +525,6 @@ desugaring code
 > runDesugar stmts =
 >     fst <$> runExcept (evalRWST (desugarStmts stmts) (DesugarReader Nothing) startingDesugarState)
 
-  
 > desugar :: Expr -> Desugarer IExpr
 > desugar (Block []) = desugar $ throwDesugarV (Iden "empty-block")
 > desugar (Block [x@LetDecl {}]) =
@@ -661,6 +658,7 @@ desugaring code
 >     f i = PatName NoShadow i
 
 > desugarStmts :: [Stmt] -> Desugarer IExpr
+
 > desugarStmts (Check nm bdy : es) = do
 >     uniqueCheckBlockIDVarName <- makeUniqueVar "check-block-id"
 >     desugaredCheck <- local (\x -> x {currentCheckBlockIDName = Just uniqueCheckBlockIDVarName}) $ do
@@ -817,7 +815,6 @@ log-test-fail(block,id, text of test, fail message)
 > logTestFail n msg failmsg = nothingWrapper $ \s ->
 >     s {testResultLog = T.TestFail n msg failmsg : testResultLog s}
 
-
 > runAddedTests :: Interpreter [T.CheckResult]
 > runAddedTests = do
 >     ts <- reverse <$> gets addedTests
@@ -833,13 +830,11 @@ ffi boilerplate
 > nothingWrapper :: (InterpreterState -> InterpreterState) -> Interpreter Value
 > nothingWrapper f = modify f *> pure nothingValueHack
 
-
 > unarySimple :: String -> (Value -> Interpreter Value) -> ([String], [Value] -> Interpreter Value)
 > unarySimple ty f = ([ty]
 >                  ,\case
 >                        [x] -> f x
 >                        y -> throwInterp $ "expected 1 arg, got " ++ show y)
->                  
 
 > _unwrapTuple :: (String, Value -> Interpreter [Value])
 > _unwrapTuple = ("Tuple", \case
@@ -854,8 +849,6 @@ ffi boilerplate
 > wrapNum :: Scientific -> Interpreter Value
 > wrapNum n = pure $ NumV n
 
-
-
 > _unwrapBool :: (String, Value -> Interpreter Bool)
 > _unwrapBool = ("Boolean", \case
 >                           BoolV n -> pure n
@@ -863,7 +856,6 @@ ffi boilerplate
 
 > wrapBool :: Bool -> Interpreter Value
 > wrapBool n = pure $ BoolV n
-
 
 > unwrapText :: (String, Value -> Interpreter String)
 > unwrapText = ("Text", \case
@@ -896,7 +888,6 @@ ffi boilerplate
 > listToHaskell (VariantV "link" [("first", v), ("rest", vs)]) = (v:) <$> listToHaskell vs
 > listToHaskell _ = Nothing
 
-
 > anyIn :: (String, Value -> Interpreter Value)
 > anyIn = ("Any", pure)
 
@@ -911,8 +902,6 @@ ffi boilerplate
 >                     ax <- (snd unwrap0) a
 >                     wrap (f ax)
 >                 _ -> throwInterp $ "wrong number of args to function, expected 1, got " ++ show (length as))
-
-
 
 > binaryOp :: (String, Value -> Interpreter a)
 >          -> (String, Value -> Interpreter b)

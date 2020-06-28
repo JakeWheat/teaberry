@@ -78,8 +78,6 @@
 >
 
 > import qualified ParseTests
-> import qualified Parse1Tests
-> import qualified Parse2Tests
 >
 > import Langs (langTests)
  
@@ -216,14 +214,6 @@ main
 >             [T.testGroup "parseExpr" $ map ParseTests.testParseExpr ParseTests.parseExprExamples
 >             ,T.testGroup "parseStmt" $ map ParseTests.testParseStmt ParseTests.parseStmtExamples
 >             ,T.testGroup "parseProgram" $ map ParseTests.testParseModule ParseTests.parseModuleExamples]
->         ,T.testGroup "parse1"
->             [T.testGroup "parse1Expr" $ map Parse1Tests.testParseExpr Parse1Tests.parseExprExamples
->             ,T.testGroup "parse1Stmt" $ map Parse1Tests.testParseStmt Parse1Tests.parseStmtExamples
->             ,T.testGroup "parse1Program" $ map Parse1Tests.testParseModule Parse1Tests.parseModuleExamples]
->         ,T.testGroup "parse2"
->             [T.testGroup "parse2Expr" $ map Parse2Tests.testParseExpr Parse2Tests.parseExprExamples
->             ,T.testGroup "parse2Stmt" $ map Parse2Tests.testParseStmt Parse2Tests.parseStmtExamples
->             ,T.testGroup "parse2Program" $ map Parse2Tests.testParseModule Parse2Tests.parseModuleExamples]
 >         ,langTests
 >         ,FrontTests.tests
 >         ]
