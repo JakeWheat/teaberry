@@ -22,7 +22,7 @@ imports
 >                      ,runFunction
 >                      ,Value(..)
 >                      ,valueToString
->                      --,T.CheckResult(..)
+>                      ,T.CheckResult(..)
 >                      ,tests
 >                      ) where
 
@@ -48,7 +48,7 @@ imports
 >                                ,ask
 >                                ,local
 >                                ,get
->                                --,gets
+>                                ,gets
 >                                ,state
 >                                --,put
 >                                ,modify
@@ -88,6 +88,7 @@ imports
 >     --,makeTests
 >     ,makeTestsIO
 >     --,parseModules
+>     ,CheckResult(..)
 >     )
 
 ------------------------------------------------------------------------------
@@ -147,29 +148,23 @@ embedded api
 > runScript h fnm lenv src = do
 >     ebs <- readIORef (tbh h)
 >     let ebs' = ebs {henv = extendEnv lenv $ henv ebs}
->     (v,ebs'') <- evaluate fnm ebs' src
->     {-case t of
->         [] -> pure ()
->         _ -> putStrLn $ T.renderCheckResults t-}
+>     (v,ebs'', _) <- evaluate fnm ebs' src
 >     -- if you press ctrl-c in between the start of
 >     -- writeioref and if finishing, or even at another time,
 >     -- can this write become corrupted?
 >     writeIORef (tbh h) ebs''
 >     pure v
 
-> runScriptWithTests :: TeaberryHandle -> Maybe String -> [(String,Value)] -> String -> IO ()
+> runScriptWithTests :: TeaberryHandle -> Maybe String -> [(String,Value)] -> String -> IO [T.CheckResult]
 > runScriptWithTests h fnm lenv src = do
 >     ebs <- readIORef (tbh h)
 >     let ebs' = ebs {henv = extendEnv lenv $ henv ebs}
->     (_v,ebs'') <- evaluate fnm ebs' src
->     {-case t of
->         [] -> pure ()
->         _ -> putStrLn $ T.renderCheckResults t-}
+>     (_v,ebs'',t) <- evaluate fnm ebs' src
 >     -- if you press ctrl-c in between the start of
 >     -- writeioref and if finishing, or even at another time,
 >     -- can this write become corrupted?
 >     writeIORef (tbh h) ebs''
->     pure ()
+>     pure t
 
 
 > runFunction :: TeaberryHandle -> String -> [Value] -> IO Value
@@ -197,20 +192,20 @@ hacky top level evaluate. not really sure if it will pay its way once
 > evaluate :: Maybe String
 >           -> RuntimeState
 >           -> String
->           -> IO (Value, RuntimeState)
+>           -> IO (Value, RuntimeState, [T.CheckResult])
 > evaluate fnm ebs src = do
 >     d <- getBuiltInModulesDir
 >     fst <$> evalRWST (f d) (makeInterpreterEnv $ henv ebs) emptyInterpreterState
 >   where
->     f :: FilePath -> Interpreter (Value, RuntimeState)
+>     f :: FilePath -> Interpreter (Value, RuntimeState, [T.CheckResult])
 >     f d =
 >         -- quick hack for set
 >         case P.parseSet src of
 >             Right (k,v)
 >               | k == "dump-desugar" -> do
 >                 case v of
->                      "t" -> pure (TextV "set dump desugar on", ebs {executionStage = DumpDesugar })
->                      "f" -> pure (TextV "set full execution on", ebs {executionStage = FullExecution })
+>                      "t" -> pure (TextV "set dump desugar on", ebs {executionStage = DumpDesugar }, [])
+>                      "f" -> pure (TextV "set full execution on", ebs {executionStage = FullExecution }, [])
 >                      _ -> throwInterp $ "bad value for dump-desugar, expected t or f, got " ++ v
 >               | otherwise -> throwInterp $ "unrecognised set key: " ++ k
 >             Left _ -> do
@@ -218,16 +213,16 @@ hacky top level evaluate. not really sure if it will pay its way once
 >                 y <- either throwInterp pure $ runDesugar True False (maybe "toplevel.x" id fnm) ast srcs
 >                 let z = simplify y
 >                 case executionStage ebs of
->                     DumpDesugar -> pure (TextV $ "\n" ++ prettyIExpr z ++ "\n", ebs)
+>                     DumpDesugar -> pure (TextV $ "\n" ++ prettyIExpr z ++ "\n", ebs, [])
 >                     FullExecution -> do
 >                         v <- {-trace (pretty z) $-} interp z
->                         --t <- runAddedTests
+>                         t <- gets (reverse . tempCheckResults)
 >                         case v of
 >                             VariantV "tuple" [("0", v')
 >                                              ,("1", VariantV "record" _)
 >                                              ,("2", VariantV "record" e)] ->
 >                                 let ne = (henv ebs) {envEnv = e}
->                                 in pure (v',ebs {henv = ne})
+>                                 in pure (v',ebs {henv = ne}, t)
 >                             {-VariantV "tuple" [_,_,_] -> throwInterp $ "expected 3 element tuple, second and third elements records, got " ++ torepr' v
 >                             VariantV "tuple" xs -> throwInterp $ "expected 3 element tuple, got " ++ show (length xs) ++ " element tuple, " ++ torepr' v-}
 >                             VariantV "tuple" [_,_,_] -> throwInterp $ "expected tuple with different types, got: " ++ torepr' v
@@ -377,12 +372,12 @@ store holds the values of variables
 
 > data InterpreterState =
 >     InterpreterState
->     {{-testResultLog :: [T.TestResultLog]
->     ,-}isStore :: Store
+>     {tempCheckResults :: [T.CheckResult]
+>     ,isStore :: Store
 >     }
 
 > emptyInterpreterState :: InterpreterState
-> emptyInterpreterState = InterpreterState emptyStore
+> emptyInterpreterState = InterpreterState [] emptyStore
 
 > data InterpreterException = InterpreterException String
 >                           | ValueException Value
@@ -563,8 +558,6 @@ ffi catalog
 >    ,("env-to-record", nullaryOp id envToRecord)
 >    ,("call-construct-make", binaryOp variantIn variantIn id callConstructMake)
 
->    -- another mystery
-
 >    ,("raise", unaryOp anyIn id raise)
 
 >    ,("is-boolean", unaryOp anyIn wrapBool isBoolean)
@@ -574,9 +567,7 @@ ffi catalog
 >    ,("is-tuple", unaryOp anyIn wrapBool isTuple)
 >    ,("is-record", unaryOp anyIn wrapBool isRecord)
 
->    --,("log-check-block", binaryOp unwrapNum unwrapText id logCheckBlock)
->    --,("log-test-pass", binaryOp unwrapNum unwrapText id logTestPass)
->    --,("log-test-fail", ternaryOp unwrapNum unwrapText unwrapText id logTestFail)
+>    ,("temp-add-check-result", binaryOp unwrapText unwrapList id tempAddCheckResult)
 
 >    ,("provides", unaryOp anyIn id providesImpl)
 
@@ -601,8 +592,24 @@ ffi catalog
 >    $ emptyEnv {envEnv = [("true", BoolV True)
 >                         ,("false", BoolV False)]}
 
+
+> tempAddCheckResult :: String -> [Value] -> Interpreter Value
+> tempAddCheckResult nm vs = do
+>     cs <- mapM f vs
+>     -- liftIO $ putStrLn $ "add tests " ++ nm ++ " " ++ show (length cs)
+>     modify $ \s -> s { tempCheckResults = T.CheckResult nm cs : tempCheckResults s }
+>     pure $ nothingValueHack
+>   where
+>     f (VariantV "tuple" [("0",TextV msg), ("1",TextV "OK")]) =
+>         pure (msg, Nothing)
+>     f (VariantV "tuple" [("0",TextV msg), ("1",TextV fm)]) =
+>         pure (msg, Just fm)
+>     f x = throwInterp $ "expected tuple of text,text, got " ++ show x
+
+
 > textSubstring :: String -> Int -> Int -> String
 > textSubstring str start end = take (end - start) (drop start str)
+
 
 
 > textIndexOf :: String -> String -> Int
@@ -1232,12 +1239,6 @@ test-results := link(test-is("a is b", lam(): a end, lam(): b end), test-results
 >          ,Lam [] e0
 >          ,e1]
 >         ,Iden "test-results"])]
-> 
->     {-desugar (App (Iden "raises-satisfies")
->            [e0
->            ,lam ["a"] $ (App (Iden "tostring") [Iden "a"] `eq` e1)])
->   where
->     eq a b = App (Iden "==") [a,b]-}
 
 > desugar (App (Iden "raises-satisfies") [e0,e1]) =
 >     desugarStmts [SetVar "test-results"
@@ -1404,8 +1405,6 @@ end
 >           [Lam [] (Block (
 >                    [VarDecl (PatName NoShadow "test-results") (Iden "empty")]
 >                    ++ bdy
-> -- {test-block-name: written-or-generated-test-block0name
-> --  ,results:reverse(test-results)}
 >                    ++ [StExpr $ App (Iden "check-block-results")
 >                                     [Text blockName
 >                                     ,App (Iden "reverse") [(Iden "test-results")]]]))]
@@ -1550,105 +1549,11 @@ setbox(a.b, 2)
 > desugarStmts (e@(TPred {}) : _) = lift $ throwE $ "test preds are not supported " ++ show e
 > desugarStmts (e@(TPostfixOp {}) : _) = lift $ throwE $ "test preds are not supported " ++ show e
 
-aexpr raises-satisfies bexpr
-desugars to
-
-haskell:
-failmsg = "The test operation raise-satisfies failed for the test " ++ pretty bexpr
-
-it could show the value it actually got?
-
-catch(
-  block:
-    aexpr
-    log-test-fail(checkblockid, name, "No exception raised: " + $src)
-  end,
-  lam(shadow a):
-    shadow v1 = bexpr
-    if v1(a):
-      log-test-pass(checkblockid, name)
-    else:
-      shadow src = pretty something
-      log-test-fail(checkblockid, name, $failmsg)
-    end
-  end)
-
-> {-desugarRaises :: String -> Expr -> Expr -> Desugarer Expr
-> desugarRaises syn e e1 = do
->     let failMsg = "The test operation raises-satisfies failed for the test "
->                   ++ Pr.prettyExpr e1
->     checkBlockIDName <- (maybe (lift $ throwE "'is' test outside check block") pure)
->                         =<< (asks currentCheckBlockIDName)
->     
->     nameit <- makeUniqueVar "isname"
->     v1 <- makeUniqueVar "isv1"
->     pure $ Catch
->         (Block [StExpr e
->                ,LetDecl (patName nameit) $ Text syn
->                ,StExpr $ appx "log-test-fail" [Iden checkBlockIDName
->                                              ,Iden nameit
->                                              ,Text "No exception raised"]])
->         (lam ["a"] $ Block
->          [LetDecl (patName v1) e1
->          ,LetDecl (patName nameit) $ Text syn
->          ,StExpr $ If [(appx v1 [Iden "a"]
->                        ,appx "log-test-pass" [Iden checkBlockIDName, Iden nameit])]
->                    $ Just $ appx "log-test-fail"
->                             [Iden checkBlockIDName
->                             ,Iden nameit
->                             ,Text failMsg `plus`
->                              Text ", value was " `plus`
->                              appx "torepr" [Iden "a"]]])
->   where
->       plus a b = appx "+" [a,b]
->       appx nm es = App (Iden nm) es-}
-
-------------------------------------------------------------------------------
-
-
-test infra
-==========
-
-
-add-tests(fn)
-takes a function value
-these functions are run at the end of the script to do the testing
-
-log-check-block(unique-block-id, name)
-says there is a new test block with a unique id and it's name
-
-> {-logCheckBlock :: Scientific -> String -> Interpreter Value
-> logCheckBlock n nm =
->     nothingWrapper $ \s -> s {testResultLog = T.TestBlock n nm : testResultLog s}
-
-log-test-pass(blockid, text of test)
-
-> logTestPass :: Scientific -> String -> Interpreter Value
-> logTestPass n msg =
->     nothingWrapper $ \s -> s {testResultLog = T.TestPass n msg : testResultLog s}
-
-log-test-fail(block,id, text of test, fail message)
-
-> logTestFail :: Scientific -> String -> String -> Interpreter Value
-> logTestFail n msg failmsg = nothingWrapper $ \s ->
->     s {testResultLog = T.TestFail n msg failmsg : testResultLog s}
-
-> runAddedTests :: Interpreter [T.CheckResult]
-> runAddedTests = do
->     -- temp: tests have already been run, only need to get the results
->     testLog <- reverse <$> gets testResultLog
->     either throwInterp pure $ T.testLogToCheckResults testLog-}
-
 
 ------------------------------------------------------------------------------
 
 ffi boilerplate
 ===============
-
-
-
-> --nothingWrapper :: (InterpreterState -> InterpreterState) -> Interpreter Value
-> --nothingWrapper f = modify f *> pure nothingValueHack
 
 > _unwrapTuple :: (String, Value -> Interpreter [Value])
 > _unwrapTuple = ("Tuple", \case
@@ -1890,12 +1795,11 @@ pretty interpreter syntax
 >             $ runFileTests ("examples/tests/fulltests" </> f))
 >     testFiles
 
-> runFileTests :: FilePath -> IO (Either String [a])
+> runFileTests :: FilePath -> IO (Either String [T.CheckResult])
 > runFileTests fp = do
 >     src <- readFile fp
->     {- ts <- -}
->     ev (Just fp) src
->     pure $ Right [] -- ts
+>     ts <- ev (Just fp) src
+>     pure $ Right ts
 >   where
 >     ev f src = do
 >         h <- newTeaberryHandle

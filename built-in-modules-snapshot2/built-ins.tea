@@ -287,23 +287,34 @@ end end
 
 fun run-all-tests():
   #print("rat")
-  if tests-to-run == empty: block:
-     #print("rat3")
-    nothing end
-  else:
+  when tests-to-run <>empty:
     block:
       #print("rat2")
     # todo: figure out why this syntax isn't working:
     # _ = map(_(), reverse(tests-to-run))
 
     #print("run all tests")
-    #print("num are: " + tostring(length(reverse(tests-to-run))))
+      #print("num are: " + tostring(length(reverse(tests-to-run))))
     r = map(lam(f): f() end, reverse(tests-to-run))
     #print("-----------------------------------")
     #print("-----------------------------------")
     #print("-----------------------------------")
     
-    print(render-check-results(r))
+      print(render-check-results(r))
+
+      #print(tostring(rts))
+      fun tempaddit(c):
+        #print("ta")
+        fun f(x):
+          #print(tostring(x))
+          cases (Test-result) x:
+            | passed(src) => {src;"OK"}
+            | else => {src;render-test(x)}
+          end
+        end
+        temp-add-check-result(c.name, map(f,c.test-results))
+      end
+      map(tempaddit, r)
 
     tests-to-run := empty
     nothing
