@@ -227,10 +227,14 @@ ffi catalog
 
 >    ,("raise", unaryOp anyIn id raise)
 
+>    ,("eval", unaryOp unwrapText id runScriptInterp)
+
+     
 >    ,("add-tests", unarySimple "Function" addTests)
 >    ,("log-check-block", binaryOp unwrapNum unwrapText id logCheckBlock)
 >    ,("log-test-pass", binaryOp unwrapNum unwrapText id logTestPass)
 >    ,("log-test-fail", ternaryOp unwrapNum unwrapText unwrapText id logTestFail)
+     
 
 >    ])
 >    $ emptyEnv {envEnv = [("true", BoolV True)
@@ -260,7 +264,12 @@ ffi catalog
 
 > torepr' NothingV = "nothing"
 
-
+> runScriptInterp :: String -> Interpreter Value
+> runScriptInterp src = do
+>     ast <- either throwInterp pure $ parse src
+>     y <- either throwInterp pure $ runDesugar ast
+>     interp (simplify y)
+  
 ------------------------------------------------------------------------------
 
 > runInterp :: Env -> IExpr -> IO [T.CheckResult]
@@ -762,7 +771,7 @@ end
 
 check "eval":
 
-  # eval("1 + 2") is 3
+  eval("1 + 2") is 3
 
 end
 
