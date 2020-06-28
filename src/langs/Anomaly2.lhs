@@ -5,22 +5,8 @@ Anomaly testing two:
 test some things which can't be straightforwardly tested in language,
 so use eval to test them:
 
-raise on left side of is
-raise on right side of is
-check is with different types on each side for sanity
-check a simple is failing
-check raises and raises satisfies failing
-check for test predicates outside of check block
-do a better error message when raises-satisfies doesn't get a function
 is outside check block
 raises, raises-satisfies outside check block
-
-most of the above is about getting a testing specific exception
-instead of the natural one from regular code
-
-the reason to have these is to make the language more usable and
-especially more accessible to beginners
-
 
 check let at the end of top level which is fine
 check data at the end of top level which desugars to let, it's fine
@@ -1214,7 +1200,6 @@ check "curried":
 end
 
 check "simple anomaly":
-  #raise(my-check-a("test")) raises-satisfies _ == my-check-a("testa")
   b == 1 raises-satisfies _ == unbound-identifier("b")
   5(1) raises-satisfies _ == not-function-value('5')
 
@@ -1266,22 +1251,10 @@ end
 
 check "testing anomalies":
 
-  # needs a new eval that returns the test results:
-  # raise on left side of is
-  # raise on right side of is
-  # check is with different types on each side for sanity
-  # pyret just says they aren't equal, it doesn't say they have different types
-  # check a simple is failing
-  # check raises and raises satisfies failing
-  # check for test predicates outside of check block
-  # do a better error message when raises-satisfies doesn't get a function
-
   # test statements outside check block
-
   eval("2 + 3 is 5") raises-satisfies is-testing-statement-outside-check-block
   eval("2 + 3 raises 5") raises-satisfies is-testing-statement-outside-check-block
   eval("2 + 3 raises-satisfies is-Number") raises-satisfies is-testing-statement-outside-check-block
-  
 
 end
 

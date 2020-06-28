@@ -305,7 +305,7 @@ value type name is used for looking up overloaded foreign functions
 >   show (BoolV n) = "BoolV " ++ show n
 >   show (VariantV nm fs) = "VariantV " ++ nm ++ "[" ++ intercalate "," (map show fs) ++ "]"
 >   show (BoxV n) = "BoxV " ++ show n
->   show FunV {} = "FunV stuff"
+>   show (FunV as bdy _env) = "FunV " ++ show as ++ "\n" ++ prettyIExpr bdy
 >   show (ForeignFunV n) = "ForeignFunV " ++ show n
 >   show (FFIVal n) = "FFIVal " ++ show n
 
@@ -1702,11 +1702,19 @@ pretty interpreter syntax
 > unconvI (ICatch e t) = unconvI (IApp (IIden "catch") [e,t])
 > unconvI (IApp (IIden e) [a,b]) | isOp e = BinOp (unconvI a) e (unconvI b)
 >   where isOp x = not $ any (\z -> isAlphaNum z || z `elem` "_") x
-> 
+>
+> unconvI (IApp (IIden "variant-field-get") [IText f, x]) = DotExpr (unconvI x) f
 > unconvI (IApp e fs) = App (unconvI e) $ map unconvI fs
 > unconvI (ILam ns e) = Lam (map unconvIPatName ns) $ unconvI e
 > unconvI (ILet bs e) = Let (map (uncurry unconvIBinding) bs) (unconvI e)
-> unconvI (ISeq a b) = Block $ map (StExpr . unconvI) [a, b]
+> unconvI (ISeq a b) =
+>     let sts = accumSeqs [a] b
+>     in Block $ map (StExpr . unconvI) sts
+>   where
+>     accumSeqs xs (ISeq x y) = accumSeqs (x:xs) y
+>     accumSeqs xs y = reverse (y:xs)
+> 
+> 
 > unconvI (IIf bs e) = If (map f bs) (fmap unconvI e)
 >   where
 >     f (c,t) = (unconvI c, unconvI t)

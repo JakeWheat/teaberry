@@ -116,8 +116,8 @@ formatted string
 >            ,length fs
 >            ,"Check block: " ++ nm ++ "\n"
 >            ++ intercalate "\n" (map indent msgs)
->            ++ "\n  " ++ show (length ps) ++ "/" ++ show (length ts) ++ " tests passed in check block: " ++ nm
->            )
+>            ++ "\n  " ++ show (length ps) ++ "/" ++ show (length ts)
+>            ++ " tests passed in check block: " ++ nm)
 >     renderTest (a,b) =
 >         "test (" ++ a ++ "): "
 >         ++ case b of

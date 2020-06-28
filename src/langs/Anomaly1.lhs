@@ -95,6 +95,10 @@ data Nothing:
    | nothing
 end
 
+# when source positions are added, will write some nice formating
+# for the error messages, can decide on the fields for each properly
+# at that time
+
 data Language-error:
   | unbound-identifier(i)
   | not-function-value(v)

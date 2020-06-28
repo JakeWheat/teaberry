@@ -308,9 +308,15 @@ todo: escape quotes
 and make sure it doesn't parse newlines when it shouldn't
 
 > stringRaw :: Parser String
-> stringRaw = choice [char_ '\'' *> takeWhileP Nothing (/='\'') <* lexeme_ (char_ '\'')
+> stringRaw = unescape <$>
+>             choice [char_ '\'' *> takeWhileP Nothing (/='\'') <* lexeme_ (char_ '\'')
 >                    ,char_ '"' *> takeWhileP Nothing (/='"') <* lexeme_ (char_ '"')]
 >             <?> "string literal"
+>   where
+>     unescape ('\\':'n':xs) = '\n':unescape xs
+>     unescape ('\\':'\\':xs) = '\\':unescape xs
+>     unescape (x:xs) = x:unescape xs
+>     unescape [] = []
 
 > stringE :: Parser Expr
 > stringE = Text <$> stringRaw

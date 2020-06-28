@@ -47,6 +47,15 @@
 >     --,("\"St\\\"ri\\\"ng\"", Text "St\"ri\"ng")
 >     --,("'Str\"ing'", Text "Str\"ing")
 >     --,("```multiline\nstring```", Text "multiline\nstring")
+>     ,("'newline\n'", Text "newline\n")
+>     ,("'new\nline\n'", Text "new\nline\n")
+>     -- double dipping: first the haskell unescapes the \\\\ to \\
+>     -- then the parser unescapes \\ to \
+>     -- (and to match it with a haskell string, we need to use \\
+>     ,("'new\\\\nline\n'", Text "new\\nline\n")
+>     ,("'\\'", Text "\\")
+>     ,("'\\a'", Text "\\a")
+>     ,("'\\\\n'", Text $ "\\n")
 
 >     ,("a(3)", App (Iden "a") [Num 3])
 

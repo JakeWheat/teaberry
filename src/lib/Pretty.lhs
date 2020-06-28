@@ -38,7 +38,12 @@
 
 > expr :: Expr -> Doc
 > expr (Num n) = text $ showScientific n
-> expr (Text s) = doubleQuotes (text s)
+> expr (Text s) = doubleQuotes (text $ escape s)
+>   where
+>     escape ('\n':xs) = '\\':'n':escape xs
+>     escape ('\\':xs) = '\\':'\\':escape xs
+>     escape (x:xs) = x : escape xs
+>     escape [] = []
 > expr (TupleSel es) = text "{" <> nest 2 (xSep ";" (map expr es) <> text "}")
 > expr (RecordSel flds) = text "{" <> nest 2 (commaSep (map fld flds) <> text "}")
 >   where
