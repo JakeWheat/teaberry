@@ -268,7 +268,7 @@ recursively load all the referenced modules in the source given
 >     getImp _ = Nothing
 
 > getBuiltInModulesDir :: IO FilePath
-> getBuiltInModulesDir = getDataFileName "built-in-modules"
+> getBuiltInModulesDir = getDataFileName "built-in-modules-snapshot1"
 
 ---------------------------------------
 

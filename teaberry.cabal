@@ -134,4 +134,5 @@ Test-Suite teaberry-dev
                        SimpleBaseCase
                        SimpleEval
                        Anomaly2
+                       RefactorTests
 

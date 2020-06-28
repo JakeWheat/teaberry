@@ -215,7 +215,7 @@ is this worth it? wait until it becomes a performance issue
 >     getImp _ = Nothing
 
 > getBuiltInModulesDir :: IO FilePath
-> getBuiltInModulesDir = getDataFileName "built-in-modules"
+> getBuiltInModulesDir = getDataFileName "built-in-modules-snapshot1"
  
   
 > evaluate :: Maybe String -> RuntimeState -> String -> IO (Value, RuntimeState, [T.CheckResult])

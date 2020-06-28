@@ -1,0 +1,43 @@
+
+# contains definitions for things that should always be there that are
+# implemented in langauge
+
+# todo: list, nothing, provide item and stuff like that is used to bootstrap the language
+# then there are a bunch of other built ins which are just defined in language
+# and are available without importing. keep these two sets separate
+
+
+data List:
+  | empty
+  | link(first, rest)
+end
+
+data Nothing:
+   | nothing
+end
+
+data ProvideItem:
+  | provide-all
+  | provide-alias(i,a)
+end
+
+data Language-error:
+  | unbound-identifier(i)
+  | not-function-value(v)
+  | function-wrong-num-args(e,r)
+  | function-wrong-types(e,r)
+  | duplicate-name(a)
+  | expected-type(e,r)
+  | no-branches-satisfied
+  | only-one-branch
+  | empty-block
+  | block-ends-with-let
+end
+
+# tests-to-run :: List<( -> Nothing)>
+# var tests-to-run = empty
+
+# fun run-all-tests():
+#   _ = map(_(), tests-to-run)
+#   nothing
+# end

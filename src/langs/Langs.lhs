@@ -54,6 +54,7 @@
 > import qualified SimpleBaseCase
 > import qualified SimpleEval
 > import qualified Anomaly2
+> import qualified RefactorTests
 
 
 > import qualified Parse1Tests
@@ -124,4 +125,5 @@
 >        ,SimpleBaseCase.tests
 >        ,SimpleEval.tests
 >        ,Anomaly2.tests
+>        ,RefactorTests.tests
 >        ]
