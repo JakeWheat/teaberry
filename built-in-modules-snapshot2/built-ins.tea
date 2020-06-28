@@ -6,7 +6,6 @@
 # then there are a bunch of other built ins which are just defined in language
 # and are available without importing. keep these two sets separate
 
-
 data List:
   | empty
   | link(first, rest)
@@ -34,10 +33,70 @@ data Language-error:
   | block-ends-with-let
 end
 
-# tests-to-run :: List<( -> Nothing)>
-# var tests-to-run = empty
+# copy here for bootstrapping, figure out if there's a better way
+# to handle this
+fun map(f, lst):
+  cases (List) lst:
+    | empty => empty
+    | link(x,xs) => block:
+        link(f(x), map(f,xs))
+      end
+  end
+  # todo: how to have tests in the built in modules?
+  # want to be able to run them
+  # but don't want them to run by default
+#where:
+#  map(tostring, [list: 1, 2]) is [list: "1", "2"]
+#  map(lam(x): x + 1 end, [list: 1, 2]) is [list: 2, 3]
+end
 
-# fun run-all-tests():
-#   _ = map(_(), tests-to-run)
-#   nothing
-# end
+fun reverse(l):
+  fun rev(lst, a):
+    cases (List) lst:
+      | empty => a
+      | link(x,xs) => rev(xs,link(x,a))
+    end
+  end
+  rev(l,empty)
+#where:
+#  reverse([list:]) is [list:]
+#  reverse([list: 1]) is [list: 1]
+#  reverse([list: 1,2]) is [list: 2,1]
+#  reverse([list: 1,2,3,4]) is [list: 4,3,2,1]
+end
+
+
+# tests-to-run :: List<( -> Nothing)>
+#print("make tests to run")
+var tests-to-run = empty
+
+#fun length(l):
+#  cases(List) l:
+#    | empty => 0
+#    | link(f, r) => 1 + length(r)
+#  end
+#end
+
+fun test-is(cbi, msg, lhs, rhs):
+  v0 = lhs()
+  v1 = rhs()
+  if v0 == v1:
+    log-test-pass(cbi, msg)
+  else:
+    log-test-fail(cbi,msg, "Values not equal:\n" + torepr(v0) + "\n" + torepr(v1))
+  end
+end
+
+# register-test :: ( -> Nothing) -> Nothing
+fun register-test(f):
+  #print("register test" + tostring(length(tests-to-run)))
+  tests-to-run := link(f,tests-to-run)
+end
+
+fun run-all-tests():
+  # todo: figure out why this syntax isn't working:
+  # _ = map(_(), reverse(tests-to-run))
+  _ = map(lam(f): f() end, reverse(tests-to-run))
+  tests-to-run := empty
+  nothing
+end

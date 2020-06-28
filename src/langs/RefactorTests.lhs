@@ -58,7 +58,7 @@ imports
 > import Scientific (Scientific, divideScientific, showScientific)
 > import Data.List (intercalate, nubBy, sortOn, findIndex, isPrefixOf, tails, find, nub, (\\))
 
-> -- import Debug.Trace (trace, traceStack)
+> --import Debug.Trace (trace, traceStack)
 > --import qualified TestUtils as T
 
 > import Data.IORef (IORef, newIORef, readIORef, writeIORef)
@@ -195,7 +195,7 @@ hacky top level evaluate. not really sure if it will pay its way once
 >               | otherwise -> throwInterp $ "unrecognised set key: " ++ k
 >             Left _ -> do
 >                 (ast,srcs) <- loadSourceFiles fnm d src
->                 y <- either throwInterp pure $ runDesugar (maybe "toplevel.x" id fnm) ast srcs
+>                 y <- either throwInterp pure $ runDesugar True (maybe "toplevel.x" id fnm) ast srcs
 >                 let z = simplify y
 >                 case executionStage ebs of
 >                     DumpDesugar -> pure (TextV $ "\n" ++ prettyIExpr z ++ "\n", ebs, [])
@@ -210,7 +210,9 @@ hacky top level evaluate. not really sure if it will pay its way once
 >                                 in pure (v',ebs {henv = ne}, t)
 >                             {-VariantV "tuple" [_,_,_] -> throwInterp $ "expected 3 element tuple, second and third elements records, got " ++ torepr' v
 >                             VariantV "tuple" xs -> throwInterp $ "expected 3 element tuple, got " ++ show (length xs) ++ " element tuple, " ++ torepr' v-}
->                             _ -> throwInterp $ "expected 3 element tuple, second one record, got " ++ torepr' v
+>                             VariantV "tuple" [_,_,_] -> throwInterp $ "expected tuple with different types, got: " ++ torepr' v
+>                             VariantV "tuple" fs -> throwInterp $ "expected 3 element tuple, got " ++ show (length fs) ++ " element tuple with " ++ intercalate "," (map (valueTypeName . snd) fs)
+>                             _ -> throwInterp $ "expected 3 element tuple, got non tuple: " ++ torepr' v
 
 recursively load all the referenced modules in the source given
 
@@ -355,13 +357,12 @@ store holds the values of variables
 
 > data InterpreterState =
 >     InterpreterState
->     {addedTests :: [Value]
->     ,testResultLog :: [T.TestResultLog]
+>     {testResultLog :: [T.TestResultLog]
 >     ,isStore :: Store
 >     }
 
 > emptyInterpreterState :: InterpreterState
-> emptyInterpreterState = InterpreterState [] [] emptyStore
+> emptyInterpreterState = InterpreterState [] emptyStore
 
 > data InterpreterException = InterpreterException String
 >                           | ValueException Value
@@ -530,6 +531,7 @@ ffi catalog
 >    ,("to-string", unaryOp anyIn pure tostring)
 >    ,("print", unaryOp anyIn id ffiprint)
 >    ,("sleep", unaryOp unwrapNum id ffisleep)
+>    ,("debug-print", unaryOp anyIn id debugPrint)
 
 >    ,("variant-field-get", binaryOp unwrapText variantIn id variantFieldGet)
 >    ,("variant-field-get-ord", binaryOp unwrapNum variantIn id variantFieldGetOrd)
@@ -553,7 +555,6 @@ ffi catalog
 >    ,("is-tuple", unaryOp anyIn wrapBool isTuple)
 >    ,("is-record", unaryOp anyIn wrapBool isRecord)
 
->    ,("add-tests", unaryOp functionIn id addTests)
 >    ,("log-check-block", binaryOp unwrapNum unwrapText id logCheckBlock)
 >    ,("log-test-pass", binaryOp unwrapNum unwrapText id logTestPass)
 >    ,("log-test-fail", ternaryOp unwrapNum unwrapText unwrapText id logTestFail)
@@ -635,7 +636,7 @@ maybe also have one which takes an ast?
 > runScriptInterp fnm' lenv src =
 >     local (\y -> y {ieEnv = extendEnv lenv $ ieEnv y}) $ do
 >     ast <- either throwInterp pure $ P.parseModule fnm src
->     y <- either throwInterp pure $ runDesugar fnm ast []
+>     y <- either throwInterp pure $ runDesugar False fnm ast []
 >     v <- interp (simplify y)
 >     case v of
 >         VariantV "tuple" [("0", v'), _, _] -> pure v'
@@ -651,7 +652,7 @@ maybe also have one which takes an ast?
 
 > runAstInterp :: Module -> Interpreter ()
 > runAstInterp ast = do
->     y <- either throwInterp pure $ runDesugar "" ast []
+>     y <- either throwInterp pure $ runDesugar False "" ast []
 >     void $ interp (simplify y)
 
 hardcoded nothing. There is also a syntax version. even though nothing
@@ -781,6 +782,11 @@ created
 >     liftIO $ putStrLn $ case v of
 >                             TextV u -> u
 >                             _ -> torepr' v
+>     pure nothingValueHack
+
+> debugPrint :: Value -> Interpreter Value
+> debugPrint v = do
+>     liftIO $ putStrLn $ show v
 >     pure nothingValueHack
 
 
@@ -922,7 +928,11 @@ b = r.b
 >     -- extent the env with the record bindings
 
   
-> interp (ISeq a b) = interp a *> interp b
+> interp (ISeq a b) = do
+>     traceIt 1 $ prettyIExpr a
+>     void $ interp a
+>     traceIt 1 $ prettyIExpr b
+>     interp b
 
 > interp (IIf [_] Nothing) = throwOnlyOneBranch
 
@@ -1036,8 +1046,8 @@ desugaring
 
 desugaring code
 
-> runDesugar :: String -> Module -> [(String,Module)] -> Either String IExpr
-> runDesugar nm ast srcs = fst <$> runExcept (evalRWST go (DesugarReader Nothing) startingDesugarState)
+> runDesugar :: Bool -> String -> Module -> [(String,Module)] -> Either String IExpr
+> runDesugar runTests nm ast srcs = fst <$> runExcept (evalRWST go (DesugarReader Nothing) startingDesugarState)
 >   where
 >     go = do
 >          srcs' <- desugarEm [] (srcs ++ [(nm,ast)])
@@ -1053,7 +1063,7 @@ desugaring code
 >     -- would make the code more regular and
 >     -- quicker to understand/review?
 >     desugarEm desugaredModules ((n,m):ms) = do
->         dsm <- desugarModule (n == "built-ins") m
+>         dsm <- desugarModule runTests (n == "built-ins") m
 >         desugarEm (("module." ++ n, dsm):desugaredModules) ms
 >     combineEm [] = id
 >     combineEm ((n,e):es) = ILet [(n,e)] <$> combineEm es
@@ -1067,19 +1077,26 @@ add the last statement which returns the last value and the env, for
 > nothingSyntaxHack :: Expr
 > nothingSyntaxHack = VariantSel "nothing" []
 
-> desugarModule :: Bool -> Module -> Desugarer IExpr
-> desugarModule skipBuiltins (Module ps stmts) = do
+> desugarModule :: Bool -> Bool -> Module -> Desugarer IExpr
+> desugarModule runTests skipBuiltins (Module ps stmts) = do
 >     ps' <- concat <$> mapM desugarPreludeStmt (builtins ++ ps)
 >     -- add the final value for repl/embedded and imported module support
 >     stmts' <- addTopRet stmts
 >     desugarStmts (ps' ++ stmts')
 >   where
 >     pis = pisToTea $ getProvides ps
->     mk x = StExpr $ TupleSel [x, App (Iden "provides") [pis], App (Iden "env-to-record") []]
->     addTopRet [] = pure [mk nothingSyntaxHack]
+>     mk x = StExpr $ TupleSel [x
+>                              ,App (Iden "provides") [pis]
+>                              ,App (Iden "env-to-record") []]
+>     runAllTests = if runTests
+>                   then [StExpr $ App (Iden "run-all-tests") []]
+>                   else []
+>     addTopRet [] = pure (runAllTests ++ [mk nothingSyntaxHack])
 >     addTopRet [StExpr x] = do
 >         z <- makeUniqueVar "z"
->         pure [LetDecl (patName z) x, mk $ Iden z]
+>         pure ([LetDecl (patName z) x]
+>               ++ runAllTests
+>               ++ [mk $ Iden z])
 >     addTopRet (x:xs) = (x:) <$> addTopRet xs
 >     builtins = if skipBuiltins
 >                then []
@@ -1171,30 +1188,13 @@ add the last statement which returns the last value and the env, for
 > desugar (UnaryMinus e) = desugar $ App (Iden "-") [e]
 
 > desugar (App (Iden "is") [a,b]) = do
->     uniqueV0 <- makeUniqueVar "is-v0"
->     uniqueV1 <- makeUniqueVar "is-v1"
->     uniqueName <- makeUniqueVar "testname"
 >     checkBlockIDName <- (maybe (throwDesugar "'is' test outside check block") Iden)
 >                         <$> (asks currentCheckBlockIDName)
->     desugarStmts
->               [LetDecl (patName uniqueV0) a
->               ,LetDecl (patName uniqueV1) b
->               ,LetDecl (patName uniqueName) (Text $ Pr.prettyExpr a ++ " is " ++ Pr.prettyExpr b)
->               ,StExpr $
->                If [(eqIdens uniqueV0 uniqueV1
->                   ,appI "log-test-pass" [checkBlockIDName
->                                         ,Iden uniqueName])]
->                   (Just $ appI "log-test-fail"
->                    [checkBlockIDName
->                    ,Iden uniqueName
->                    ,Text "Values not equal:\n"
->                        `plus` appI "torepr" [Iden uniqueV0]
->                        `plus` Text "\n"
->                        `plus` appI "torepr" [Iden uniqueV1]])]
->   where
->     plus c d = appI "+" [c, d]
->     eqIdens c d = appI "==" [Iden c, Iden d]
->     appI i es = App (Iden i) es
+>     desugar $ App (Iden "test-is") [checkBlockIDName
+>                          ,Text $ Pr.prettyExpr a ++ " is " ++ Pr.prettyExpr b
+>                          ,Lam [] a
+>                          ,Lam [] b]
+> 
 
 > desugar (App (Iden "raises") [e0, e1]) = do
 >   desugar (App (Iden "raises-satisfies") [e0, lam ["a"] $ App (Iden "tostring-equals") [e1, Iden "a"]])
@@ -1338,7 +1338,7 @@ xxx.make([list: <elements>])
 >       let uniqueCheckBlockID = Num $ fromIntegral $ nextUnusedCheckBlockID s
 >       blockName <- maybe getAnonBlockName pure nm
 >       desugar $
->           appI "add-tests"
+>           appI "register-test"
 >           [Lam [] (Block $
 >                    [LetDecl (patName uniqueCheckBlockIDVarName) uniqueCheckBlockID
 >                    ,StExpr $ appI "log-check-block"
@@ -1555,9 +1555,6 @@ add-tests(fn)
 takes a function value
 these functions are run at the end of the script to do the testing
 
-> addTests :: Value -> Interpreter Value
-> addTests v = nothingWrapper $ \s -> s {addedTests = v : addedTests s}
-
 log-check-block(unique-block-id, name)
 says there is a new test block with a unique id and it's name
 
@@ -1577,12 +1574,9 @@ log-test-fail(block,id, text of test, fail message)
 > logTestFail n msg failmsg = nothingWrapper $ \s ->
 >     s {testResultLog = T.TestFail n msg failmsg : testResultLog s}
 
-this is run at the end of the script to run all the saved tests
-
 > runAddedTests :: Interpreter [T.CheckResult]
 > runAddedTests = do
->     ts <- reverse <$> gets addedTests
->     mapM_ (`app` []) ts
+>     -- temp: tests have already been run, only need to get the results
 >     testLog <- reverse <$> gets testResultLog
 >     either throwInterp pure $ T.testLogToCheckResults testLog
 
@@ -1777,94 +1771,6 @@ pretty interpreter syntax
 > unconvIPatName :: String -> PatName
 > unconvIPatName n = PatName NoShadow n
 
-
-------------------------------------------------------------------------------
-
-in language testing support
-
-> {-data TestResultLog = TestPass Scientific String -- check block id, test source
->                    | TestFail Scientific String String -- check block id, test source, failure message
->                    | TestBlock Scientific String
-
-this is run after that, to convert the log of test events, into a
-organised data structure to view the results
-
-> testLogToCheckResults :: [TestResultLog] -> Either String [CheckResult]
-> testLogToCheckResults trls = do
->     -- 'streaming' algorithm, very efficient
->     -- but the reason to do it is because it's an easy
->     -- way to catch a test result without a matching check block
->     -- relies on the test results being in the order you write
->     -- the corresponding tests in the source file
->     let f :: [(Scientific, CheckResult)] -> [TestResultLog] -> Either String [CheckResult]
->         -- finished, reverse the check results
->         f res [] = pure $ map reverseResults $ map snd $ reverse res
->         -- new check block, make sure it's id hasn't been seen already
->         f res ((TestBlock cid nm) : xs) = do
->             --when (any (== cid) $ map fst res)
->             --    $ Left $ "multiple check result name for check block with id " ++ show cid
->             f ((cid, CheckResult nm []) : res) xs
->         -- if we see a pass or a fail without having see a testblock
->         -- then it's a bug
->         f [] (TestPass {} : _) = Left $ "unmatched check block id in test result"
->         f [] (TestFail {} : _) = Left $ "unmatched check block id in test result"
->         -- pass or fail, the id should match the id of the last testblock entry
->         -- not sure if this extra checking is really needed
->         -- maybe it will be useful if try to run tests in multiple threads
->         -- in the future?
->         f ((cid, CheckResult cnm ts):cs) ((TestPass tid tnm) : xs)
->             | cid == tid =
->               f ((cid,CheckResult cnm ((tnm, Nothing):ts)):cs) xs
->             | otherwise = Left $ "unmatched check block id in test result"
->         f ((cid, CheckResult cnm ts):cs) ((TestFail tid tnm fmsg) : xs)
->             | cid == tid =
->               f ((cid,CheckResult cnm ((tnm, Just fmsg):ts)):cs) xs
->             | otherwise = Left $ "unmatched check block id in test result"
->     f [] trls
->   where
->     reverseResults (CheckResult nm ts) = CheckResult nm $ reverse ts
-
-function to convert the check result data structure into a nicely
-formatted string
-
-> renderCheckResults :: [CheckResult] -> String
-> renderCheckResults cs =
->     let bs = map renderCheck cs
->         totalPasses = sum $ map (\(n,_,_) -> n) bs
->         totalFails = sum $ map (\(_,n,_) -> n) bs
->         msgs = map (\(_,_,m) -> m) bs
->     in intercalate "\n\n" msgs
->        ++ "\n\n" ++ (show totalPasses) ++ "/" ++ show (totalPasses + totalFails)
->        ++ " tests passed in all check blocks"
->   where
->     renderCheck (CheckResult nm ts) =
->         let (ps,fs) = partition (isNothing . snd) ts
->             msgs = map renderTest ts
->         in (length ps
->            ,length fs
->            ,"Check block: " ++ nm ++ "\n"
->            ++ intercalate "\n" (map indent msgs)
->            ++ "\n  " ++ show (length ps) ++ "/" ++ show (length ts) ++ " tests passed in check block: " ++ nm
->            )
->     renderTest (a,b) =
->         "test (" ++ a ++ "): "
->         ++ case b of
->                Nothing -> "OK"
->                Just msg -> "failed, reason:\n" ++ indent msg
->     indent [] = []
->     indent x = "  " ++ indent' x
->     indent' [] = []
->     indent' x@[_] = x
->     indent' ('\n':y@(_:_)) = "\n  " ++ indent' y
->     indent' (x:y) = x : indent' y
-
-
-test results
-
-> data CheckResult = CheckResult String -- the test block name
->                               [(String, Maybe String)]
->                  deriving Show-}
-
 ------------------------------------------------------------------------------
 
 > tests :: T.TestTree
@@ -1920,8 +1826,8 @@ test results
 >     ]
 
 > tests1 :: T.TestTree
-> tests1 = T.testGroup "front1" $
->     map (\f -> T.makeTestsIO ("front" ++ f)
+> tests1 = T.testGroup "refactortests1" $
+>     map (\f -> T.makeTestsIO ("refactortests" ++ f)
 >             $ runFileTests ("examples/tests/fulltests" </> f))
 >     testFiles
 
@@ -1936,7 +1842,7 @@ test results
 >         runScriptWithTests h f [] src
 
 > tests4 :: T.TestTree
-> tests4 = T.testGroup "front4"
+> tests4 = T.testGroup "refactortests4"
 >     [testSanityArith
 >     ,testEnvKept
 >     ,testEnvOverridden

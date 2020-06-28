@@ -48,6 +48,11 @@
 >                                   ,runScript
 >                                   ,valueToString)
 
+> import qualified RefactorTests (newTeaberryHandle
+>                                   ,runScript
+>                                   ,valueToString)
+
+
 
 > import qualified Front (newTeaberryHandle
 >                        ,runScript
@@ -245,6 +250,9 @@ main
 >                                    ,xRunScript = \h _ e s ->
 >                                            either error id <$> Records1Embedded.runScript h e s
 >                                    ,xValueToString = Records1Embedded.valueToString}
+>         refactorTests = Backend {xNewHandle = RefactorTests.newTeaberryHandle
+>                               ,xRunScript = RefactorTests.runScript
+>                               ,xValueToString = RefactorTests.valueToString}
 >     case backend os of
 >         Nothing -> runWithBackend os defaultBackend
 >         Just "default" -> runWithBackend os defaultBackend
@@ -255,6 +263,7 @@ main
 >         Just "FixWhere" -> runWithBackend os fixWhere
 >         Just "DumpDesugared" -> runWithBackend os dumpDesugared
 >         Just "Records1Embedded" -> runWithBackend os records1Embedded
+>         Just "RefactorTests" -> runWithBackend os refactorTests
 >         Just x -> error $ "backend not recognised: " ++ x
 
 > runWithBackend :: MyOpts -> Backend h v -> IO ()

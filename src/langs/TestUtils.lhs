@@ -57,6 +57,7 @@ test logging
 > data TestResultLog = TestPass Scientific String -- check block id, test source
 >                    | TestFail Scientific String String -- check block id, test source, failure message
 >                    | TestBlock Scientific String
+>                    deriving Show
 
 this is run after that, to convert the log of test events, into a
 organised data structure to view the results
