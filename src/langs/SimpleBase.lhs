@@ -419,7 +419,7 @@ desugaring code
 > desugar (App (Iden "raises") [e0, e1]) = do
 >     desugar (App (Iden "raises-satisfies")
 >            [e0
->            ,lam ["a"] $ (Iden "a" `eq` App (Iden "tostring") [e1])])
+>            ,lam ["a"] $ (App (Iden "tostring") [Iden "a"] `eq` e1)])
 >   where
 >     eq a b = App (Iden "==") [a,b]
 

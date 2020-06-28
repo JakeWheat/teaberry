@@ -543,8 +543,6 @@ ffi catalog
 >    ,("call-construct-make", binaryOp variantIn variantIn id callConstructMake)
 
 >    -- another mystery
->    --,("tostring-equals", binaryOp unwrapText anyIn wrapBool tostringEquals)
->    ,("tostring-equals", binaryOp anyIn anyIn wrapBool tostringEqualsx)
 
 >    ,("raise", unaryOp anyIn id raise)
 
@@ -682,9 +680,6 @@ created
 
 > raise :: Value -> Interpreter Value
 > raise v = throwM $ ValueException v
-
-> tostringEqualsx :: Value -> Value -> Bool
-> tostringEqualsx e0 e1 = e0 == tostring e1
 
 > isBoolean :: Value -> Bool
 > isBoolean (BoolV {}) = True
@@ -1196,11 +1191,15 @@ add the last statement which returns the last value and the env, for
 >                          ,Lam [] b]
 > 
 
-> desugar (App (Iden "raises") [e0, e1]) = do
->   desugar (App (Iden "raises-satisfies") [e0, lam ["a"] $ App (Iden "tostring-equals") [e1, Iden "a"]])
+> desugar (App (Iden "raises") [e0, e1]) =
+>     desugar (App (Iden "raises-satisfies")
+>            [e0
+>            ,lam ["a"] $ (App (Iden "tostring") [Iden "a"] `eq` e1)])
+>   where
+>     eq a b = App (Iden "==") [a,b]
 
 > desugar x@(App (Iden "raises-satisfies") [e0,e1]) =
->   desugar =<< desugarRaises  (Pr.prettyExpr x) e0 e1
+>   desugar =<< desugarRaises (Pr.prettyExpr x) e0 e1
 
 > desugar (App (Iden "or") [a,b]) =
 >     desugar (If [(a, Iden "true")] (Just b))
