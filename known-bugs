@@ -1,0 +1,86 @@
+Here go bugs that aren't fixing immediately
+
+the list doesn't things which haven't been implemented yet or have a
+  temp design
+
+--------------------------------------
+
+letrec desugaring doesn't work for hof:
+
+this desugars incorrectly:
+fun dontwork
+  ...
+
+fun f
+  map(dontwork,lst)
+
+
+--------------------------------------
+
+there is another bug with letrec desugaring, look for the comments and
+tests commented out, it's in the commented out test in the fronttest
+.tea file list
+
+--------------------------------------
+
+implementation functions are leaked into the top level environment
+
+
+--------------------------------------
+
+reimporting modules changed or unchanged in the embedded/repl is not
+right - no specific bug, but it's not designed at all and leads to
+very weird behaviour
+
+--------------------------------------
+
+can't put tests in built in modules and not run them when you run a
+normal script
+
+not exactly a bug but quite serious
+
+--------------------------------------
+
+_() doesn't seem to work
+
+seen in this:
+_ = map(_(), reverse(tests-to-run))
+
+without the curry sugar it works
+  _ = map(lam(f): f() end, reverse(tests-to-run))
+
+
+--------------------------------------
+
+where blocks in nested functions which run multiple times get
+duplicate test block ids, not sure what this breaks exactly.
+
+--------------------------------------
+
+fixity parsing is broken badly
+
+--------------------------------------
+
+critical whitespace issues:
+1. doesn't reject ws between expr and () for app
+2. allows parsing more than one expression on a line
+
+both lead to bad error messages and incorrect parsing
+
+--------------------------------------
+
+nested pattern binding is broken
+
+--------------------------------------
+
+relative path handling for module loading is probably broken, not 100% sure
+
+--------------------------------------
+
+if you use string-to-number it tries to use some and none, and if you
+  didn't import option, it breaks
+  this needs support for local imports inside ffi functions
+  or to bring ffi functions into the language in a different way
+  the string-to-number has a more sensible fix (put it in a module
+  properly), but the bug/deficiency will still be there
+
