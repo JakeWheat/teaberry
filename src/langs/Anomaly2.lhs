@@ -1,15 +1,32 @@
- 
-Anomaly testing version one:
 
-start with a simple language
 
-do tests for every way you can mistakenly use the language (excluding
-parse errors)
+Anomaly testing two:
 
-add tests for all of these to see them
+test some things which can't be straightforwardly tested in language,
+so use eval to test them:
 
-a big part of the goal is to develop the infrastructure to do this
-kind of testing
+raise on left side of is
+raise on right side of is
+check is with different types on each side for sanity
+check a simple is failing
+check raises and raises satisfies failing
+check for test predicates outside of check block
+do a better error message when raises-satisfies doesn't get a function
+is outside check block
+raises, raises-satisfies outside check block
+
+most of the above is about getting a testing specific exception
+instead of the natural one from regular code
+
+the reason to have these is to make the language more usable and
+especially more accessible to beginners
+
+
+check let at the end of top level which is fine
+check data at the end of top level which desugars to let, it's fine
+empty block
+block ends with let
+
 
 =============================================================================
 
@@ -22,7 +39,7 @@ imports
 > {-# LANGUAGE DeriveDataTypeable #-}
 > {-# LANGUAGE MultiWayIf #-}
 
-> module Anomaly1 (tests) where
+> module Anomaly2 (tests) where
 
 > import Text.RawString.QQ
 
@@ -106,6 +123,7 @@ data Language-error:
   | only-one-branch
   | empty-block
   | block-ends-with-let
+  | testing-statement-outside-check-block
 end
 
 
@@ -315,6 +333,9 @@ ffi catalog
 >    ,("tostring", unaryOp anyIn pure tostring)
 >    ,("to-string", unaryOp anyIn pure tostring)
 
+>    ,("eval", unaryOp unwrapText id runScriptInterp)
+
+
 >    ,("variant-field-get", binaryOp unwrapText variantIn id variantFieldGet)
 >    ,("variant-field-get-ord", binaryOp unwrapNum variantIn id variantFieldGetOrd)
 >    ,("safe-variant-name", unaryOp anyIn id safeVariantName)
@@ -361,6 +382,13 @@ ffi catalog
 > torepr' (VariantV nm []) = nm
 > torepr' (VariantV nm fs) =
 >     nm ++ "(" ++ intercalate "," (map (torepr' . snd) fs) ++ ")"
+
+> runScriptInterp :: String -> Interpreter Value
+> runScriptInterp src = do
+>     ast <- either throwInterp pure $ parse src
+>     y <- either throwInterp pure $ runDesugar ast
+>     interp (simplify y)
+
 
 > safeVariantName :: Value -> Interpreter Value
 > safeVariantName (VariantV x _) = pure $ TextV x
@@ -545,31 +573,34 @@ desugaring code
 > desugar (BinOp e0 f e1) = desugar $ App (Iden f) [e0,e1]
 > desugar (UnaryMinus e) = desugar $ App (Iden "-") [e]
 
-> desugar (App (Iden "is") [a,b]) = do
->     uniqueV0 <- makeUniqueVar "is-v0"
->     uniqueV1 <- makeUniqueVar "is-v1"
->     uniqueName <- makeUniqueVar "testname"
->     checkBlockIDName <- (maybe (throwDesugar "'is' test outside check block") Iden)
->                         <$> (asks currentCheckBlockIDName)
->     desugarStmts
->               [letDecl uniqueV0 a
->               ,letDecl uniqueV1 b
->               ,letDecl uniqueName (Text $ Pr.prettyExpr a ++ " is " ++ Pr.prettyExpr b)
->               ,StExpr $
->                If [(eqIdens uniqueV0 uniqueV1,
->                    appI "log-test-pass" [checkBlockIDName
->                                         ,Iden uniqueName])]
->                   (Just $ appI "log-test-fail"
->                    [checkBlockIDName
->                    ,Iden uniqueName
->                    ,Text "Values not equal:\n"
->                        `plus` appI "torepr" [Iden uniqueV0]
->                        `plus` Text "\n"
->                        `plus` appI "torepr" [Iden uniqueV1]])]
+> desugar (App (Iden "is") [a,b]) =
+>     maybe
+>        (desugar $ throwDesugarV $ Iden "testing-statement-outside-check-block")
+>        gen =<< asks currentCheckBlockIDName
 >   where
+>     gen checkBlockIDName = do
+>         uniqueV0 <- makeUniqueVar "is-v0"
+>         uniqueV1 <- makeUniqueVar "is-v1"
+>         uniqueName <- makeUniqueVar "testname"
+>         desugarStmts
+>                   [letDecl uniqueV0 a
+>                   ,letDecl uniqueV1 b
+>                   ,letDecl uniqueName (Text $ Pr.prettyExpr a ++ " is " ++ Pr.prettyExpr b)
+>                   ,StExpr $
+>                    If [(eqIdens uniqueV0 uniqueV1,
+>                        appI "log-test-pass" [Iden checkBlockIDName
+>                                             ,Iden uniqueName])]
+>                       (Just $ appI "log-test-fail"
+>                        [Iden checkBlockIDName
+>                        ,Iden uniqueName
+>                        ,Text "Values not equal:\n"
+>                            `plus` appI "torepr" [Iden uniqueV0]
+>                            `plus` Text "\n"
+>                            `plus` appI "torepr" [Iden uniqueV1]])]
 >     plus c d = appI "+" [c, d]
 >     eqIdens c d = appI "==" [Iden c, Iden d]
 >     appI i es = App (Iden i) es
+
 > desugar (App (Iden "raises") [e0, e1]) = do
 >     desugar (App (Iden "raises-satisfies")
 >            [e0
@@ -746,34 +777,35 @@ special case to bootstrap the variant constructor for list link
 > nothingSyntaxHack = VariantSel "nothing" []
 
 > desugarRaises :: String -> Expr -> Expr -> Desugarer Expr
-> desugarRaises syn e e1 = do
->     let failMsg = "The test operation raises-satisfies failed for the test "
->                   ++ Pr.prettyExpr e1
->     checkBlockIDName <- (maybe (lift $ throwE "'is' test outside check block") pure)
->                         =<< (asks currentCheckBlockIDName)
->     
->     nameit <- makeUniqueVar "isname"
->     v1 <- makeUniqueVar "isv1"
->     pure $ App (Iden "catch")[
->         (Block [StExpr e
->                ,LetDecl (patName nameit) $ Text syn
->                ,StExpr $ appx "log-test-fail" [Iden checkBlockIDName
->                                               ,Iden nameit
->                                               ,Text "No exception raised"]])
->         ,(lam ["a"] $ Block
->          [LetDecl (patName v1) e1
->          ,LetDecl (patName nameit) $ Text syn
->          ,StExpr $ If [(appx v1 [Iden "a"]
->                        ,appx "log-test-pass" [Iden checkBlockIDName, Iden nameit])]
->                    $ Just $ appx "log-test-fail"
->                             [Iden checkBlockIDName
->                             ,Iden nameit
->                             ,Text failMsg `plus`
->                              Text ", value was " `plus`
->                              appx "torepr" [Iden "a"]]])]
+> desugarRaises syn e e1 =
+>     maybe
+>        (pure $ throwDesugarV $ Iden "testing-statement-outside-check-block")
+>        gen =<< asks currentCheckBlockIDName
 >   where
->       plus a b = appx "+" [a,b]
->       appx nm es = App (Iden nm) es
+>     gen checkBlockIDName = do
+>         let failMsg = "The test operation raises-satisfies failed for the test "
+>                       ++ Pr.prettyExpr e1
+>         nameit <- makeUniqueVar "isname"
+>         v1 <- makeUniqueVar "isv1"
+>         pure $ App (Iden "catch")[
+>             (Block [StExpr e
+>                    ,LetDecl (patName nameit) $ Text syn
+>                    ,StExpr $ appx "log-test-fail" [Iden checkBlockIDName
+>                                                   ,Iden nameit
+>                                                   ,Text "No exception raised"]])
+>             ,(lam ["a"] $ Block
+>              [LetDecl (patName v1) e1
+>              ,LetDecl (patName nameit) $ Text syn
+>              ,StExpr $ If [(appx v1 [Iden "a"]
+>                            ,appx "log-test-pass" [Iden checkBlockIDName, Iden nameit])]
+>                        $ Just $ appx "log-test-fail"
+>                                 [Iden checkBlockIDName
+>                                 ,Iden nameit
+>                                 ,Text failMsg `plus`
+>                                  Text ", value was " `plus`
+>                                  appx "torepr" [Iden "a"]]])]
+>     plus a b = appx "+" [a,b]
+>     appx nm es = App (Iden nm) es
 
 ------------------------------------------------------------------------------
 
@@ -1205,18 +1237,18 @@ check "simple anomaly":
   # needs some more work to get the types of variants right
   if false: 1 else if nothing: 2 else: 3 end raises-satisfies _ == expected-type('Boolean', 'Variant')
   # if -> falls through with no else
-  if 1 == 2: 1 else if 1 == 3: 2 end raises-satisfies _ == no-branches-satisfied
+  if 1 == 2: 1 else if 1 == 3: 2 end raises-satisfies is-no-branches-satisfied
   # if with only one branch
-  if 1 == 1: 1 end raises-satisfies _ == only-one-branch
+  if 1 == 1: 1 end raises-satisfies is-only-one-branch
 
   # block: an empty block gives an error
-  block: end raises-satisfies _ == empty-block
+  block: end raises-satisfies is-empty-block
 
   # sanity check
   block: 3 end is 3
 
   # let at the end of a block
-  block: a = 3 end raises-satisfies _ == block-ends-with-let
+  block: a = 3 end raises-satisfies is-block-ends-with-let
 
   # tests for curried:
   badc = lam(a,b): a + b end
@@ -1225,10 +1257,58 @@ check "simple anomaly":
 
 end
 
+check "eval":
+
+  eval("1 + 2") is 3
+  eval("raise('xx')") raises 'xx'
+
+end
+
+check "testing anomalies":
+
+  # needs a new eval that returns the test results:
+  # raise on left side of is
+  # raise on right side of is
+  # check is with different types on each side for sanity
+  # pyret just says they aren't equal, it doesn't say they have different types
+  # check a simple is failing
+  # check raises and raises satisfies failing
+  # check for test predicates outside of check block
+  # do a better error message when raises-satisfies doesn't get a function
+
+  # test statements outside check block
+
+  eval("2 + 3 is 5") raises-satisfies is-testing-statement-outside-check-block
+  eval("2 + 3 raises 5") raises-satisfies is-testing-statement-outside-check-block
+  eval("2 + 3 raises-satisfies is-Number") raises-satisfies is-testing-statement-outside-check-block
+  
+
+end
+
+check "block anomalies":
+
+  # check let at the end of top level which is fine
+  eval("a = 3") is nothing
+
+  # check data at the end of top level which desugars to let, it's fine
+  eval(```
+data D:
+  | dx(a)
+end```) is nothing
+
+  eval("block: 3 end") is 3
+
+  eval("block: end") raises-satisfies is-empty-block
+
+  eval("block: a = 3 end") raises-satisfies is-block-ends-with-let
+
+end
+
+
 \end{code}
 >    |]
 
 
       
 > tests :: T.TestTree
-> tests = T.makeTestsIO "anomaly1" $ (Right <$> evaluateWithChecks simpleTestScript)
+> tests = T.makeTestsIO "anomaly2" $ (Right <$> evaluateWithChecks simpleTestScript)

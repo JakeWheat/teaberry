@@ -133,4 +133,5 @@ Test-Suite teaberry-dev
                        Curried
                        SimpleBaseCase
                        SimpleEval
+                       Anomaly2
 

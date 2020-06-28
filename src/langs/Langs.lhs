@@ -53,6 +53,7 @@
 > import qualified Curried
 > import qualified SimpleBaseCase
 > import qualified SimpleEval
+> import qualified Anomaly2
 
 
 > import qualified Parse1Tests
@@ -122,4 +123,5 @@
 >        ,Curried.tests
 >        ,SimpleBaseCase.tests
 >        ,SimpleEval.tests
+>        ,Anomaly2.tests
 >        ]
