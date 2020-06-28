@@ -6,6 +6,7 @@
 # then there are a bunch of other built ins which are just defined in language
 # and are available without importing. keep these two sets separate
 
+
 data List:
   | empty
   | link(first, rest)
@@ -32,3 +33,11 @@ data Language-error:
   | empty-block
   | block-ends-with-let
 end
+
+# tests-to-run :: List<( -> Nothing)>
+# var tests-to-run = empty
+
+# fun run-all-tests():
+#   _ = map(_(), tests-to-run)
+#   nothing
+# end

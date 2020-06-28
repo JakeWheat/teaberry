@@ -271,6 +271,8 @@ simplify
 >     ILet bs (ILet bs' x) -> ILet (bs ++ bs') x
 >     x1 -> x1
 
+when can (Seq (Seq a b) c) be safely changed to (Seq a (Seq b c))?
+this will make a lot of things more readable
 
 ---------------------------------------
 
@@ -558,6 +560,15 @@ ffi catalog
 >    ,("mhs", unaryOp unwrapText pure makeHaskellString)
 >    ,("ghs", unaryOp anyIn id getHaskellString)
 
+>    ,("text-length", unaryOp unwrapText wrapInt length)
+>    ,("text-char-at", binaryOp unwrapText unwrapInt wrapText textCharAt)
+>    ,("text-starts-with", binaryOp unwrapText unwrapText wrapBool isPrefixOf)
+>    ,("text-drop-prefix", binaryOp unwrapText unwrapInt wrapText (flip drop))
+>    ,("text-index-of", binaryOp unwrapText unwrapText wrapInt textIndexOf)
+>    ,("text-length", unaryOp unwrapText wrapInt length)
+>    -- "string" is too weird, let's use text instead ...
+>    ,("text-substring", ternaryOp unwrapText unwrapInt unwrapInt wrapText textSubstring)
+
 >    ,("string-to-number", unaryOp unwrapText id stringToNumber)
 >    ,("string-index-of", binaryOp unwrapText unwrapText wrapNum stringIndexOf)
 >    ,("string-append", binaryOp unwrapText unwrapText wrapText (++))
@@ -566,6 +577,15 @@ ffi catalog
 >    ])
 >    $ emptyEnv {envEnv = [("true", BoolV True)
 >                         ,("false", BoolV False)]}
+
+> textSubstring :: String -> Int -> Int -> String
+> textSubstring str start end = take (end - start) (drop start str)
+
+
+> textIndexOf :: String -> String -> Int
+> textIndexOf str i = case findIndex (isPrefixOf i) (tails str) of
+>     Nothing -> -1
+>     Just n -> n
 
 > providesImpl :: Value -> Interpreter Value
 > providesImpl x = do
@@ -585,6 +605,20 @@ ffi catalog
 > stringIndexOf str substr = case findIndex (isPrefixOf substr) (tails str) of
 >     Just n -> fromIntegral n
 >     Nothing -> -1
+
+Returns a String containing the character at the string index n from String n.
+dodgy: returns an empty string if index is out of range
+
+> textCharAt :: String -> Int -> String
+> textCharAt s i =
+>     if i < 0
+>     then ""
+>     else go s i
+>   where
+>     go [] _ = ""
+>     go (x:_) 0 = [x]
+>     go (_:xs) j = go xs (j -1)
+
 
 
 > stringToNumber :: String -> Interpreter Value
@@ -1570,9 +1604,20 @@ ffi boilerplate
 >                           NumV n -> pure n
 >                           x -> throwInterp $ "type: expected number, got " ++ show x)
 
+> unwrapInt :: (String, Value -> Interpreter Int)
+> unwrapInt = ("Number", \case
+>                           NumV n | Just i <- extractInt n -> pure i
+>                                  | otherwise -> throwInterp $ "expected integer, got " ++ show n
+>                           x -> throwInterp $ "type: expected number, got " ++ show x)
+
+
 
 > wrapNum :: Scientific -> Interpreter Value
 > wrapNum n = pure $ NumV n
+
+> wrapInt :: Int -> Interpreter Value
+> wrapInt n = pure $ NumV $ fromIntegral n
+
 
 
 
