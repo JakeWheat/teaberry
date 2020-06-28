@@ -5,13 +5,15 @@
 >                  ,T.assertEqual
 >                  ,T.assertBool
 >                  ,T.assertFailure
+>                  ,makeTests
+>                  ,makeTestsIO
+
+>                  ,parseModules
+
 >                  ,CheckResult (..)
 >                  ,TestResultLog(..)
 >                  ,testLogToCheckResults
 >                  ,renderCheckResults
->                  ,makeTests
->                  ,makeTestsIO
->                  ,parseModules
 >                  ) where
 
 > import qualified Test.Tasty as T

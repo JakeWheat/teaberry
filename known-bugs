@@ -21,6 +21,7 @@ there is another bug with letrec desugaring, look for the comments and
 tests commented out, it's in the commented out test in the fronttest
 .tea file list
 
+
 --------------------------------------
 
 implementation functions are leaked into the top level environment
@@ -59,6 +60,11 @@ duplicate test block ids, not sure what this breaks exactly.
 
 fixity parsing is broken badly
 
+a specific example:
+-1 is 0 - 1
+parses as
+-(1 is (0 - 1))
+
 --------------------------------------
 
 critical whitespace issues:
@@ -81,6 +87,10 @@ if you use string-to-number it tries to use some and none, and if you
   didn't import option, it breaks
   this needs support for local imports inside ffi functions
   or to bring ffi functions into the language in a different way
-  the string-to-number has a more sensible fix (put it in a module
-  properly), but the bug/deficiency will still be there
+
+--------------------------------------
+
+case with one branch gives an error about if with one branch
+
+--------------------------------------
 

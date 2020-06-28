@@ -241,10 +241,9 @@ end
 |#
 
 rec countdown-good =
-  # countdown-good is in scope here, because of the 'rec'
   lam(n):
     if n == 0: true
-    else: countdown-good(n - 1) # so this call is fine
+    else: countdown-good(n - 1)
     end
   end
 

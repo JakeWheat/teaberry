@@ -22,7 +22,7 @@ imports
 >                      ,runFunction
 >                      ,Value(..)
 >                      ,valueToString
->                      ,T.CheckResult(..)
+>                      --,T.CheckResult(..)
 >                      ,tests
 >                      ) where
 
@@ -43,7 +43,17 @@ imports
 > import Control.Monad.Trans.Class (lift)
 > import Control.Monad.IO.Class (liftIO)
 > import Control.Monad.Trans.Except (Except, runExcept, throwE)
-> import Control.Monad.Trans.RWS (RWST, evalRWST, ask, local, get, gets, state, put, modify, asks)
+> import Control.Monad.Trans.RWS (RWST
+>                                ,evalRWST
+>                                ,ask
+>                                ,local
+>                                ,get
+>                                --,gets
+>                                ,state
+>                                --,put
+>                                ,modify
+>                                --,asks
+>                                )
 > import Control.Exception.Safe (Exception, throwM, catch)
 > import Control.Concurrent (threadDelay)
 
@@ -69,6 +79,16 @@ imports
 > import Data.Dynamic (Dynamic, toDyn, fromDynamic)
 
 > import qualified TestUtils as T
+>     (TestTree
+>     ,testGroup
+>     ,testCase
+>     ,assertEqual
+>     --,assertBool
+>     --,assertFailure
+>     --,makeTests
+>     ,makeTestsIO
+>     --,parseModules
+>     )
 
 ------------------------------------------------------------------------------
 
@@ -127,29 +147,29 @@ embedded api
 > runScript h fnm lenv src = do
 >     ebs <- readIORef (tbh h)
 >     let ebs' = ebs {henv = extendEnv lenv $ henv ebs}
->     (v,ebs'',t) <- evaluate fnm ebs' src
->     case t of
+>     (v,ebs'') <- evaluate fnm ebs' src
+>     {-case t of
 >         [] -> pure ()
->         _ -> putStrLn $ T.renderCheckResults t
+>         _ -> putStrLn $ T.renderCheckResults t-}
 >     -- if you press ctrl-c in between the start of
 >     -- writeioref and if finishing, or even at another time,
 >     -- can this write become corrupted?
 >     writeIORef (tbh h) ebs''
 >     pure v
 
-> runScriptWithTests :: TeaberryHandle -> Maybe String -> [(String,Value)] -> String -> IO [T.CheckResult]
+> runScriptWithTests :: TeaberryHandle -> Maybe String -> [(String,Value)] -> String -> IO ()
 > runScriptWithTests h fnm lenv src = do
 >     ebs <- readIORef (tbh h)
 >     let ebs' = ebs {henv = extendEnv lenv $ henv ebs}
->     (_v,ebs'',t) <- evaluate fnm ebs' src
->     case t of
+>     (_v,ebs'') <- evaluate fnm ebs' src
+>     {-case t of
 >         [] -> pure ()
->         _ -> putStrLn $ T.renderCheckResults t
+>         _ -> putStrLn $ T.renderCheckResults t-}
 >     -- if you press ctrl-c in between the start of
 >     -- writeioref and if finishing, or even at another time,
 >     -- can this write become corrupted?
 >     writeIORef (tbh h) ebs''
->     pure t
+>     pure ()
 
 
 > runFunction :: TeaberryHandle -> String -> [Value] -> IO Value
@@ -177,37 +197,37 @@ hacky top level evaluate. not really sure if it will pay its way once
 > evaluate :: Maybe String
 >           -> RuntimeState
 >           -> String
->           -> IO (Value, RuntimeState, [T.CheckResult])
+>           -> IO (Value, RuntimeState)
 > evaluate fnm ebs src = do
 >     d <- getBuiltInModulesDir
 >     fst <$> evalRWST (f d) (makeInterpreterEnv $ henv ebs) emptyInterpreterState
 >   where
->     f :: FilePath -> Interpreter (Value, RuntimeState, [T.CheckResult])
+>     f :: FilePath -> Interpreter (Value, RuntimeState)
 >     f d =
 >         -- quick hack for set
 >         case P.parseSet src of
 >             Right (k,v)
 >               | k == "dump-desugar" -> do
 >                 case v of
->                      "t" -> pure (TextV "set dump desugar on", ebs {executionStage = DumpDesugar }, [])
->                      "f" -> pure (TextV "set full execution on", ebs {executionStage = FullExecution }, [])
+>                      "t" -> pure (TextV "set dump desugar on", ebs {executionStage = DumpDesugar })
+>                      "f" -> pure (TextV "set full execution on", ebs {executionStage = FullExecution })
 >                      _ -> throwInterp $ "bad value for dump-desugar, expected t or f, got " ++ v
 >               | otherwise -> throwInterp $ "unrecognised set key: " ++ k
 >             Left _ -> do
 >                 (ast,srcs) <- loadSourceFiles fnm d src
->                 y <- either throwInterp pure $ runDesugar True (maybe "toplevel.x" id fnm) ast srcs
+>                 y <- either throwInterp pure $ runDesugar True False (maybe "toplevel.x" id fnm) ast srcs
 >                 let z = simplify y
 >                 case executionStage ebs of
->                     DumpDesugar -> pure (TextV $ "\n" ++ prettyIExpr z ++ "\n", ebs, [])
+>                     DumpDesugar -> pure (TextV $ "\n" ++ prettyIExpr z ++ "\n", ebs)
 >                     FullExecution -> do
 >                         v <- {-trace (pretty z) $-} interp z
->                         t <- runAddedTests
+>                         --t <- runAddedTests
 >                         case v of
 >                             VariantV "tuple" [("0", v')
 >                                              ,("1", VariantV "record" _)
 >                                              ,("2", VariantV "record" e)] ->
 >                                 let ne = (henv ebs) {envEnv = e}
->                                 in pure (v',ebs {henv = ne}, t)
+>                                 in pure (v',ebs {henv = ne})
 >                             {-VariantV "tuple" [_,_,_] -> throwInterp $ "expected 3 element tuple, second and third elements records, got " ++ torepr' v
 >                             VariantV "tuple" xs -> throwInterp $ "expected 3 element tuple, got " ++ show (length xs) ++ " element tuple, " ++ torepr' v-}
 >                             VariantV "tuple" [_,_,_] -> throwInterp $ "expected tuple with different types, got: " ++ torepr' v
@@ -357,12 +377,12 @@ store holds the values of variables
 
 > data InterpreterState =
 >     InterpreterState
->     {testResultLog :: [T.TestResultLog]
->     ,isStore :: Store
+>     {{-testResultLog :: [T.TestResultLog]
+>     ,-}isStore :: Store
 >     }
 
 > emptyInterpreterState :: InterpreterState
-> emptyInterpreterState = InterpreterState [] emptyStore
+> emptyInterpreterState = InterpreterState emptyStore
 
 > data InterpreterException = InterpreterException String
 >                           | ValueException Value
@@ -439,7 +459,8 @@ env
 > envLookup nm env =
 >     maybe
 >       --traceStack  "" -- \n----------\n" ++ _showEnvNames env ++"\n-----------\n"
->       (throwUnboundIdentifier nm) pure $ lookup nm (envEnv env)
+>       ({-liftIO (putStrLn $ "throwiden:" ++ nm) >>-}
+>         throwUnboundIdentifier nm) pure $ lookup nm (envEnv env)
 >       -- throwInterp $ "Identifier not found: " ++ nm {-++ "\n" ++ showEnvNames env-})
 >       -- pure $ lookup nm (envEnv env)
 
@@ -553,9 +574,9 @@ ffi catalog
 >    ,("is-tuple", unaryOp anyIn wrapBool isTuple)
 >    ,("is-record", unaryOp anyIn wrapBool isRecord)
 
->    ,("log-check-block", binaryOp unwrapNum unwrapText id logCheckBlock)
->    ,("log-test-pass", binaryOp unwrapNum unwrapText id logTestPass)
->    ,("log-test-fail", ternaryOp unwrapNum unwrapText unwrapText id logTestFail)
+>    --,("log-check-block", binaryOp unwrapNum unwrapText id logCheckBlock)
+>    --,("log-test-pass", binaryOp unwrapNum unwrapText id logTestPass)
+>    --,("log-test-fail", ternaryOp unwrapNum unwrapText unwrapText id logTestFail)
 
 >    ,("provides", unaryOp anyIn id providesImpl)
 
@@ -634,7 +655,7 @@ maybe also have one which takes an ast?
 > runScriptInterp fnm' lenv src =
 >     local (\y -> y {ieEnv = extendEnv lenv $ ieEnv y}) $ do
 >     ast <- either throwInterp pure $ P.parseModule fnm src
->     y <- either throwInterp pure $ runDesugar False fnm ast []
+>     y <- either throwInterp pure $ runDesugar False True fnm ast []
 >     v <- interp (simplify y)
 >     case v of
 >         VariantV "tuple" [("0", v'), _, _] -> pure v'
@@ -650,7 +671,9 @@ maybe also have one which takes an ast?
 
 > runAstInterp :: Module -> Interpreter ()
 > runAstInterp ast = do
->     y <- either throwInterp pure $ runDesugar False "" ast []
+>     --liftIO $ putStrLn $ "run " ++ Pr.prettyModule ast
+>     y <- either throwInterp pure $ runDesugar False True "" ast []
+>     --liftIO $ putStrLn $ "run " ++ prettyIExpr (simplify y)
 >     void $ interp (simplify y)
 
 hardcoded nothing. There is also a syntax version. even though nothing
@@ -767,10 +790,7 @@ created
 > gte a b = throwInterp $ "cannot compare " ++ show a ++ " and " ++ show b
 
 > neq :: Value -> Value -> Interpreter Value
-> neq (NumV a) (NumV b) = pure $ BoolV $ a /= b
-> neq (TextV a) (TextV b) = pure $ BoolV $ a /= b
-> neq (BoolV a) (BoolV b) = pure $ BoolV $ a /= b
-> neq a b = throwInterp $ "cannot compare " ++ show a ++ " and " ++ show b
+> neq a b = pure $ BoolV $ not $ a == b
 
 > ffiprint :: Value -> Interpreter Value
 > ffiprint v = do
@@ -1016,14 +1036,14 @@ desugaring
 
 > type Desugarer = RWST DesugarReader () DesugarState (Except String)
 
-> data DesugarReader = DesugarReader {currentCheckBlockIDName :: Maybe String}
+> data DesugarReader = DesugarReader {} --currentCheckBlockIDName :: Maybe String}
 
 > data DesugarState = DesugarState {uniqueCtr :: Int
->                                  ,nextUnusedCheckBlockID :: Int
->                                  ,nextAnonymousBlockNumber :: Int}
+>                                  --,nextUnusedCheckBlockID :: Int
+>                                  ,nextAnonymousCheckBlockNumber :: Int}
 
 > startingDesugarState :: DesugarState
-> startingDesugarState = DesugarState 0 0 0
+> startingDesugarState = DesugarState 0 0
 
 > makeUniqueVar :: String -> Desugarer String
 > makeUniqueVar pref = state $ \s ->
@@ -1031,8 +1051,15 @@ desugaring
 >     in (pref ++ "-" ++ show suff
 >        ,s {uniqueCtr = suff + 1})
 
-> throwDesugar :: String ->  Expr
-> throwDesugar e = App (Iden "raise") [Text e]
+> getAnonCheckBlockName :: Desugarer String
+> getAnonCheckBlockName = state $ \s ->
+>     let blockNo = nextAnonymousCheckBlockNumber s
+>     in ("check-block-" ++ show blockNo
+>        ,s {nextAnonymousCheckBlockNumber = blockNo + 1})
+
+
+> --throwDesugar :: String ->  Expr
+> --throwDesugar e = App (Iden "raise") [Text e]
   
 > throwDesugarV :: Expr ->  Expr
 > throwDesugarV v = App (Iden "raise") [v]
@@ -1041,8 +1068,8 @@ desugaring
 
 desugaring code
 
-> runDesugar :: Bool -> String -> Module -> [(String,Module)] -> Either String IExpr
-> runDesugar runTests nm ast srcs = fst <$> runExcept (evalRWST go (DesugarReader Nothing) startingDesugarState)
+> runDesugar :: Bool -> Bool -> String -> Module -> [(String,Module)] -> Either String IExpr
+> runDesugar runTests skipBuiltins nm ast srcs = fst <$> runExcept (evalRWST go (DesugarReader {}) startingDesugarState)
 >   where
 >     go = do
 >          srcs' <- desugarEm [] (srcs ++ [(nm,ast)])
@@ -1058,7 +1085,7 @@ desugaring code
 >     -- would make the code more regular and
 >     -- quicker to understand/review?
 >     desugarEm desugaredModules ((n,m):ms) = do
->         dsm <- desugarModule runTests (n == "built-ins") m
+>         dsm <- desugarModule runTests (skipBuiltins || n == "built-ins") m
 >         desugarEm (("module." ++ n, dsm):desugaredModules) ms
 >     combineEm [] = id
 >     combineEm ((n,e):es) = ILet [(n,e)] <$> combineEm es
@@ -1182,24 +1209,45 @@ add the last statement which returns the last value and the env, for
 > desugar (BinOp e0 f e1) = desugar $ App (Iden f) [e0,e1]
 > desugar (UnaryMinus e) = desugar $ App (Iden "-") [e]
 
-> desugar (App (Iden "is") [a,b]) = do
->     checkBlockIDName <- (maybe (throwDesugar "'is' test outside check block") Iden)
->                         <$> (asks currentCheckBlockIDName)
->     desugar $ App (Iden "test-is") [checkBlockIDName
->                          ,Text $ Pr.prettyExpr a ++ " is " ++ Pr.prettyExpr b
->                          ,Lam [] a
->                          ,Lam [] b]
-> 
+a is b
+
+->
+
+test-results := link(test-is("a is b", lam(): a end, lam(): b end), test-results)
+
+> desugar (App (Iden "is") [a,b]) =
+>     desugarStmts [SetVar "test-results"
+>        (App (Iden "link")
+>         [App (Iden "test-is")
+>          [Text $ Pr.prettyExpr a ++ " is " ++ Pr.prettyExpr b
+>          ,Lam [] a
+>          ,Lam [] b]
+>         ,Iden "test-results"])]
 
 > desugar (App (Iden "raises") [e0, e1]) =
->     desugar (App (Iden "raises-satisfies")
+>     desugarStmts [SetVar "test-results"
+>        (App (Iden "link")
+>         [App (Iden "test-raises")
+>          [Text $ Pr.prettyExpr e0 ++ " raises " ++ Pr.prettyExpr e1
+>          ,Lam [] e0
+>          ,e1]
+>         ,Iden "test-results"])]
+> 
+>     {-desugar (App (Iden "raises-satisfies")
 >            [e0
 >            ,lam ["a"] $ (App (Iden "tostring") [Iden "a"] `eq` e1)])
 >   where
->     eq a b = App (Iden "==") [a,b]
+>     eq a b = App (Iden "==") [a,b]-}
 
-> desugar x@(App (Iden "raises-satisfies") [e0,e1]) =
->   desugar =<< desugarRaises (Pr.prettyExpr x) e0 e1
+> desugar (App (Iden "raises-satisfies") [e0,e1]) =
+>     desugarStmts [SetVar "test-results"
+>        (App (Iden "link")
+>         [App (Iden "test-raises-satisfies")
+>          [Text $ Pr.prettyExpr e0 ++ " raises-satisfies " ++ Pr.prettyExpr e1
+>          ,Text $ Pr.prettyExpr e1
+>          ,Lam [] e0
+>          ,Lam [] e1]
+>         ,Iden "test-results"])]
 
 > desugar (App (Iden "or") [a,b]) =
 >     desugar (If [(a, Iden "true")] (Just b))
@@ -1329,21 +1377,38 @@ xxx.make([list: <elements>])
 >     f i = PatName NoShadow i
 
 > desugarStmts :: [Stmt] -> Desugarer IExpr
+
 > desugarStmts (Check nm bdy : es) = do
->     uniqueCheckBlockIDVarName <- makeUniqueVar "check-block-id"
->     desugaredCheck <- local (\x -> x {currentCheckBlockIDName = Just uniqueCheckBlockIDVarName}) $ do
->       s <- get
->       put $ s {nextUnusedCheckBlockID = nextUnusedCheckBlockID s + 1}
->       let uniqueCheckBlockID = Num $ fromIntegral $ nextUnusedCheckBlockID s
->       blockName <- maybe getAnonBlockName pure nm
+
+check:
+  stmt1
+  ..
+end
+
+desugared to:
+
+register-test-block(lam():
+  var test-results = empty
+  desugared stmt1
+  ...
+
+  # return:
+  check-block-results(written-or-generated-test-block0name,reverse(test-results))x
+
+end
+
+>     desugaredCheck <- do
+>       blockName <- maybe getAnonCheckBlockName pure nm
 >       desugar $
->           appI "register-test"
->           [Lam [] (Block $
->                    [LetDecl (patName uniqueCheckBlockIDVarName) uniqueCheckBlockID
->                    ,StExpr $ appI "log-check-block"
->                                [Iden uniqueCheckBlockIDVarName
->                                ,Text blockName]]
->                    ++ bdy)]
+>           appI "register-check-block"
+>           [Lam [] (Block (
+>                    [VarDecl (PatName NoShadow "test-results") (Iden "empty")]
+>                    ++ bdy
+> -- {test-block-name: written-or-generated-test-block0name
+> --  ,results:reverse(test-results)}
+>                    ++ [StExpr $ App (Iden "check-block-results")
+>                                     [Text blockName
+>                                     ,App (Iden "reverse") [(Iden "test-results")]]]))]
 >     case es of
 >         [] -> pure desugaredCheck
 >         _ -> ISeq desugaredCheck <$> desugarStmts es
@@ -1508,7 +1573,7 @@ catch(
     end
   end)
 
-> desugarRaises :: String -> Expr -> Expr -> Desugarer Expr
+> {-desugarRaises :: String -> Expr -> Expr -> Desugarer Expr
 > desugarRaises syn e e1 = do
 >     let failMsg = "The test operation raises-satisfies failed for the test "
 >                   ++ Pr.prettyExpr e1
@@ -1536,7 +1601,7 @@ catch(
 >                              appx "torepr" [Iden "a"]]])
 >   where
 >       plus a b = appx "+" [a,b]
->       appx nm es = App (Iden nm) es
+>       appx nm es = App (Iden nm) es-}
 
 ------------------------------------------------------------------------------
 
@@ -1544,11 +1609,6 @@ catch(
 test infra
 ==========
 
-> getAnonBlockName :: Desugarer String
-> getAnonBlockName = state $ \s ->
->     let blockNo = nextAnonymousBlockNumber s
->     in ("check-block-" ++ show blockNo
->        ,s {nextAnonymousBlockNumber = blockNo + 1})
 
 add-tests(fn)
 takes a function value
@@ -1557,7 +1617,7 @@ these functions are run at the end of the script to do the testing
 log-check-block(unique-block-id, name)
 says there is a new test block with a unique id and it's name
 
-> logCheckBlock :: Scientific -> String -> Interpreter Value
+> {-logCheckBlock :: Scientific -> String -> Interpreter Value
 > logCheckBlock n nm =
 >     nothingWrapper $ \s -> s {testResultLog = T.TestBlock n nm : testResultLog s}
 
@@ -1577,7 +1637,7 @@ log-test-fail(block,id, text of test, fail message)
 > runAddedTests = do
 >     -- temp: tests have already been run, only need to get the results
 >     testLog <- reverse <$> gets testResultLog
->     either throwInterp pure $ T.testLogToCheckResults testLog
+>     either throwInterp pure $ T.testLogToCheckResults testLog-}
 
 
 ------------------------------------------------------------------------------
@@ -1587,8 +1647,8 @@ ffi boilerplate
 
 
 
-> nothingWrapper :: (InterpreterState -> InterpreterState) -> Interpreter Value
-> nothingWrapper f = modify f *> pure nothingValueHack
+> --nothingWrapper :: (InterpreterState -> InterpreterState) -> Interpreter Value
+> --nothingWrapper f = modify f *> pure nothingValueHack
 
 > _unwrapTuple :: (String, Value -> Interpreter [Value])
 > _unwrapTuple = ("Tuple", \case
@@ -1830,11 +1890,12 @@ pretty interpreter syntax
 >             $ runFileTests ("examples/tests/fulltests" </> f))
 >     testFiles
 
-> runFileTests :: FilePath -> IO (Either String [T.CheckResult])
+> runFileTests :: FilePath -> IO (Either String [a])
 > runFileTests fp = do
 >     src <- readFile fp
->     ts <- ev (Just fp) src
->     pure $ Right ts
+>     {- ts <- -}
+>     ev (Just fp) src
+>     pure $ Right [] -- ts
 >   where
 >     ev f src = do
 >         h <- newTeaberryHandle
