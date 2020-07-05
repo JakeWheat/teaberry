@@ -23,11 +23,61 @@ fix dump desugared which had been temporarily disabled but then got
  commented out
 
 TODO:
+DONE: make the handle state the same as the intepreter monad state+reader
 DONE load builtins when initializing handle
 DONE don't save test results in interpreter state
 DONE remove global var for tracking tests
 DONE reduce use of state generally in test system
 
+write the main runscriptinterp which everything else will use
+
+rename rundesugar to compile
+fold simplify and the seq thing into desugar instead of using transform
+
+remove evaluate
+rename the runrwst for interp to evaluate
+  -> write this helper function first or figure out how it all will be written
+
+cache reloading modules if they haven't changed and it's not the
+ direct module that you're loading
+
+compile and run module by module instead of smushing them all into one
+source
+
+fix the canonical name of a module stuff, and the module. crap that's
+ everywhere
+
+figure out new set syntax
+add it to the parser
+figure out how it will work in terms of interp state
+things that it will support:
+  setting the test running settings
+    which tests to run
+    what to print
+    what results to return?
+  dump desugar toggle
+  chose what dump desugar dumps:
+    just the top module
+    all user modules
+    all builtin modules also
+    built-ins also
+
+does it need a special method to run the tests for built-ins.tea
+what about doing a dump-desugar for built-ins.tea
+what about a flag to create a embedded handle without autoloading built-ins.tea
+
+refactor all the code to remove all the junk output when running all
+the tasty tests
+
+preserve the reader/state for desugar in a embedded handle
+-> especially to work towards having globally unique freshvars
+
+
+todo for testing:
+  figure out how to run tests in built-ins
+  setting to skip tests, to run tests only for direct module, for all user modules,
+  or for all built in modules that are imported too (apart form
+   built-ins.tea itself which is separate?)
 
 
 =============================================================================
@@ -174,41 +224,17 @@ embedded api
   
 > newTeaberryHandle :: IO TeaberryHandle
 > newTeaberryHandle = do
->     let rts = defaultRuntimeState
+>     th <- TeaberryHandle <$> newIORef defaultRuntimeState
 >     -- load builtins
 >     d <- getBuiltInModulesDir
 >     src <- liftIO $ readFile (d </> "built-ins.tea")
->     let f = do
->             ast <- either throwInterp pure $ P.parseModule (d </> "built-ins.tea") src
->             y <- either throwInterp pure $ runDesugar True "built-ins" ast []
->             --liftIO $ putStrLn $ prettyIExpr y
->             v <- interp y
->             case v of
->                 VariantV "tuple" [("0", _)
->                                  ,("1", VariantV "record" _)
->                                  ,("2", VariantV "record" e)
->                                  ,("3", _)] ->
->                     let ne = let x = (henv rts)
->                             in x {ieEnv = (ieEnv x) {envEnv = e}}
->                     in pure ne
->                 VariantV "tuple" [_,_,_,_] -> throwInterp $ "expected tuple<value,record,record,fun>, got: " ++ torepr' v
->                 VariantV "tuple" fs -> throwInterp $ "expected 4 element tuple, got " ++ show (length fs) ++ " element tuple with " ++ intercalate "," (map (valueTypeName . snd) fs)
->                 _ -> throwInterp $ "expected 4 element tuple, got non tuple: " ++ torepr' v
->     (ie,s,_w) <- runRWST f (henv rts) (hstate rts)
->     x <- newIORef (RuntimeState ie s)
->     pure $ TeaberryHandle x
-
+>     _ <- evaluateWithHandle th (runSrcInterp True (Just (d </> "built-ins.tea")) src)
+>     pure th
   
 > runScript :: TeaberryHandle -> Maybe String -> [(String,Value)] -> String -> IO Value
-> runScript h fnm lenv src = do
->     ebs <- readIORef (tbh h)
->     let ebs' = updateRTSEnv (extendEnv lenv) ebs
->     (v,ebs'', _) <- evaluate fnm ebs' src
->     -- if you press ctrl-c in between the start of
->     -- writeioref and if finishing, or even at another time,
->     -- can this write become corrupted?
->     writeIORef (tbh h) ebs''
->     pure v
+> runScript th mfn lenv src =
+>     fst <$> (evaluateWithHandle th $
+>          runWithEnv lenv $ runSrcWithLoadInterp False mfn src)
 
 > runScriptWithTests :: TeaberryHandle -> Maybe String -> [(String,Value)] -> String -> IO [T.CheckResult]
 > runScriptWithTests h fnm lenv src = do
@@ -232,6 +258,16 @@ embedded api
 >     VariantV "nothing" [] -> Nothing
 >     _ -> Just $ torepr' v
 
+> evaluateWithHandle :: TeaberryHandle
+>                    -> Interpreter ([(String,Value)], a)
+>                    -> IO a
+> evaluateWithHandle h f = do
+>     rts <- readIORef (tbh h)
+>     (x,s,_) <- runRWST f (henv rts) (hstate rts)
+>     let ie = let y = (henv rts)
+>              in y {ieEnv = (ieEnv y) {envEnv = fst x}} 
+>     writeIORef (tbh h) $ RuntimeState ie s
+>     pure (snd x)
 
 ---------------------------------------
 
@@ -296,7 +332,7 @@ hacky top level evaluate. not really sure if it will pay its way once
 
 recursively load all the referenced modules in the source given
 
-> loadSourceFiles :: Maybe FilePath ->  String -> String -> Interpreter (Module, [(String,Module)])
+> loadSourceFiles :: Maybe FilePath -> String -> String -> Interpreter (Module, [(String,Module)])
 > loadSourceFiles mfnm buildInModDir src = do
 >     -- todo: memoize so loading a module twice doesn't read the
 >     -- file and parse it twice
@@ -622,11 +658,6 @@ ffi catalog
 >    ,("haskell-cons-cr", binaryOp unwrapDyn unwrapDyn wrapDyn haskellConsCr)
 >    ,("make-cr", binaryOp unwrapText unwrapList id makeCr)
 
-
-
->    ,("provides", unaryOp anyIn id providesImpl)
-
-
 >    ,("provides", unaryOp anyIn id providesImpl)
 
 >    ,("mhs", unaryOp unwrapText pure makeHaskellString)
@@ -715,9 +746,17 @@ dodgy: returns an empty string if index is out of range
 > stringToNumber :: String -> Interpreter Value
 > stringToNumber s = case readMaybe s of
 >     Just x -> runFunctionInterp "some" [NumV x]
->     Nothing -> runScriptInterp Nothing [] "none"
+>     Nothing -> runSimpleInterp "none"
 
-maybe also have one which takes an ast?
+> runSimpleInterp :: String -> Interpreter Value
+> runSimpleInterp src = do
+>    (fst . snd) <$> runSrcInterp True Nothing src
+
+> runFunctionInterp :: String -> [Value] -> Interpreter Value
+> runFunctionInterp f as = do
+>     v <- runScriptInterp Nothing [] f
+>     let as' = zipWith (\i x -> ("aaa-" ++ show i, x)) [(0::Int)..] as
+>     runScriptInterp Nothing (("fff", v):as') $ "fff(" ++ intercalate "," (map fst as') ++ ")"
 
 > runScriptInterp :: Maybe FilePath -> [(String,Value)] -> String -> Interpreter Value
 > runScriptInterp fnm' lenv src =
@@ -732,18 +771,77 @@ maybe also have one which takes an ast?
 >   where
 >     fnm = maybe "" id fnm'
 
-> runFunctionInterp :: String -> [Value] -> Interpreter Value
-> runFunctionInterp f as = do
->     v <- runScriptInterp Nothing [] f
->     let as' = zipWith (\i x -> ("aaa-" ++ show i, x)) [(0::Int)..] as
->     runScriptInterp Nothing (("fff", v):as') $ "fff(" ++ intercalate "," (map fst as') ++ ")"
+
+> runWithEnv :: [(String,Value)] -> Interpreter a -> Interpreter a
+> runWithEnv lenv f = local (\y -> y {ieEnv = extendEnv lenv $ ieEnv y}) f
+
+> runSrcWithLoadInterp :: Bool
+>                      -> Maybe FilePath
+>                      -> String
+>                      -> Interpreter ([(String,Value)], (Value,Value))
+> runSrcWithLoadInterp skipTestsForBuiltins mfn src = do
+>     d <- liftIO $ getBuiltInModulesDir
+>     srcs <- loadSourceFiles mfn d src
+>     runAstInterpNew skipTestsForBuiltins mfn srcs
+
+
+> runSrcInterp :: Bool
+>              -> Maybe FilePath
+>              -> String
+>              -> Interpreter ([(String,Value)], (Value,Value))
+> runSrcInterp skipTestsForBuiltins mfn src = do
+>     ast <- either throwInterp pure $ P.parseModule "" src
+>     runAstInterpNew skipTestsForBuiltins mfn (ast,[])
 
 > runAstInterp :: Module -> Interpreter ()
-> runAstInterp ast = do
->     --liftIO $ putStrLn $ "run " ++ Pr.prettyModule ast
->     y <- either throwInterp pure $ runDesugar False "" ast []
->     --liftIO $ putStrLn $ "run " ++ prettyIExpr y
->     void $ interp y
+> runAstInterp ast = void $ runAstInterpNew True Nothing (ast,[])
+
+the new thing: all the 'eval' stuff (runscriptinterp, etc.) plus the
+external stuff that runs code (load builtins in newhandle,
+runscript/etc. in handle api, evaluate) to all use this
+
+take an ast with additional modules that it needs that aren't already
+loaded (temp)
+run it
+return the resulting return value, the resulting env, and a function
+to run any tests from the script
+
+> runAstInterpNew :: Bool -- skip tests (temp hack used when loading built-ins)
+>                 -> Maybe FilePath
+>                 -> (Module, [(String,Module)])
+>                 -> Interpreter ([(String,Value)]
+>                                ,(Value,Value))
+> runAstInterpNew skipTestsForBuiltins mfn (ast,srcs) = do
+>     let fn = maybe "toplevel.x" id mfn
+>     compiled <- either throwInterp pure $
+>         runDesugar skipTestsForBuiltins fn ast srcs
+>     interpRes <- interp compiled
+>     case interpRes of
+>         VariantV "tuple" [("0", v)
+>                          ,("1", VariantV "record" _)
+>                          ,("2", VariantV "record" e)
+>                          ,("3", testFn)
+>                          ] ->
+>             pure (e, (v,testFn))
+>         VariantV "tuple" [_,_,_,_] ->
+>             throwInterp $ "expected tuple<value,record,record,fun>, got: "
+>                 ++ torepr' interpRes
+>         VariantV "tuple" fs ->
+>             throwInterp $ "expected 4 element tuple, got "
+>                 ++ show (length fs) ++ " element tuple with "
+>                 ++ intercalate "," (map (valueTypeName . snd) fs)
+>         _ -> throwInterp $ "expected 4 element tuple, got non tuple: "
+>                 ++ torepr' interpRes
+
+
+adaptors:
+parse
+run loadsourcefiles
+add env
+extract and run tests
+run function
+
+-------------------
 
 hardcoded nothing. There is also a syntax version. even though nothing
 is defined in built in, it needs bootstrapping like list because a
