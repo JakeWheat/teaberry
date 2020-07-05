@@ -217,17 +217,24 @@ embedded api
 >                                    ,hstate = emptyInterpreterState
 >                                    {-,executionStage = FullExecution-}}
   
-> data ExecutionStage = FullExecution
+> {-data ExecutionStage = FullExecution
 >                     | DumpDesugar
->                     deriving (Eq,Show)
-  
+>                     deriving (Eq,Show)-}
+
+temp while come up with a better way to do this
+
+> runBuiltinTests :: Bool
+> runBuiltinTests = False
+
 > newTeaberryHandle :: IO TeaberryHandle
 > newTeaberryHandle = do
 >     th <- TeaberryHandle <$> newIORef defaultRuntimeState
 >     -- load builtins
 >     d <- getBuiltInModulesDir
 >     src <- liftIO $ readFile (d </> "built-ins.tea")
->     _ <- evaluateWithHandle th (runSrcInterp True (Just (d </> "built-ins.tea")) src)
+>     x <- evaluateWithHandle th (runSrcInterp True (Just (d </> "built-ins.tea")) src)
+>     when runBuiltinTests $ do
+>         void $ evaluateWithHandle th $ runFunctionInterp "lam(x): x() end" [snd x]
 >     pure th
   
 > runScript :: TeaberryHandle -> Maybe String -> [(String,Value)] -> String -> IO Value
