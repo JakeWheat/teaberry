@@ -30,12 +30,16 @@ DONE remove global var for tracking tests
 DONE reduce use of state generally in test system
 
 DONE write the main runscriptinterp which everything else will use
+DONE remove evaluate
+DONE rename the runrwst for interp to evaluate
+
+temp add some sort of dump desugar back in?
+
+also todo:
 
 rename rundesugar to compile
 fold simplify and the seq thing into desugar instead of using transform
 
-DONE remove evaluate
-DONE rename the runrwst for interp to evaluate
 
 cache reloading modules if they haven't changed and it's not the
  direct module that you're loading
@@ -43,7 +47,7 @@ cache reloading modules if they haven't changed and it's not the
 compile and run module by module instead of smushing them all into one
 source
 
-fix the canonical name of a module stuff, and the module. crap that's
+fix the canonical name of a module stuff, and the "module." crap that's
  everywhere
 
 figure out new set syntax
@@ -227,9 +231,14 @@ embedded api
 >     pure th
   
 > runScript :: TeaberryHandle -> Maybe String -> [(String,Value)] -> String -> IO Value
-> runScript th mfn lenv src =
->     fst <$> (evaluateWithHandle th $
->          runWithEnv lenv $ runSrcWithLoadInterp False mfn src)
+> runScript th mfn lenv src = do
+>     x <- (evaluateWithHandle th $
+>           runWithEnv lenv $ runSrcWithLoadInterp False mfn src)
+>     -- run the tests by default
+>     _  <- evaluateWithHandle th $ runFunctionInterp "lam(x): x() end" [snd x]
+>     pure $ fst x
+
+runs a script and returns the test results in haskell format, a bit hacky
 
 > runScriptWithTests :: TeaberryHandle
 >                    -> Maybe String
