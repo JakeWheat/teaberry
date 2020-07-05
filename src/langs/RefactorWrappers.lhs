@@ -29,14 +29,13 @@ DONE don't save test results in interpreter state
 DONE remove global var for tracking tests
 DONE reduce use of state generally in test system
 
-write the main runscriptinterp which everything else will use
+DONE write the main runscriptinterp which everything else will use
 
 rename rundesugar to compile
 fold simplify and the seq thing into desugar instead of using transform
 
-remove evaluate
-rename the runrwst for interp to evaluate
-  -> write this helper function first or figure out how it all will be written
+DONE remove evaluate
+DONE rename the runrwst for interp to evaluate
 
 cache reloading modules if they haven't changed and it's not the
  direct module that you're loading
@@ -209,10 +208,6 @@ embedded api
 >     --,executionStage :: ExecutionStage
 >     }
 
-> updateRTSEnv :: (Env -> Env) -> RuntimeState -> RuntimeState
-> updateRTSEnv f (RuntimeState e s) =
->     RuntimeState (e {ieEnv = f (ieEnv e)}) s
-
 > defaultRuntimeState :: RuntimeState
 > defaultRuntimeState = RuntimeState {henv = makeInterpreterEnv defaultEnv
 >                                    ,hstate = emptyInterpreterState
@@ -236,14 +231,25 @@ embedded api
 >     fst <$> (evaluateWithHandle th $
 >          runWithEnv lenv $ runSrcWithLoadInterp False mfn src)
 
-> runScriptWithTests :: TeaberryHandle -> Maybe String -> [(String,Value)] -> String -> IO [T.CheckResult]
-> runScriptWithTests h fnm lenv src = do
->     ebs <- readIORef (tbh h)
->     let ebs' = updateRTSEnv (extendEnv lenv) ebs
->     (_v,ebs'',t) <- evaluate fnm ebs' src
->     writeIORef (tbh h) ebs''
->     pure t
-
+> runScriptWithTests :: TeaberryHandle
+>                    -> Maybe String
+>                    -> [(String,Value)]
+>                    -> String
+>                    -> IO [T.CheckResult]
+> runScriptWithTests th mfn lenv src = do
+>     runTests <- snd <$> (evaluateWithHandle th $ runWithEnv lenv $ runSrcWithLoadInterp False mfn src)
+>     evaluateWithHandle th $ f runTests
+>   where
+>     f :: Value -> Interpreter ([(String,Value)], [T.CheckResult])
+>     f runTests = do
+>         (x,tv) <- runFunctionInterp "lam(x): test-results-to-haskell(x()) end" [runTests]
+>         -- liftIO $ putStrLn "here2"
+>         (x,) <$> case tv of
+>                  FFIVal cs' ->
+>                      case fromDynamic cs' of
+>                          Just trs -> pure (trs :: [T.CheckResult])
+>                          Nothing -> throwInterp $ "expected [checkresult], got " ++ show cs'
+>                  _ -> throwInterp $ "expected FFIVal, got " ++ show tv
 
 > runFunction :: TeaberryHandle -> String -> [Value] -> IO Value
 > runFunction h f as = do
@@ -268,117 +274,6 @@ embedded api
 >              in y {ieEnv = (ieEnv y) {envEnv = fst x}} 
 >     writeIORef (tbh h) $ RuntimeState ie s
 >     pure (snd x)
-
----------------------------------------
-
-evaluate
-========
-
-hacky top level evaluate. not really sure if it will pay its way once
- the kruft is refactored, since it isn't part of the user api either
-
-> evaluate :: Maybe String
->           -> RuntimeState
->           -> String
->           -> IO (Value, RuntimeState, [T.CheckResult])
-> evaluate fnm rts src = do
->     d <- getBuiltInModulesDir
->     ((v,ie,ts),s,_w) <- runRWST (f d) (henv rts) (hstate rts)
->     pure (v, RuntimeState ie s, ts)
->   where
->     f :: FilePath -> Interpreter (Value, InterpreterEnv, [T.CheckResult])
->     f d =
->         -- quick hack for set
->         {-case P.parseSet src of
->             Right (k,v)
->               | k == "dump-desugar" -> do
->                 case v of
->                      "t" -> pure (TextV "set dump desugar on", ebs {executionStage = DumpDesugar }, [])
->                      "f" -> pure (TextV "set full execution on", ebs {executionStage = FullExecution }, [])
->                      _ -> throwInterp $ "bad value for dump-desugar, expected t or f, got " ++ v
->               | otherwise -> throwInterp $ "unrecognised set key: " ++ k
->             Left _ ->-}  do
->                 (ast,srcs) <- loadSourceFiles fnm d src
->                 y <- either throwInterp pure $ runDesugar False (maybe "toplevel.x" id fnm) ast srcs
->                 --case executionStage ebs of
->                 --    DumpDesugar -> pure (TextV $ "\n" ++ prettyIExpr y ++ "\n", ebs, [])
->                 {-    FullExecution ->-}
->                 do
->                         v <- {-trace (pretty z) $-} interp y
->                         case v of
->                             VariantV "tuple" [("0", v')
->                                              ,("1", VariantV "record" _)
->                                              ,("2", VariantV "record" e)
->                                              ,("3", testFn)
->                                              ] -> do
->                                 -- liftIO $ putStrLn "here1"
->                                 -- this is a hack to convert the in language test results
->                                 -- to the other kind of thing that the temp tasty tests convertor
->                                 -- needs
->                                 tv <- runFunctionInterp "lam(x): test-results-to-haskell(x()) end" [testFn]
->                                 -- liftIO $ putStrLn "here2"
->                                 t <- case tv of
->                                          FFIVal cs' ->
->                                              case fromDynamic cs' of
->                                                  Just x -> pure x
->                                                  Nothing -> throwInterp $ "expected [checkresult], got " ++ show cs'
->                                          _ -> throwInterp $ "expected FFIVal, got " ++ show tv
->                                 let ne = let x = (henv rts)
->                                          in x {ieEnv = (ieEnv x) {envEnv = e}}
->                                 pure (v',ne, t)
->                             VariantV "tuple" [_,_,_,_] -> throwInterp $ "expected tuple<value,record,record,fun>, got: " ++ torepr' v
->                             VariantV "tuple" fs -> throwInterp $ "expected 4 element tuple, got " ++ show (length fs) ++ " element tuple with " ++ intercalate "," (map (valueTypeName . snd) fs)
->                             _ -> throwInterp $ "expected 4 element tuple, got non tuple: " ++ torepr' v
-
-recursively load all the referenced modules in the source given
-
-> loadSourceFiles :: Maybe FilePath -> String -> String -> Interpreter (Module, [(String,Module)])
-> loadSourceFiles mfnm buildInModDir src = do
->     -- todo: memoize so loading a module twice doesn't read the
->     -- file and parse it twice
->     (ast,rs) <- parseMod src
->     -- reverse the list to put dependencies first
->     -- nub it so it only includes each dependency once
->     x <- (nubBy (\a b -> fst a == fst b) . reverse . concat)
->          <$> mapM loadAndRecurse rs
->     pure (ast, x)
->   where
->     fnm = maybe "" id mfnm
->     cwd = takeDirectory fnm
->     -- parse the file, get the imports
->     -- recurse on these imports, returning the filename and the
->     -- file contents
->     parseMod s = either throwInterp pure $ do
->                  ast@(Module ps _) <- P.parseModule fnm s -- todo: get the filename in here
->                  let rs = mapMaybe getImp ps
->                  pure (ast, rs)
->     f nm s = do
->              (ast,rs) <- parseMod s
->              ((nm,ast):) . concat <$> mapM loadAndRecurse rs
->     -- todo: a bit confused
->     -- what is the canonical name of a module?
->     -- it's not exactly the same as the file path
->     -- and it's definitely not the filepath of built in modules
->     -- try to find a single place to have this resolution
->     -- it's also used in the desugaring of prelude statements
->     -- before packages, hierarchical names and builtins being
->     -- in different namespaces, it should be the name of the built in
->     -- used by the user (no .tea, no path)
->     -- or the path used in import file(x), with any .tea removed
->     -- and the directory removed if there is one      
->     loadAndRecurse is = do
->         (fn,mn) <- case is of
->                   ImportSpecial "file" [n] -> pure (cwd </> n,n)
->                   ImportSpecial x _ -> throwInterp $ "import special with " ++ x ++ " not supported"
->                   ImportName n -> pure (buildInModDir </> n ++ ".tea", n)
->         x <- liftIO $ readFile fn
->         f mn x
->     getImp (Import fn _) = Just fn
->     getImp (Include fn) = Just fn
->     getImp _ = Nothing
-
-> getBuiltInModulesDir :: IO FilePath
-> getBuiltInModulesDir = getDataFileName "built-in-modules-snapshot3"
 
 ---------------------------------------
 
@@ -481,7 +376,7 @@ language exceptions
 
 > raiseValue :: Expr -> Interpreter a
 > raiseValue e = do
->     runAstInterp $ Module [] [StExpr $ eapp "raise" [e]]
+>     runAstInterpVoid $ Module [] [StExpr $ eapp "raise" [e]]
 >     throwInterp "internal error: should have raised"
 
 > eapp :: String -> [Expr] -> Expr
@@ -745,73 +640,27 @@ dodgy: returns an empty string if index is out of range
 
 > stringToNumber :: String -> Interpreter Value
 > stringToNumber s = case readMaybe s of
->     Just x -> runFunctionInterp "some" [NumV x]
+>     Just x -> snd <$> runFunctionInterp "some" [NumV x]
 >     Nothing -> runSimpleInterp "none"
 
-> runSimpleInterp :: String -> Interpreter Value
-> runSimpleInterp src = do
->    (fst . snd) <$> runSrcInterp True Nothing src
+--------------------------------------
 
-> runFunctionInterp :: String -> [Value] -> Interpreter Value
-> runFunctionInterp f as = do
->     v <- runScriptInterp Nothing [] f
->     let as' = zipWith (\i x -> ("aaa-" ++ show i, x)) [(0::Int)..] as
->     runScriptInterp Nothing (("fff", v):as') $ "fff(" ++ intercalate "," (map fst as') ++ ")"
+main interpreter functions
 
-> runScriptInterp :: Maybe FilePath -> [(String,Value)] -> String -> Interpreter Value
-> runScriptInterp fnm' lenv src =
->     local (\y -> y {ieEnv = extendEnv lenv $ ieEnv y}) $ do
->     ast <- either throwInterp pure $ P.parseModule fnm src
->     y <- either throwInterp pure $ runDesugar False fnm ast []
->     --liftIO $ putStrLn $ "******************\n" ++ prettyIExpr y ++ "\n*****************\n"
->     v <- interp y
->     case v of
->         VariantV "tuple" [("0", v'), _, _, _] -> pure v'
->         _ -> throwInterp $ "expected tuple<Value,_,_,_>, got " ++ torepr' v
->   where
->     fnm = maybe "" id fnm'
-
-
-> runWithEnv :: [(String,Value)] -> Interpreter a -> Interpreter a
-> runWithEnv lenv f = local (\y -> y {ieEnv = extendEnv lenv $ ieEnv y}) f
-
-> runSrcWithLoadInterp :: Bool
->                      -> Maybe FilePath
->                      -> String
->                      -> Interpreter ([(String,Value)], (Value,Value))
-> runSrcWithLoadInterp skipTestsForBuiltins mfn src = do
->     d <- liftIO $ getBuiltInModulesDir
->     srcs <- loadSourceFiles mfn d src
->     runAstInterpNew skipTestsForBuiltins mfn srcs
-
-
-> runSrcInterp :: Bool
->              -> Maybe FilePath
->              -> String
->              -> Interpreter ([(String,Value)], (Value,Value))
-> runSrcInterp skipTestsForBuiltins mfn src = do
->     ast <- either throwInterp pure $ P.parseModule "" src
->     runAstInterpNew skipTestsForBuiltins mfn (ast,[])
-
-> runAstInterp :: Module -> Interpreter ()
-> runAstInterp ast = void $ runAstInterpNew True Nothing (ast,[])
-
-the new thing: all the 'eval' stuff (runscriptinterp, etc.) plus the
-external stuff that runs code (load builtins in newhandle,
-runscript/etc. in handle api, evaluate) to all use this
+the central one:
 
 take an ast with additional modules that it needs that aren't already
-loaded (temp)
+loaded (temporary)
 run it
-return the resulting return value, the resulting env, and a function
-to run any tests from the script
 
-> runAstInterpNew :: Bool -- skip tests (temp hack used when loading built-ins)
->                 -> Maybe FilePath
->                 -> (Module, [(String,Module)])
->                 -> Interpreter ([(String,Value)]
->                                ,(Value,Value))
-> runAstInterpNew skipTestsForBuiltins mfn (ast,srcs) = do
+return the the resulting env, the value of the last line of the
+script, and a function to run any tests from the script
+
+> runAstInterp :: Bool -- skip tests (temp hack used when loading built-ins)
+>              -> Maybe FilePath
+>              -> (Module, [(String,Module)])
+>              -> Interpreter ([(String,Value)],(Value,Value))
+> runAstInterp skipTestsForBuiltins mfn (ast,srcs) = do
 >     let fn = maybe "toplevel.x" id mfn
 >     compiled <- either throwInterp pure $
 >         runDesugar skipTestsForBuiltins fn ast srcs
@@ -834,12 +683,103 @@ to run any tests from the script
 >                 ++ torepr' interpRes
 
 
-adaptors:
-parse
-run loadsourcefiles
-add env
-extract and run tests
-run function
+run a simple script without imports and return the value
+
+> runSimpleInterp :: String -> Interpreter Value
+> runSimpleInterp src = do
+>    (fst . snd) <$> runSrcInterp True Nothing src
+
+run a simple ast and return nothing
+
+> runAstInterpVoid :: Module -> Interpreter ()
+> runAstInterpVoid ast = void $ runAstInterp True Nothing (ast,[])
+
+
+run a function with args passed as values
+
+> runFunctionInterp :: String -> [Value] -> Interpreter ([(String,Value)],Value)
+> runFunctionInterp f as = do
+>     v <- runSrcInterp True Nothing f
+>     let as' = zipWith (\i x -> ("aaa-" ++ show i, x)) [(0::Int)..] as
+>     (\(x,(y,_)) -> (x,y)) <$>
+>         (runWithEnv (("fff", fst (snd v)):as') $
+>          runSrcInterp True Nothing $ "fff(" ++ intercalate "," (map fst as') ++ ")")
+
+run a script with additional bindings
+
+> runWithEnv :: [(String,Value)] -> Interpreter a -> Interpreter a
+> runWithEnv lenv f = local (\y -> y {ieEnv = extendEnv lenv $ ieEnv y}) f
+
+run a script wihtout imports, including parsing it
+
+> runSrcInterp :: Bool
+>              -> Maybe FilePath
+>              -> String
+>              -> Interpreter ([(String,Value)], (Value,Value))
+> runSrcInterp skipTestsForBuiltins mfn src = do
+>     ast <- either throwInterp pure $ P.parseModule "" src
+>     runAstInterp skipTestsForBuiltins mfn (ast,[])
+
+run a script by parsing it and also loading all imports recursively
+
+> runSrcWithLoadInterp :: Bool
+>                      -> Maybe FilePath
+>                      -> String
+>                      -> Interpreter ([(String,Value)], (Value,Value))
+> runSrcWithLoadInterp skipTestsForBuiltins mfn src = do
+>     d <- liftIO $ getBuiltInModulesDir
+>     srcs <- loadSourceFiles mfn d src
+>     runAstInterp skipTestsForBuiltins mfn srcs
+
+recursively load all the referenced modules in the source given
+
+> loadSourceFiles :: Maybe FilePath -> String -> String -> Interpreter (Module, [(String,Module)])
+> loadSourceFiles mfnm buildInModDir src = do
+>     -- todo: memoize so loading a module twice doesn't read the
+>     -- file and parse it twice
+>     (ast,rs) <- parseMod src
+>     -- reverse the list to put dependencies first
+>     -- nub it so it only includes each dependency once
+>     x <- (nubBy (\a b -> fst a == fst b) . reverse . concat)
+>          <$> mapM loadAndRecurse rs
+>     pure (ast, x)
+>   where
+>     fnm = maybe "" id mfnm
+>     cwd = takeDirectory fnm
+>     -- parse the file, get the imports
+>     -- recurse on these imports, returning the filename and the
+>     -- file contents
+>     parseMod s = either throwInterp pure $ do
+>                  ast@(Module ps _) <- P.parseModule fnm s -- todo: get the filename in here
+>                  let rs = mapMaybe getImp ps
+>                  pure (ast, rs)
+>     f nm s = do
+>              (ast,rs) <- parseMod s
+>              ((nm,ast):) . concat <$> mapM loadAndRecurse rs
+>     -- todo: a bit confused
+>     -- what is the canonical name of a module?
+>     -- it's not exactly the same as the file path
+>     -- and it's definitely not the filepath of built in modules
+>     -- try to find a single place to have this resolution
+>     -- it's also used in the desugaring of prelude statements
+>     -- before packages, hierarchical names and builtins being
+>     -- in different namespaces, it should be the name of the built in
+>     -- used by the user (no .tea, no path)
+>     -- or the path used in import file(x), with any .tea removed
+>     -- and the directory removed if there is one      
+>     loadAndRecurse is = do
+>         (fn,mn) <- case is of
+>                   ImportSpecial "file" [n] -> pure (cwd </> n,n)
+>                   ImportSpecial x _ -> throwInterp $ "import special with " ++ x ++ " not supported"
+>                   ImportName n -> pure (buildInModDir </> n ++ ".tea", n)
+>         x <- liftIO $ readFile fn
+>         f mn x
+>     getImp (Import fn _) = Just fn
+>     getImp (Include fn) = Just fn
+>     getImp _ = Nothing
+
+> getBuiltInModulesDir :: IO FilePath
+> getBuiltInModulesDir = getDataFileName "built-in-modules-snapshot3"
 
 -------------------
 
