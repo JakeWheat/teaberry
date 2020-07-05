@@ -234,9 +234,8 @@ end
 
 # run and render tests
 
-fun render-test(tr):
-  "test (" + tr.src + "): "
-    + cases(Test-result) tr:
+fun render-result(tr):
+  cases(Test-result) tr:
     | passed(_) => "OK"
     | values-not-equal(_,a,b) => "failed, reason:\n"
         + indent("Values not equal:\n" + torepr(a) + "\n" + torepr(b))
@@ -249,6 +248,10 @@ fun render-test(tr):
         + indent("no exception raised, expected " + tostring(e))
     | else => "no render for " + tostring(tr)
   end
+end
+
+fun render-test(tr):
+  "test (" + tr.src + "): " + render-result(tr)
 end
 
 render-check = lam(cbr): block:
@@ -284,26 +287,40 @@ render-check-results = lam(lst): block:
     + " test passed in all check blocks"
 end end
 
+fun test-results-to-haskell(lst):
+  var a = make-check-result-list()
+  fun conv-tr(cr):
+    fun f(x):
+      cases (Test-result) x:
+        | passed(src) => {src;"OK"}
+        | else => {src;render-test(x)}
+      end
+    end
+    make-cr(cr.name, map(f,cr.test-results))
+  end
+ 
+  _ = map(lam(x): block:
+        cr = conv-tr(x)
+        a := haskell-cons-cr(cr, a)
+      end
+    end, lst)
+  a
+end
 
 fun run-all-tests():
   #print("rat")
-  when tests-to-run <>empty:
+  when tests-to-run <> empty:
     block:
-      #print("rat2")
-    # todo: figure out why this syntax isn't working:
-    # _ = map(_(), reverse(tests-to-run))
+      # todo: figure out why this syntax isn't working:
+      # _ = map(_(), reverse(tests-to-run))
 
-    #print("run all tests")
-      #print("num are: " + tostring(length(reverse(tests-to-run))))
-    r = map(lam(f): f() end, reverse(tests-to-run))
-    #print("-----------------------------------")
-    #print("-----------------------------------")
-    #print("-----------------------------------")
+      r = map(lam(f): f() end, reverse(tests-to-run))
     
       print(render-check-results(r))
+      temp-add-check-results(test-results-to-haskell(r))
 
       #print(tostring(rts))
-      fun tempaddit(c):
+      #|fun tempaddit(c):
         #print("ta")
         fun f(x):
           #print(tostring(x))
@@ -314,9 +331,10 @@ fun run-all-tests():
         end
         temp-add-check-result(c.name, map(f,c.test-results))
       end
-      map(tempaddit, r)
-
-    tests-to-run := empty
-    nothing
-  end end
+      map(tempaddit, r)|#
+      
+      tests-to-run := empty
+      nothing
+    end
+  end
 end

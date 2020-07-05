@@ -68,7 +68,7 @@ imports
 > import Scientific (Scientific, divideScientific, showScientific)
 > import Data.List (intercalate, nubBy, sortOn, findIndex, isPrefixOf, tails, find, nub, (\\))
 
-> --import Debug.Trace (trace, traceStack)
+> import Debug.Trace (trace {-, traceStack-})
 > --import qualified TestUtils as T
 
 > import Data.IORef (IORef, newIORef, readIORef, writeIORef)
@@ -76,7 +76,7 @@ imports
 > import Paths_teaberry
 > import System.FilePath ((</>), takeDirectory)
 
-> import Data.Dynamic (Dynamic, toDyn, fromDynamic)
+> import Data.Dynamic (Dynamic, toDyn, fromDynamic, Typeable)
 
 > import qualified TestUtils as T
 >     (TestTree
@@ -458,7 +458,7 @@ env
 >        -- check for matching function, but wrong number of args
 >        | Just f <- find ((== nm) . fst . fst) $ envForeignFuns env
 >          -> if length (snd $ fst f) == length tys
->             then throwWrongTypes (snd $ fst f) tys
+>             then trace (show nm) $ throwWrongTypes (snd $ fst f) tys
 >             else throwWrongNumberOfArgs (length (snd $ fst f)) (length tys)
 >        | otherwise -> throwInterp $ "ffi function not found: " ++ nm ++ "(" ++ intercalate "," tys ++")"
 >   where
@@ -554,7 +554,16 @@ ffi catalog
 >    ,("is-tuple", unaryOp anyIn wrapBool isTuple)
 >    ,("is-record", unaryOp anyIn wrapBool isRecord)
 
->    ,("temp-add-check-result", binaryOp unwrapText unwrapList id tempAddCheckResult)
+>    --,("temp-add-check-result", binaryOp unwrapText unwrapList id tempAddCheckResult)
+>    ,("temp-add-check-results", unaryOp unwrapDyn id tempAddCheckResults)
+>    ,("make-check-result-list", nullaryOp pure makeCheckResultList)
+>    ,("haskell-cons-cr", binaryOp unwrapDyn unwrapDyn wrapDyn haskellConsCr)
+>    ,("make-cr", binaryOp unwrapText unwrapList id makeCr)
+
+
+
+>    ,("provides", unaryOp anyIn id providesImpl)
+
 
 >    ,("provides", unaryOp anyIn id providesImpl)
 
@@ -580,7 +589,7 @@ ffi catalog
 >                         ,("false", BoolV False)]}
 
 
-> tempAddCheckResult :: String -> [Value] -> Interpreter Value
+> {-tempAddCheckResult :: String -> [Value] -> Interpreter Value
 > tempAddCheckResult nm vs = do
 >     cs <- mapM f vs
 >     -- liftIO $ putStrLn $ "add tests " ++ nm ++ " " ++ show (length cs)
@@ -591,13 +600,37 @@ ffi catalog
 >         pure (msg, Nothing)
 >     f (VariantV "tuple" [("0",TextV msg), ("1",TextV fm)]) =
 >         pure (msg, Just fm)
->     f x = throwInterp $ "expected tuple of text,text, got " ++ show x
+>     f x = throwInterp $ "expected tuple of text,text, got " ++ show x-}
+
+
+> tempAddCheckResults :: [T.CheckResult] -> Interpreter Value
+> tempAddCheckResults vs = do
+>     modify $ \s -> s { tempCheckResults = vs ++ tempCheckResults s }
+>     pure $ nothingValueHack
+
+
+> makeCheckResultList :: Value
+> makeCheckResultList = FFIVal $ toDyn ([] :: [T.CheckResult])
+
+written out in full to add the type easily
+
+> haskellConsCr :: T.CheckResult -> [T.CheckResult] -> [T.CheckResult]
+> haskellConsCr = (:)
 
 
 > textSubstring :: String -> Int -> Int -> String
 > textSubstring str start end = take (end - start) (drop start str)
 
-
+> makeCr :: String -> [Value] -> Interpreter Value
+> makeCr nm vs = do
+>     vs' <- mapM f vs
+>     pure $ FFIVal $ toDyn $ T.CheckResult nm vs'
+>   where
+>     f (VariantV "tuple" [("0", TextV tnm)
+>                         ,("1", TextV msg)]) = pure (tnm, if msg == "OK"
+>                                                          then Nothing
+>                                                          else Just msg)
+>     f x = throwInterp $ "expected tuple<text,text>, got " ++ show x
 
 > textIndexOf :: String -> String -> Int
 > textIndexOf str i = case findIndex (isPrefixOf i) (tails str) of
@@ -1638,6 +1671,17 @@ ffi boilerplate
 >                           x@(FunV {}) -> pure x
 >                           x@(ForeignFunV {}) -> pure x
 >                           x -> throwInterp $ "type: expected function, got " ++ show x)
+
+> unwrapDyn :: Typeable a => (String, Value -> Interpreter a)
+> unwrapDyn = ("FFI-val", \case
+>                           FFIVal n -> case fromDynamic n of
+>                               Just x -> pure x
+>                               -- todo: terrible error message doesn't even say what was expected
+>                               Nothing -> throwInterp $ "wrong dyn val, got " ++ show n
+>                           x -> throwInterp $ "type: expected number, got " ++ show x)
+
+> wrapDyn :: Typeable a => a -> Interpreter Value
+> wrapDyn a = pure $ FFIVal $ toDyn a
 
   
 > unaryOp :: (String, Value -> Interpreter a)
