@@ -1,9 +1,6 @@
 
-
-Work on refactoring how the tests work to make them saner, and move
-them more into the language and out of haskell. Most of this is to
-make writing and testing anomaly tests for user programming mistakes
-easier.
+Somehow, only just noticed that the store gets lost in between calls
+to the embedded api.
 
 =============================================================================
 
@@ -15,7 +12,7 @@ imports
 > {-# LANGUAGE MultiWayIf #-}
 > {-# LANGUAGE DeriveDataTypeable #-}
 
-> module RefactorTests (TeaberryHandle
+> module FixHandleState (TeaberryHandle
 >                      ,newTeaberryHandle
 >                      ,runScript
 >                      ,runScriptWithTests
@@ -45,6 +42,7 @@ imports
 > import Control.Monad.Trans.Except (Except, runExcept, throwE)
 > import Control.Monad.Trans.RWS (RWST
 >                                ,evalRWST
+>                                ,runRWST
 >                                ,ask
 >                                ,local
 >                                ,get
@@ -127,13 +125,20 @@ embedded api
 > newtype TeaberryHandle = TeaberryHandle
 >     {tbh :: IORef RuntimeState}
 
-> data RuntimeState = RuntimeState {
->      henv :: Env
->     ,executionStage :: ExecutionStage}
+> data RuntimeState = RuntimeState
+>     {henv :: InterpreterEnv
+>     ,hstate :: InterpreterState
+>     --,executionStage :: ExecutionStage
+>     }
+
+> updateRTSEnv :: (Env -> Env) -> RuntimeState -> RuntimeState
+> updateRTSEnv f (RuntimeState e s) =
+>     RuntimeState (e {ieEnv = f (ieEnv e)}) s
 
 > defaultRuntimeState :: RuntimeState
-> defaultRuntimeState = RuntimeState {henv = defaultEnv
->                                    ,executionStage = FullExecution}
+> defaultRuntimeState = RuntimeState {henv = makeInterpreterEnv defaultEnv
+>                                    ,hstate = emptyInterpreterState
+>                                    {-,executionStage = FullExecution-}}
   
 > data ExecutionStage = FullExecution
 >                     | DumpDesugar
@@ -147,7 +152,7 @@ embedded api
 > runScript :: TeaberryHandle -> Maybe String -> [(String,Value)] -> String -> IO Value
 > runScript h fnm lenv src = do
 >     ebs <- readIORef (tbh h)
->     let ebs' = ebs {henv = extendEnv lenv $ henv ebs}
+>     let ebs' = updateRTSEnv (extendEnv lenv) ebs
 >     (v,ebs'', _) <- evaluate fnm ebs' src
 >     -- if you press ctrl-c in between the start of
 >     -- writeioref and if finishing, or even at another time,
@@ -158,7 +163,7 @@ embedded api
 > runScriptWithTests :: TeaberryHandle -> Maybe String -> [(String,Value)] -> String -> IO [T.CheckResult]
 > runScriptWithTests h fnm lenv src = do
 >     ebs <- readIORef (tbh h)
->     let ebs' = ebs {henv = extendEnv lenv $ henv ebs}
+>     let ebs' = updateRTSEnv (extendEnv lenv) ebs
 >     (_v,ebs'',t) <- evaluate fnm ebs' src
 >     -- if you press ctrl-c in between the start of
 >     -- writeioref and if finishing, or even at another time,
@@ -193,14 +198,15 @@ hacky top level evaluate. not really sure if it will pay its way once
 >           -> RuntimeState
 >           -> String
 >           -> IO (Value, RuntimeState, [T.CheckResult])
-> evaluate fnm ebs src = do
+> evaluate fnm rts src = do
 >     d <- getBuiltInModulesDir
->     fst <$> evalRWST (f d) (makeInterpreterEnv $ henv ebs) emptyInterpreterState
+>     ((v,ie,ts),s,_w) <- runRWST (f d) (henv rts) (hstate rts)
+>     pure (v, RuntimeState ie s, ts)
 >   where
->     f :: FilePath -> Interpreter (Value, RuntimeState, [T.CheckResult])
+>     f :: FilePath -> Interpreter (Value, InterpreterEnv, [T.CheckResult])
 >     f d =
 >         -- quick hack for set
->         case P.parseSet src of
+>         {-case P.parseSet src of
 >             Right (k,v)
 >               | k == "dump-desugar" -> do
 >                 case v of
@@ -208,20 +214,22 @@ hacky top level evaluate. not really sure if it will pay its way once
 >                      "f" -> pure (TextV "set full execution on", ebs {executionStage = FullExecution }, [])
 >                      _ -> throwInterp $ "bad value for dump-desugar, expected t or f, got " ++ v
 >               | otherwise -> throwInterp $ "unrecognised set key: " ++ k
->             Left _ -> do
+>             Left _ ->-}  do
 >                 (ast,srcs) <- loadSourceFiles fnm d src
 >                 y <- either throwInterp pure $ runDesugar True False (maybe "toplevel.x" id fnm) ast srcs
->                 case executionStage ebs of
->                     DumpDesugar -> pure (TextV $ "\n" ++ prettyIExpr y ++ "\n", ebs, [])
->                     FullExecution -> do
+>                 --case executionStage ebs of
+>                 --    DumpDesugar -> pure (TextV $ "\n" ++ prettyIExpr y ++ "\n", ebs, [])
+>                 {-    FullExecution ->-}
+>                 do
 >                         v <- {-trace (pretty z) $-} interp y
 >                         t <- gets (reverse . tempCheckResults)
 >                         case v of
 >                             VariantV "tuple" [("0", v')
 >                                              ,("1", VariantV "record" _)
 >                                              ,("2", VariantV "record" e)] ->
->                                 let ne = (henv ebs) {envEnv = e}
->                                 in pure (v',ebs {henv = ne}, t)
+>                                 let ne = let x = (henv rts)
+>                                          in x {ieEnv = (ieEnv x) {envEnv = e}}
+>                                 in pure (v',ne, t)
 >                             {-VariantV "tuple" [_,_,_] -> throwInterp $ "expected 3 element tuple, second and third elements records, got " ++ torepr' v
 >                             VariantV "tuple" xs -> throwInterp $ "expected 3 element tuple, got " ++ show (length xs) ++ " element tuple, " ++ torepr' v-}
 >                             VariantV "tuple" [_,_,_] -> throwInterp $ "expected tuple with different types, got: " ++ torepr' v
@@ -492,7 +500,6 @@ not sure if it should do this, or keep the rest of the env in the state
 > makeInterpreterEnv x = InterpreterEnv x 0
   
 > type Interpreter = RWST InterpreterEnv () InterpreterState IO
-
 
 trace the string if the tracel level is >= i
 
@@ -1863,6 +1870,7 @@ pretty interpreter syntax
 >     [testSanityArith
 >     ,testEnvKept
 >     ,testEnvOverridden
+>     ,testStorePreserved
 >     ,testAScript
 >     ,testRunScriptWithValues
 >     ,testRunFunctionSimple
@@ -1890,6 +1898,15 @@ pretty interpreter syntax
 >     _ <- runScript h Nothing [] "a = 4"
 >     v <- runScript h Nothing [] "a"
 >     T.assertEqual "" (NumV 4) v
+
+
+> testStorePreserved :: T.TestTree
+> testStorePreserved = T.testCase "testStorePreserved" $ do
+>     h <- newTeaberryHandle
+>     _ <- runScript h Nothing [] "var a = 12"
+>     v <- runScript h Nothing [] "a"
+>     T.assertEqual "" (NumV 12) v
+
 
 *****
 TODO: test running something with tests and there's a test failure
