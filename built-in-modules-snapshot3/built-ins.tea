@@ -37,6 +37,82 @@ end
 
 # all the bootstrapping to run and render test results
 
+var all-module-tests-internal = empty
+
+######################
+
+# desugared tests
+
+######################################
+
+# data types
+
+data Check-block-results:
+  | check-block-results(name, test-results)
+end
+
+data Test-result:
+  | passed(src)
+  | values-not-equal(src,a,b)
+  | left-side-raised(src,ex)
+  | right-side-raised(src,ex)
+  | no-exception-raised(src, e)
+  | raises-not-equal(src,a,b)
+  | raises-satisfies-failed(src,tst,ex)
+  | raises-satisfies-not-function(src,v)
+  | raises-satisfies-function-wrong-num-args(src,f)
+  | raises-satisfies-function-result-not-boolean(src,v)
+end
+
+fun test-is(msg, lhs, rhs):
+  #print("test is " + msg)
+  v0 = lhs()
+  v1 = rhs()
+  if v0 == v1:
+    passed(msg)
+  else: block:
+    values-not-equal(msg,v0,v1)
+  end end
+end
+
+fun test-raises(msg,v0,v1):
+  catch(
+    block:
+      v0()
+      no-exception-raised(msg,v1)
+    end,
+    lam(ex): block:
+        if tostring(ex) == v1:
+          passed(msg)
+        else:
+          raises-not-equal(msg,ex,v1)
+        end
+      end
+    end)
+end
+
+fun test-raises-satisfies(msg, cmsg, v0,v1):
+  #print("test raises-satisfies " + msg)
+  #passed(msg)
+  catch(
+    block:
+      v0()
+      no-exception-raised(msg, "")
+    end,
+    lam(ex): block:
+        f = v1()
+        if f(ex):
+        passed(msg)
+        else: block:
+          #print("here")
+            raises-satisfies-failed(msg,cmsg,ex)
+          end
+      end end
+    end)
+end
+
+################################
+
 # copy here for bootstrapping, figure out if there's a better way
 # to handle this
 fun map(f, lst):
@@ -49,9 +125,9 @@ fun map(f, lst):
   # todo: how to have tests in the built in modules?
   # want to be able to run them
   # but don't want them to run by default
-#where:
-#  map(tostring, [list: 1, 2]) is [list: "1", "2"]
-#  map(lam(x): x + 1 end, [list: 1, 2]) is [list: 2, 3]
+where:
+  map(tostring, [list: 1, 2]) is [list: "1", "2"]
+  map(lam(x): x + 1 end, [list: 1, 2]) is [list: 2, 3]
 end
 
 fun reverse(l):
@@ -62,11 +138,11 @@ fun reverse(l):
     end
   end
   rev(l,empty)
-#where:
-#  reverse([list:]) is [list:]
-#  reverse([list: 1]) is [list: 1]
-#  reverse([list: 1,2]) is [list: 2,1]
-#  reverse([list: 1,2,3,4]) is [list: 4,3,2,1]
+where:
+  reverse([list:]) is [list:]
+  reverse([list: 1]) is [list: 1]
+  reverse([list: 1,2]) is [list: 2,1]
+  reverse([list: 1,2,3,4]) is [list: 4,3,2,1]
 end
 
 fun partition(f, lst):
@@ -148,83 +224,17 @@ end
 
 # the actual testing code
 
-######################################
-
-# data types
-
-data Check-block-results:
-  | check-block-results(name, test-results)
-end
-
-data Test-result:
-  | passed(src)
-  | values-not-equal(src,a,b)
-  | left-side-raised(src,ex)
-  | right-side-raised(src,ex)
-  | no-exception-raised(src, e)
-  | raises-not-equal(src,a,b)
-  | raises-satisfies-failed(src,tst,ex)
-  | raises-satisfies-not-function(src,v)
-  | raises-satisfies-function-wrong-num-args(src,f)
-  | raises-satisfies-function-result-not-boolean(src,v)
-end
 
 ######################################
 
 # running the tests
 
-fun test-is(msg, lhs, rhs):
-  #print("test is " + msg)
-  v0 = lhs()
-  v1 = rhs()
-  if v0 == v1:
-    passed(msg)
-  else: block:
-    values-not-equal(msg,v0,v1)
-  end end
-end
-
-fun test-raises(msg,v0,v1):
-  catch(
-    block:
-      v0()
-      no-exception-raised(msg,v1)
-    end,
-    lam(ex): block:
-        if tostring(ex) == v1:
-          passed(msg)
-        else:
-          raises-not-equal(msg,ex,v1)
-        end
-      end
-    end)
-end
-
-fun test-raises-satisfies(msg, cmsg, v0,v1):
-  #print("test raises-satisfies " + msg)
-  #passed(msg)
-  catch(
-    block:
-      v0()
-      no-exception-raised(msg, "")
-    end,
-    lam(ex): block:
-        f = v1()
-        if f(ex):
-        passed(msg)
-        else: block:
-          #print("here")
-            raises-satisfies-failed(msg,cmsg,ex)
-          end
-      end end
-    end)
-end
 
 # register-test :: ( -> Nothing) -> Nothing
-fun register-check-block(f):
+#fun register-check-block(f):
   #print("register test block")
-  tests-to-run := link(f,tests-to-run)
-end
+#  tests-to-run := link(f,tests-to-run)
+#xend
 
 ######################################
 
