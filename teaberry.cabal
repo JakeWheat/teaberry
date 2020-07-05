@@ -136,4 +136,5 @@ Test-Suite teaberry-dev
                        Anomaly2
                        RefactorTests
                        FixHandleState
+                       RefactorWrappers
 

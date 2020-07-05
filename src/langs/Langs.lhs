@@ -56,7 +56,7 @@
 > import qualified Anomaly2
 > import qualified RefactorTests
 > import qualified FixHandleState
-
+> import qualified RefactorWrappers
 
 > import qualified Parse1Tests
 > import qualified Parse2Tests
@@ -128,4 +128,5 @@
 >        ,Anomaly2.tests
 >        ,RefactorTests.tests
 >        ,FixHandleState.tests
+>        ,RefactorWrappers.tests
 >        ]
