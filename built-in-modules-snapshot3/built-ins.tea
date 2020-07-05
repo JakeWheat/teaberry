@@ -1,0 +1,341 @@
+
+# contains definitions for things that should always be there that are
+# implemented in langauge
+
+# todo: list, nothing, provide item and stuff like that is used to bootstrap the language
+# then there are a bunch of other built ins which are just defined in language
+# and are available without importing. keep these two sets separate
+
+data List:
+  | empty
+  | link(first, rest)
+end
+
+data Nothing:
+   | nothing
+end
+
+data ProvideItem:
+  | provide-all
+  | provide-alias(i,a)
+end
+
+data Language-error:
+  | unbound-identifier(i)
+  | not-function-value(v)
+  | function-wrong-num-args(e,r)
+  | function-wrong-types(e,r)
+  | duplicate-name(a)
+  | expected-type(e,r)
+  | no-branches-satisfied
+  | only-one-branch
+  | empty-block
+  | block-ends-with-let
+end
+
+##############################################################################
+
+# all the bootstrapping to run and render test results
+
+# copy here for bootstrapping, figure out if there's a better way
+# to handle this
+fun map(f, lst):
+  cases (List) lst:
+    | empty => empty
+    | link(x,xs) => block:
+        link(f(x), map(f,xs))
+      end
+  end
+  # todo: how to have tests in the built in modules?
+  # want to be able to run them
+  # but don't want them to run by default
+#where:
+#  map(tostring, [list: 1, 2]) is [list: "1", "2"]
+#  map(lam(x): x + 1 end, [list: 1, 2]) is [list: 2, 3]
+end
+
+fun reverse(l):
+  fun rev(lst, a):
+    cases (List) lst:
+      | empty => a
+      | link(x,xs) => rev(xs,link(x,a))
+    end
+  end
+  rev(l,empty)
+#where:
+#  reverse([list:]) is [list:]
+#  reverse([list: 1]) is [list: 1]
+#  reverse([list: 1,2]) is [list: 2,1]
+#  reverse([list: 1,2,3,4]) is [list: 4,3,2,1]
+end
+
+fun partition(f, lst):
+  fun partition-go(ts, fs, lst1):
+    cases(List) lst1:
+      | empty => {is-true: reverse(ts), is-false: reverse(fs)}
+      | link(x,xs) => if f(x):
+          partition-go(link(x,ts),fs,xs)
+        else:
+          partition-go(ts,link(x,fs),xs)
+        end
+    end
+  end
+  partition-go(empty,empty,lst)
+end
+
+fun foldr(f,z,l):
+  cases(List) l:
+    | empty => z
+    | link(x,xs) => f(x,foldr(f,z,xs))
+  end
+end
+
+fun sum(lst):
+  foldr(_ + _, 0, lst)
+end
+
+fun intercalate(sep,lst):
+  cases(List) lst:
+    | empty => ""
+    | link(a,b) =>
+      if is-link(b):
+        a + sep + intercalate(sep,b)
+      else:
+        a
+      end
+  end
+end
+
+fun find-char(str,frm,c):
+  tl = text-length(str)
+  fun go(frm):
+    if frm >= tl: -1
+    else if text-char-at(str,frm) == c: frm
+    else: go(frm + 1)
+    end
+  end
+  go(frm)
+end
+
+fun indent(str):
+  tl = text-length(str)
+  fun indent-x(i):
+    # scan until next \n
+    # if the \n is the last thing in the file, append until the end of the file
+    # else append the text until the newline, add the indent, and continue
+    j = find-char(str,i,"\n")
+    if (j == -1) or (j == (tl - 1)):
+      text-substring(str,i,tl)
+    else:
+      # question: should there be a string builder or a default string data type
+      # which can handle this? if a string builder, how will it work? explicit always,
+      # or sometimes implict?
+      text-substring(str, i, j + 1) + "  " + indent-x(j + 1)
+    end
+  end
+  if str == "": "" else: "  " + indent-x(0) end
+end
+
+fun length(l):
+  cases(List) l:
+    | empty => 0
+    | link(f, r) => 1 + length(r)
+  end
+end
+
+
+##############################################################################
+
+# the actual testing code
+
+######################################
+
+# data types
+
+data Check-block-results:
+  | check-block-results(name, test-results)
+end
+
+data Test-result:
+  | passed(src)
+  | values-not-equal(src,a,b)
+  | left-side-raised(src,ex)
+  | right-side-raised(src,ex)
+  | no-exception-raised(src, e)
+  | raises-not-equal(src,a,b)
+  | raises-satisfies-failed(src,tst,ex)
+  | raises-satisfies-not-function(src,v)
+  | raises-satisfies-function-wrong-num-args(src,f)
+  | raises-satisfies-function-result-not-boolean(src,v)
+end
+
+######################################
+
+# running the tests
+
+fun test-is(msg, lhs, rhs):
+  #print("test is " + msg)
+  v0 = lhs()
+  v1 = rhs()
+  if v0 == v1:
+    passed(msg)
+  else: block:
+    values-not-equal(msg,v0,v1)
+  end end
+end
+
+fun test-raises(msg,v0,v1):
+  catch(
+    block:
+      v0()
+      no-exception-raised(msg,v1)
+    end,
+    lam(ex): block:
+        if tostring(ex) == v1:
+          passed(msg)
+        else:
+          raises-not-equal(msg,ex,v1)
+        end
+      end
+    end)
+end
+
+fun test-raises-satisfies(msg, cmsg, v0,v1):
+  #print("test raises-satisfies " + msg)
+  #passed(msg)
+  catch(
+    block:
+      v0()
+      no-exception-raised(msg, "")
+    end,
+    lam(ex): block:
+        f = v1()
+        if f(ex):
+        passed(msg)
+        else: block:
+          #print("here")
+            raises-satisfies-failed(msg,cmsg,ex)
+          end
+      end end
+    end)
+end
+
+# register-test :: ( -> Nothing) -> Nothing
+fun register-check-block(f):
+  #print("register test block")
+  tests-to-run := link(f,tests-to-run)
+end
+
+######################################
+
+# run and render tests
+
+fun render-result(tr):
+  cases(Test-result) tr:
+    | passed(_) => "OK"
+    | values-not-equal(_,a,b) => "failed, reason:\n"
+        + indent("Values not equal:\n" + torepr(a) + "\n" + torepr(b))
+    | raises-satisfies-failed(_,tst,ex) => "failed, reason:\n" 
+        + indent("The test operation raise-satisfies failed for the test " + tst
+        + ", value was " + torepr(ex))
+    | raises-not-equal(_,a,b) => "failed, reason:\n"
+        + indent("raise not equal:\n" + tostring(a) + "\n" + b)
+    | no-exception-raised(src, e) => "failed, reason:\n"
+        + indent("no exception raised, expected " + tostring(e))
+    | else => "no render for " + tostring(tr)
+  end
+end
+
+fun render-test(tr):
+  "test (" + tr.src + "): " + render-result(tr)
+end
+
+render-check = lam(cbr): block:
+    # split the results into passed and not passed
+    # in order to count the two sizes
+    # this is probably a very ineffient way of doing it
+    # and indirect too
+    # add a count-if function, and use this + list-length
+    res-split = partition(is-passed, cbr.test-results)
+    # render each result
+    msgs = map(render-test, cbr.test-results)
+    # return the number of passes, the number of fails,
+    # and the formatted results + some boilerplate formatting
+    # around them
+    # todo: use a record, get used to these being available, no
+    # more tuples for "multiple return values"
+    {length(res-split.is-true); length(res-split.is-false);
+    "Check block: " + cbr.name + "\n"
+      + intercalate("\n", map(indent, msgs)) + "\n  "
+      + tostring(length(res-split.is-true))
+        + "/" + tostring(length(cbr.test-results))
+      + " tests passed in check block: " + cbr.name}
+end end
+
+render-check-results = lam(lst): block:
+  bs = map(render-check,lst)
+  total-passes = sum(map(_.{0}, bs))
+  total-fails = sum(map(_.{1}, bs))
+  msgs = map(_.{2}, bs)
+  intercalate("\n\n",msgs)
+    + "\n\n" + tostring(total-passes)
+      + "/" + tostring(total-passes + total-fails)
+    + " test passed in all check blocks"
+end end
+
+fun test-results-to-haskell(lst):
+  var a = make-check-result-list()
+  fun conv-tr(cr):
+    fun f(x):
+      cases (Test-result) x:
+        | passed(src) => {src;"OK"}
+        | else => {src;render-test(x)}
+      end
+    end
+    make-cr(cr.name, map(f,cr.test-results))
+  end
+ 
+  _ = map(lam(x): block:
+        cr = conv-tr(x)
+        a := haskell-cons-cr(cr, a)
+      end
+    end, lst)
+  a
+end
+
+fun run-tests(tests-to-run):
+  print("rat")
+  if tests-to-run <> empty:
+    block:
+      # todo: figure out why this syntax isn't working:
+      # r = map(_(), reverse(tests-to-run))
+
+      r = map(lam(f): f() end, reverse(tests-to-run))
+    
+      print(render-check-results(r))
+      #print("herex")
+      #temp-add-check-results(test-results-to-haskell(r))
+
+      #print(tostring(rts))
+      #|fun tempaddit(c):
+        #print("ta")
+        fun f(x):
+          #print(tostring(x))
+          cases (Test-result) x:
+            | passed(src) => {src;"OK"}
+            | else => {src;render-test(x)}
+          end
+        end
+        temp-add-check-result(c.name, map(f,c.test-results))
+      end
+      map(tempaddit, r)|#
+      
+      #tests-to-run := empty
+      #nothing
+      r
+    end
+  else:
+    empty
+  end
+
+end

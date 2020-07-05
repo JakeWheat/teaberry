@@ -22,6 +22,13 @@ duplication in runscript* and similar
 fix dump desugared which had been temporarily disabled but then got
  commented out
 
+TODO:
+DONE load builtins when initializing handle
+DONE don't save test results in interpreter state
+DONE remove global var for tracking tests
+DONE reduce use of state generally in test system
+
+
 
 =============================================================================
 
@@ -67,7 +74,7 @@ imports
 >                                ,ask
 >                                ,local
 >                                ,get
->                                ,gets
+>                                --,gets
 >                                ,state
 >                                --,put
 >                                ,modify
@@ -173,16 +180,20 @@ embedded api
 >     src <- liftIO $ readFile (d </> "built-ins.tea")
 >     let f = do
 >             ast <- either throwInterp pure $ P.parseModule (d </> "built-ins.tea") src
->             y <- either throwInterp pure $ runDesugar False "built-ins" ast []
+>             y <- either throwInterp pure $ runDesugar True "built-ins" ast []
 >             --liftIO $ putStrLn $ prettyIExpr y
 >             v <- interp y
 >             case v of
 >                 VariantV "tuple" [("0", _)
 >                                  ,("1", VariantV "record" _)
->                                  ,("2", VariantV "record" e)] ->
+>                                  ,("2", VariantV "record" e)
+>                                  ,("3", _)] ->
 >                     let ne = let x = (henv rts)
 >                             in x {ieEnv = (ieEnv x) {envEnv = e}}
 >                     in pure ne
+>                 VariantV "tuple" [_,_,_,_] -> throwInterp $ "expected tuple<value,record,record,fun>, got: " ++ torepr' v
+>                 VariantV "tuple" fs -> throwInterp $ "expected 4 element tuple, got " ++ show (length fs) ++ " element tuple with " ++ intercalate "," (map (valueTypeName . snd) fs)
+>                 _ -> throwInterp $ "expected 4 element tuple, got non tuple: " ++ torepr' v
 >     (ie,s,_w) <- runRWST f (henv rts) (hstate rts)
 >     x <- newIORef (RuntimeState ie s)
 >     pure $ TeaberryHandle x
@@ -204,9 +215,6 @@ embedded api
 >     ebs <- readIORef (tbh h)
 >     let ebs' = updateRTSEnv (extendEnv lenv) ebs
 >     (_v,ebs'',t) <- evaluate fnm ebs' src
->     -- if you press ctrl-c in between the start of
->     -- writeioref and if finishing, or even at another time,
->     -- can this write become corrupted?
 >     writeIORef (tbh h) ebs''
 >     pure t
 
@@ -255,25 +263,36 @@ hacky top level evaluate. not really sure if it will pay its way once
 >               | otherwise -> throwInterp $ "unrecognised set key: " ++ k
 >             Left _ ->-}  do
 >                 (ast,srcs) <- loadSourceFiles fnm d src
->                 y <- either throwInterp pure $ runDesugar True (maybe "toplevel.x" id fnm) ast srcs
+>                 y <- either throwInterp pure $ runDesugar False (maybe "toplevel.x" id fnm) ast srcs
 >                 --case executionStage ebs of
 >                 --    DumpDesugar -> pure (TextV $ "\n" ++ prettyIExpr y ++ "\n", ebs, [])
 >                 {-    FullExecution ->-}
 >                 do
 >                         v <- {-trace (pretty z) $-} interp y
->                         t <- gets (reverse . tempCheckResults)
 >                         case v of
 >                             VariantV "tuple" [("0", v')
 >                                              ,("1", VariantV "record" _)
->                                              ,("2", VariantV "record" e)] ->
+>                                              ,("2", VariantV "record" e)
+>                                              ,("3", testFn)
+>                                              ] -> do
+>                                 -- liftIO $ putStrLn "here1"
+>                                 -- this is a hack to convert the in language test results
+>                                 -- to the other kind of thing that the temp tasty tests convertor
+>                                 -- needs
+>                                 tv <- runFunctionInterp "lam(x): test-results-to-haskell(x()) end" [testFn]
+>                                 -- liftIO $ putStrLn "here2"
+>                                 t <- case tv of
+>                                          FFIVal cs' ->
+>                                              case fromDynamic cs' of
+>                                                  Just x -> pure x
+>                                                  Nothing -> throwInterp $ "expected [checkresult], got " ++ show cs'
+>                                          _ -> throwInterp $ "expected FFIVal, got " ++ show tv
 >                                 let ne = let x = (henv rts)
 >                                          in x {ieEnv = (ieEnv x) {envEnv = e}}
->                                 in pure (v',ne, t)
->                             {-VariantV "tuple" [_,_,_] -> throwInterp $ "expected 3 element tuple, second and third elements records, got " ++ torepr' v
->                             VariantV "tuple" xs -> throwInterp $ "expected 3 element tuple, got " ++ show (length xs) ++ " element tuple, " ++ torepr' v-}
->                             VariantV "tuple" [_,_,_] -> throwInterp $ "expected tuple with different types, got: " ++ torepr' v
->                             VariantV "tuple" fs -> throwInterp $ "expected 3 element tuple, got " ++ show (length fs) ++ " element tuple with " ++ intercalate "," (map (valueTypeName . snd) fs)
->                             _ -> throwInterp $ "expected 3 element tuple, got non tuple: " ++ torepr' v
+>                                 pure (v',ne, t)
+>                             VariantV "tuple" [_,_,_,_] -> throwInterp $ "expected tuple<value,record,record,fun>, got: " ++ torepr' v
+>                             VariantV "tuple" fs -> throwInterp $ "expected 4 element tuple, got " ++ show (length fs) ++ " element tuple with " ++ intercalate "," (map (valueTypeName . snd) fs)
+>                             _ -> throwInterp $ "expected 4 element tuple, got non tuple: " ++ torepr' v
 
 recursively load all the referenced modules in the source given
 
@@ -323,7 +342,7 @@ recursively load all the referenced modules in the source given
 >     getImp _ = Nothing
 
 > getBuiltInModulesDir :: IO FilePath
-> getBuiltInModulesDir = getDataFileName "built-in-modules-snapshot2"
+> getBuiltInModulesDir = getDataFileName "built-in-modules-snapshot3"
 
 ---------------------------------------
 
@@ -403,12 +422,11 @@ store holds the values of variables
 
 > data InterpreterState =
 >     InterpreterState
->     {tempCheckResults :: [T.CheckResult]
->     ,isStore :: Store
+>     {isStore :: Store
 >     }
 
 > emptyInterpreterState :: InterpreterState
-> emptyInterpreterState = InterpreterState [] emptyStore
+> emptyInterpreterState = InterpreterState emptyStore
 
 > data InterpreterException = InterpreterException String
 >                           | ValueException Value
@@ -434,7 +452,10 @@ language exceptions
 > eapp f as = App (Iden f) as
 
 > throwUnboundIdentifier :: String -> Interpreter a
-> throwUnboundIdentifier i = raiseValue $ eapp "unbound-identifier" [Text i]
+> throwUnboundIdentifier i =
+>     if (i == "unbound-identifier")
+>     then error ("unbound loop")
+>     else raiseValue $ eapp "unbound-identifier" [Text i]
 
 > throwNotFunctionValue :: String -> Interpreter a
 > throwNotFunctionValue i = raiseValue $ eapp "not-function-value" [Text i]
@@ -597,8 +618,6 @@ ffi catalog
 >    ,("is-tuple", unaryOp anyIn wrapBool isTuple)
 >    ,("is-record", unaryOp anyIn wrapBool isRecord)
 
->    --,("temp-add-check-result", binaryOp unwrapText unwrapList id tempAddCheckResult)
->    ,("temp-add-check-results", unaryOp unwrapDyn id tempAddCheckResults)
 >    ,("make-check-result-list", nullaryOp pure makeCheckResultList)
 >    ,("haskell-cons-cr", binaryOp unwrapDyn unwrapDyn wrapDyn haskellConsCr)
 >    ,("make-cr", binaryOp unwrapText unwrapList id makeCr)
@@ -630,27 +649,6 @@ ffi catalog
 >    ])
 >    $ emptyEnv {envEnv = [("true", BoolV True)
 >                         ,("false", BoolV False)]}
-
-
-> {-tempAddCheckResult :: String -> [Value] -> Interpreter Value
-> tempAddCheckResult nm vs = do
->     cs <- mapM f vs
->     -- liftIO $ putStrLn $ "add tests " ++ nm ++ " " ++ show (length cs)
->     modify $ \s -> s { tempCheckResults = T.CheckResult nm cs : tempCheckResults s }
->     pure $ nothingValueHack
->   where
->     f (VariantV "tuple" [("0",TextV msg), ("1",TextV "OK")]) =
->         pure (msg, Nothing)
->     f (VariantV "tuple" [("0",TextV msg), ("1",TextV fm)]) =
->         pure (msg, Just fm)
->     f x = throwInterp $ "expected tuple of text,text, got " ++ show x-}
-
-
-> tempAddCheckResults :: [T.CheckResult] -> Interpreter Value
-> tempAddCheckResults vs = do
->     modify $ \s -> s { tempCheckResults = vs ++ tempCheckResults s }
->     pure $ nothingValueHack
-
 
 > makeCheckResultList :: Value
 > makeCheckResultList = FFIVal $ toDyn ([] :: [T.CheckResult])
@@ -726,10 +724,11 @@ maybe also have one which takes an ast?
 >     local (\y -> y {ieEnv = extendEnv lenv $ ieEnv y}) $ do
 >     ast <- either throwInterp pure $ P.parseModule fnm src
 >     y <- either throwInterp pure $ runDesugar False fnm ast []
+>     --liftIO $ putStrLn $ "******************\n" ++ prettyIExpr y ++ "\n*****************\n"
 >     v <- interp y
 >     case v of
->         VariantV "tuple" [("0", v'), _, _] -> pure v'
->         _ -> throwInterp $ "expected 3 element tuple, got " ++ torepr' v
+>         VariantV "tuple" [("0", v'), _, _, _] -> pure v'
+>         _ -> throwInterp $ "expected tuple<Value,_,_,_>, got " ++ torepr' v
 >   where
 >     fnm = maybe "" id fnm'
 
@@ -1139,7 +1138,7 @@ desugaring
 desugaring code
 
 > runDesugar :: Bool -> String -> Module -> [(String,Module)] -> Either String IExpr
-> runDesugar runTests nm ast srcs =
+> runDesugar skipTestsForBuiltins nm ast srcs =
 >     (simplify . fst) <$> runExcept (evalRWST go (DesugarReader {}) startingDesugarState)
 >   where
 >     go = do
@@ -1147,7 +1146,7 @@ desugaring code
 >          -- for repl support, splat out the contents of the last module
 >          -- and return the last value of this module plus the env           
 >          sf <- desugarStmts [LetSplatDecl (tg 1)
->                             ,StExpr $ TupleSel [tg 0, tg 1, tg 2]]
+>                             ,StExpr $ TupleSel [tg 0, tg 1, tg 2, tg 3]]
 >          let y = (combineEm srcs') sf
 >          pure y
 >     tg i = TupleGet (Iden ("module." ++ nm)) i
@@ -1156,7 +1155,7 @@ desugaring code
 >     -- would make the code more regular and
 >     -- quicker to understand/review?
 >     desugarEm desugaredModules ((n,m):ms) = do
->         dsm <- desugarModule runTests m
+>         dsm <- desugarModule skipTestsForBuiltins m
 >         desugarEm (("module." ++ n, dsm):desugaredModules) ms
 >     combineEm [] = id
 >     combineEm ((n,e):es) = ILet [(n,e)] <$> combineEm es
@@ -1174,24 +1173,25 @@ add the last statement which returns the last value and the env, for
 > nothingSyntaxHack = VariantSel "nothing" []
 
 > desugarModule :: Bool -> Module -> Desugarer IExpr
-> desugarModule runTests (Module ps stmts) = do
+> desugarModule skipTestsForBuiltins (Module ps stmts) = do
 >     ps' <- concat <$> mapM desugarPreludeStmt ps
->     -- add the final value for repl/embedded and imported module support
+>     -- add the final value for repl/embedded, imported module and testing support
 >     stmts' <- addTopRet stmts
->     desugarStmts (ps' ++ stmts')
+>     desugarStmts (ps' ++ testsVar ++ stmts')
 >   where
 >     pis = pisToTea $ getProvides ps
 >     mk x = StExpr $ TupleSel [x
 >                              ,App (Iden "provides") [pis]
->                              ,App (Iden "env-to-record") []]
->     runAllTests = if runTests
->                   then [StExpr $ App (Iden "run-all-tests") []]
->                   else []
->     addTopRet [] = pure (runAllTests ++ [mk nothingSyntaxHack])
+>                              ,App (Iden "env-to-record") []
+>                              ,Lam [] $ App (Iden "run-tests") [Iden "all-module-tests-internal"]]
+>     testsVar = -- hack to void referring to empty before it exists in the builtins
+>                if skipTestsForBuiltins
+>                then []
+>                else [VarDecl (PatName NoShadow "all-module-tests-internal") (Iden "empty")]
+>     addTopRet [] = pure ([mk nothingSyntaxHack])
 >     addTopRet [StExpr x] = do
 >         z <- makeUniqueVar "z"
 >         pure ([LetDecl (patName z) x]
->               ++ runAllTests
 >               ++ [mk $ Iden z])
 >     addTopRet (x:xs) = (x:) <$> addTopRet xs
 
@@ -1440,6 +1440,11 @@ xxx.make([list: <elements>])
 >   where
 >     f i = PatName NoShadow i
 
+> registerCheckBlock :: Expr -> Stmt
+> registerCheckBlock f =
+>     SetVar "all-module-tests-internal"
+>     (App (Iden "link") [f, Iden "all-module-tests-internal"])
+
 > desugarStmts :: [Stmt] -> Desugarer IExpr
 
 > desugarStmts (Check nm bdy : es) = do
@@ -1457,25 +1462,22 @@ register-test-block(lam():
   ...
 
   # return:
-  check-block-results(written-or-generated-test-block0name,reverse(test-results))x
+  check-block-results(written-or-generated-test-block0name,reverse(test-results))
 
 end
 
 >     desugaredCheck <- do
 >       blockName <- maybe getAnonCheckBlockName pure nm
->       desugar $
->           appI "register-check-block"
->           [Lam [] (Block (
+>       desugarStmts [registerCheckBlock
+>           (Lam [] (Block (
 >                    [VarDecl (PatName NoShadow "test-results") (Iden "empty")]
 >                    ++ bdy
 >                    ++ [StExpr $ App (Iden "check-block-results")
 >                                     [Text blockName
->                                     ,App (Iden "reverse") [(Iden "test-results")]]]))]
+>                                     ,App (Iden "reverse") [(Iden "test-results")]]])))]
 >     case es of
 >         [] -> pure desugaredCheck
 >         _ -> ISeq desugaredCheck <$> desugarStmts es
->   where
->     appI i as = App (Iden i) as
 
 contracts are ignored
 

@@ -1,0 +1,115 @@
+
+#|
+
+   The following list things are built into the interpreter:
+
+   List
+   empty
+   link
+   is-empty
+   is-link
+   [list: ... ]
+
+   todo: these are always available, even if you don't import lists
+   pyret has some of this behaviour too
+
+
+   functions todo: 
+   take
+   drop
+   
+   length
+   get
+   set
+   sort
+   sort-by
+   join-str
+   range
+   range-by
+   repeat
+   distinct
+   filter
+   partition
+   find
+   split-at
+   last
+   push
+   append
+   any
+   all
+   all2
+   map
+   map2
+   map3
+   map4
+   map_n
+   map2_n
+   map3_n
+   map4_n
+   each
+   each2
+   each3
+   each4
+   each_n
+   each2_n
+   each3_n
+   each4_n
+   fold-while
+   foldr
+   foldl
+   fold2
+   fold3
+   fold4
+   fold_n
+   member
+   member-with
+   reverse
+   remove
+   shuffle
+   
+  
+   
+
+|#
+
+provide:
+  length,
+  get,
+  set
+end
+
+fun length(l):
+  cases(List) l:
+    | empty => 0
+    | link(f, r) => 1 + length(r)
+  end
+end
+
+fun get(l, i):
+  when i < 0:
+    raise("invalid argument")
+  end
+  cases(List) l:
+    | empty => raise("too large")
+    | link(f, r) =>
+      if i == 0: f
+      else:
+        get(r, i - 1)
+      end
+  end
+end
+
+fun set(l, i, v):
+  when i < 0:
+    raise("invalid argument")
+  end
+  cases(List) l:
+    | empty => raise("too large")
+    | link(f, r) =>
+      if i == 0: link(v,r)
+      else:
+        link(f, set(r, i - 1, v))
+      end
+  end
+end
+
