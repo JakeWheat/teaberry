@@ -52,6 +52,9 @@
 >                                   ,runScript
 >                                   ,valueToString)
 
+> import qualified RefactorWrappers (newTeaberryHandle
+>                                   ,runScript
+>                                   ,valueToString)
 
 
 > import qualified Front (newTeaberryHandle
@@ -253,6 +256,9 @@ main
 >         refactorTests = Backend {xNewHandle = RefactorTests.newTeaberryHandle
 >                               ,xRunScript = RefactorTests.runScript
 >                               ,xValueToString = RefactorTests.valueToString}
+>         refactorWrappers = Backend {xNewHandle = RefactorWrappers.newTeaberryHandle
+>                               ,xRunScript = RefactorWrappers.runScript
+>                               ,xValueToString = RefactorWrappers.valueToString}
 >     case backend os of
 >         Nothing -> runWithBackend os defaultBackend
 >         Just "default" -> runWithBackend os defaultBackend
@@ -264,6 +270,7 @@ main
 >         Just "DumpDesugared" -> runWithBackend os dumpDesugared
 >         Just "Records1Embedded" -> runWithBackend os records1Embedded
 >         Just "RefactorTests" -> runWithBackend os refactorTests
+>         Just "RefactorWrappers" -> runWithBackend os refactorWrappers
 >         Just x -> error $ "backend not recognised: " ++ x
 
 > runWithBackend :: MyOpts -> Backend h v -> IO ()
