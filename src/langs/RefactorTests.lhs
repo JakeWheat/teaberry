@@ -211,11 +211,10 @@ hacky top level evaluate. not really sure if it will pay its way once
 >             Left _ -> do
 >                 (ast,srcs) <- loadSourceFiles fnm d src
 >                 y <- either throwInterp pure $ runDesugar True False (maybe "toplevel.x" id fnm) ast srcs
->                 let z = simplify y
 >                 case executionStage ebs of
->                     DumpDesugar -> pure (TextV $ "\n" ++ prettyIExpr z ++ "\n", ebs, [])
+>                     DumpDesugar -> pure (TextV $ "\n" ++ prettyIExpr y ++ "\n", ebs, [])
 >                     FullExecution -> do
->                         v <- {-trace (pretty z) $-} interp z
+>                         v <- {-trace (pretty z) $-} interp y
 >                         t <- gets (reverse . tempCheckResults)
 >                         case v of
 >                             VariantV "tuple" [("0", v')
@@ -281,18 +280,6 @@ recursively load all the referenced modules in the source given
 
 > getBuiltInModulesDir :: IO FilePath
 > getBuiltInModulesDir = getDataFileName "built-in-modules-snapshot2"
-
----------------------------------------
-
-simplify
-
-> simplify :: IExpr -> IExpr
-> simplify = transformBi $ \case
->     ILet bs (ILet bs' x) -> ILet (bs ++ bs') x
->     x1 -> x1
-
-when can (Seq (Seq a b) c) be safely changed to (Seq a (Seq b c))?
-this will make a lot of things more readable
 
 ---------------------------------------
 
@@ -663,7 +650,7 @@ maybe also have one which takes an ast?
 >     local (\y -> y {ieEnv = extendEnv lenv $ ieEnv y}) $ do
 >     ast <- either throwInterp pure $ P.parseModule fnm src
 >     y <- either throwInterp pure $ runDesugar False True fnm ast []
->     v <- interp (simplify y)
+>     v <- interp y
 >     case v of
 >         VariantV "tuple" [("0", v'), _, _] -> pure v'
 >         _ -> throwInterp $ "expected 3 element tuple, got " ++ torepr' v
@@ -680,8 +667,8 @@ maybe also have one which takes an ast?
 > runAstInterp ast = do
 >     --liftIO $ putStrLn $ "run " ++ Pr.prettyModule ast
 >     y <- either throwInterp pure $ runDesugar False True "" ast []
->     --liftIO $ putStrLn $ "run " ++ prettyIExpr (simplify y)
->     void $ interp (simplify y)
+>     --liftIO $ putStrLn $ "run " ++ prettyIExpr y
+>     void $ interp y
 
 hardcoded nothing. There is also a syntax version. even though nothing
 is defined in built in, it needs bootstrapping like list because a
@@ -1076,7 +1063,8 @@ desugaring
 desugaring code
 
 > runDesugar :: Bool -> Bool -> String -> Module -> [(String,Module)] -> Either String IExpr
-> runDesugar runTests skipBuiltins nm ast srcs = fst <$> runExcept (evalRWST go (DesugarReader {}) startingDesugarState)
+> runDesugar runTests skipBuiltins nm ast srcs =
+>     (simplify . fst) <$> runExcept (evalRWST go (DesugarReader {}) startingDesugarState)
 >   where
 >     go = do
 >          srcs' <- desugarEm [] (srcs ++ [(nm,ast)])
@@ -1096,6 +1084,9 @@ desugaring code
 >         desugarEm (("module." ++ n, dsm):desugaredModules) ms
 >     combineEm [] = id
 >     combineEm ((n,e):es) = ILet [(n,e)] <$> combineEm es
+
+
+--------------------------------------
 
 desugar module:
 desugar the prelude
@@ -1549,6 +1540,24 @@ setbox(a.b, 2)
 > desugarStmts (e@(TPred {}) : _) = lift $ throwE $ "test preds are not supported " ++ show e
 > desugarStmts (e@(TPostfixOp {}) : _) = lift $ throwE $ "test preds are not supported " ++ show e
 
+---------------------------------------
+
+simplify
+
+> simplify :: IExpr -> IExpr
+> simplify = transformBi $ \case
+>     ILet bs (ILet bs' x) -> ILet (bs ++ bs') x
+>     x1 -> x1
+
+todo: put this in the regular desugar, it doesn't need generics
+
+when can (Seq (Seq a b) c) be safely changed to (Seq a (Seq b c))?
+this will make a lot of things more readable
+if there are no decls, then is it always?
+if there are, it's if the first statement doesn't introduce a name
+  but this is only important if names aren't checked already and aren't
+  made unique
+there aren't any things that make seq unsafe to change this way in this ast
 
 ------------------------------------------------------------------------------
 
