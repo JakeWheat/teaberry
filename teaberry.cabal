@@ -135,4 +135,5 @@ Test-Suite teaberry-dev
                        SimpleEval
                        Anomaly2
                        RefactorTests
+                       FixHandleState
 

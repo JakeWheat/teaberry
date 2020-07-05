@@ -55,6 +55,7 @@
 > import qualified SimpleEval
 > import qualified Anomaly2
 > import qualified RefactorTests
+> import qualified FixHandleState
 
 
 > import qualified Parse1Tests
@@ -126,4 +127,5 @@
 >        ,SimpleEval.tests
 >        ,Anomaly2.tests
 >        ,RefactorTests.tests
+>        ,FixHandleState.tests
 >        ]
