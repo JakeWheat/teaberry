@@ -57,6 +57,7 @@
 > import qualified RefactorTests
 > import qualified FixHandleState
 > import qualified RefactorWrappers
+> import qualified OneModuleAtATime
 
 > import qualified Parse1Tests
 > import qualified Parse2Tests
@@ -129,4 +130,5 @@
 >        ,RefactorTests.tests
 >        ,FixHandleState.tests
 >        ,RefactorWrappers.tests
+>        ,OneModuleAtATime.tests
 >        ]

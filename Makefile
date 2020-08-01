@@ -8,11 +8,11 @@ build :
 
 .PHONY : test
 test :
-	cabal run RunTests --disable-optimization -- --hide-successes --ansi-tricks=false
+	time cabal run teaberry-dev --disable-optimization -- test --hide-successes --ansi-tricks=false
 
 .PHONY : run-tour
 run-tour :
-	cabal run -v0 teaberry --disable-optimization -- -g examples/tests/fulltests/tour.tea
+	time cabal run teaberry --disable-optimization --  -f examples/tests/fulltests/tour.tea
 
 # parserize : todo - name this better, it's a kind of check on the parse error messages
 .PHONY : parserize
