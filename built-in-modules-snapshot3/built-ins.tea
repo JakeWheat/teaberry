@@ -36,6 +36,14 @@ end
 ##############################################################################
 
 # all the bootstrapping to run and render test results
+# this is a bit hacky, the variable is needed to desugar tests
+# but can't be added automatically at the start of this module
+# like it is with others, because empty doesn't exist at the
+# start of this module
+# so there's a flag which disables adding it (only) for this module
+# and it's written here manually. it's not perfect because it has
+# to be kept in sync, but it should fail pretty quickly if you
+# don't keep it in sync
 
 var all-module-tests-internal = empty
 
@@ -222,19 +230,7 @@ end
 
 ##############################################################################
 
-# the actual testing code
-
-
-######################################
-
-# running the tests
-
-
-# register-test :: ( -> Nothing) -> Nothing
-#fun register-check-block(f):
-  #print("register test block")
-#  tests-to-run := link(f,tests-to-run)
-#xend
+# the rest of the testing code
 
 ######################################
 
@@ -297,10 +293,7 @@ fun test-results-to-haskell(lst):
   var a = make-check-result-list()
   fun conv-tr(cr):
     fun f(x):
-      cases (Test-result) x:
-        | passed(src) => {src;"OK"}
-        | else => {src;render-test(x)}
-      end
+      {x.src;render-result(x)}
     end
     make-cr(cr.name, map(f,cr.test-results))
   end

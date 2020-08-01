@@ -1,25 +1,46 @@
 
-Take the mess in fixhandlestate and factor it to be much cleaner:
+Take RefactorWrappers and modify so that modules are compiled and
+executed one by one (like builtins is now), instead of desugared
+together and run together.
 
-loading builtins now happens once when an embedded handle is
- initialized
+This will remove duplication of functionality, and is a precursor to:
 
-evaluate: this entire big function was just weird boilerplate and
-  no longer exists, now evaluate is a thin wrapper around runRWST
-  which also maintains the handle state trivially
+* running tests and dump desugaring the builtins
+* flexbility choosing which tests to run across multiple modules, and
+  what modules to dump desugar (e.g. built in modules, or only user
+  modules, or only the top level module)
+* caching modules and only reloading if changed on repeated calls to
+ the embedded api
 
-fix the handle state to be the same as the interpreter monad state
+also:
+fix the canonical name of a module stuff, and the "module." crap that's
+everywhere
 
-make the test running much more direct - local functions which return
-results - much less variables in closures used (or equivalent), and no
-global variables or interpreter state used
++ thread the desugar state through the interpreter so it's reused every time
+desugar runs
 
-deduplication in runscript* and similar and runscriptinterp*
-  there's one main function that the rest are wrappers around now
+don't copy out the interpreter state to the runtime handle, just embed
+it there to avoid boilerplate
 
-don't return test results except when asked for
+todo:
 
-simplify is run as part of desugaring
+understand the canonical name of a module (maybe first?)
+  -> for stuff without a name, generate a unique name instead of
+  having it be ""
+  maybe this shouldn't be the same as the parse error filename?
+
+fix the 4 tuple to work by getting it from the module
+  and not from the return of the script
+  then that will become only the return value of the script again
+
+run each module one at a time and see it working
+
+remove all the excess code
+
+use interpreter state directly in runtime handle
+
+add desugar state saved in interpreter state
+
 
 =============================================================================
 
@@ -31,7 +52,7 @@ imports
 > {-# LANGUAGE MultiWayIf #-}
 > {-# LANGUAGE DeriveDataTypeable #-}
 
-> module RefactorWrappers (TeaberryHandle
+> module OneModuleAtATime (TeaberryHandle
 >                      ,newTeaberryHandle
 >                      ,runScript
 >                      ,runScriptWithTests
@@ -91,7 +112,7 @@ imports
 > import Data.IORef (IORef, newIORef, readIORef, writeIORef)
 
 > import Paths_teaberry
-> import System.FilePath ((</>), takeDirectory)
+> import System.FilePath ((</>), takeDirectory, dropExtension)
 
 > import Data.Dynamic (Dynamic, toDyn, fromDynamic, Typeable)
 
@@ -170,15 +191,17 @@ temp while come up with a better way to do this
 >     -- load builtins
 >     d <- getBuiltInModulesDir
 >     src <- liftIO $ readFile (d </> "built-ins.tea")
->     x <- evaluateWithHandle th (runSrcInterpBuiltinsTestHack (Just (d </> "built-ins.tea")) src)
+>     x <- evaluateWithHandle th (runSrcInterpBuiltinsTestHack (d </> "built-ins.tea") src)
 >     when runBuiltinTests $ do
 >         void $ evaluateWithHandle th $ runFunctionInterp "lam(x): x() end" [snd x]
 >     pure th
   
 > runScript :: TeaberryHandle -> Maybe String -> [(String,Value)] -> String -> IO Value
 > runScript th mfn lenv src = do
+>     -- todo: generate unique names
+>     let fn = maybe "unnamed" id mfn
 >     x <- (evaluateWithHandle th $
->           runWithEnv lenv $ runSrcWithLoadInterp mfn src)
+>           runWithEnv lenv $ runSrcWithLoadInterp fn src)
 >     -- run the tests by default
 >     _  <- evaluateWithHandle th $ runFunctionInterp "lam(x): x() end" [snd x]
 >     pure $ fst x
@@ -191,8 +214,10 @@ runs a script and returns the test results in haskell format, a bit hacky
 >                    -> String
 >                    -> IO [T.CheckResult]
 > runScriptWithTests th mfn lenv src = do
+>     -- todo: generate unique names
+>     let fn = maybe "unnamed" id mfn
 >     runTests <- snd <$> (evaluateWithHandle th $ runWithEnv lenv
->                          $ runSrcWithLoadInterp mfn src)
+>                          $ runSrcWithLoadInterp fn src)
 >     evaluateWithHandle th $ f runTests
 >   where
 >     f :: Value -> Interpreter ([(String,Value)], [T.CheckResult])
@@ -615,17 +640,19 @@ run it
 return the the resulting env, the value of the last line of the
 script, and a function to run any tests from the script
 
-> runAstInterp :: Maybe FilePath
+> runAstInterp :: FilePath
 >              -> (Module, [(String,Module)])
 >              -> Interpreter ([(String,Value)],(Value,Value))
 > runAstInterp mfn srcs = runAstInterp' False mfn srcs
 
 > runAstInterp' :: Bool -- skip tests hack for builtins module only
->              -> Maybe FilePath
+>              -> FilePath
 >              -> (Module, [(String,Module)])
 >              -> Interpreter ([(String,Value)],(Value,Value))
-> runAstInterp' skipTestsForBuiltins mfn (ast,srcs) = do
->     let fn = maybe "toplevel.x" id mfn
+> runAstInterp' skipTestsForBuiltins fn (ast,srcs) = do
+>     -- todo: if fn is nothing
+>     -- get a unique name using the desugar state
+>     -- let fn = maybe "toplevel.x" id mfn
 >     compiled <- either throwInterp pure $
 >         runDesugar skipTestsForBuiltins fn ast srcs
 >     interpRes <- interp compiled
@@ -651,23 +678,23 @@ run a simple script without imports and return the value
 
 > runSimpleInterp :: String -> Interpreter Value
 > runSimpleInterp src = do
->    (fst . snd) <$> runSrcInterp Nothing src
+>    (fst . snd) <$> runSrcInterp "simple" src
 
 run a simple ast and return nothing
 
 > runAstInterpVoid :: Module -> Interpreter ()
-> runAstInterpVoid ast = void $ runAstInterp Nothing (ast,[])
+> runAstInterpVoid ast = void $ runAstInterp "simple" (ast,[])
 
 
 run a function with args passed as values
 
 > runFunctionInterp :: String -> [Value] -> Interpreter ([(String,Value)],Value)
 > runFunctionInterp f as = do
->     v <- runSrcInterp Nothing f
+>     v <- runSrcInterp "simple" f
 >     let as' = zipWith (\i x -> ("aaa-" ++ show i, x)) [(0::Int)..] as
 >     (\(x,(y,_)) -> (x,y)) <$>
 >         (runWithEnv (("fff", fst (snd v)):as') $
->          runSrcInterp Nothing $ "fff(" ++ intercalate "," (map fst as') ++ ")")
+>          runSrcInterp "simple" $ "fff(" ++ intercalate "," (map fst as') ++ ")")
 
 run a script with additional bindings
 
@@ -676,25 +703,27 @@ run a script with additional bindings
 
 run a script wihtout imports, including parsing it
 
-> runSrcInterp :: Maybe FilePath
+> runSrcInterp :: FilePath
 >              -> String
 >              -> Interpreter ([(String,Value)], (Value,Value))
 > runSrcInterp mfn src = do
+>     -- todo: use a filename
 >     ast <- either throwInterp pure $ P.parseModule "" src
 >     runAstInterp mfn (ast,[])
 
 
-> runSrcInterpBuiltinsTestHack :: Maybe FilePath
+> runSrcInterpBuiltinsTestHack :: FilePath
 >                              -> String
 >                              -> Interpreter ([(String,Value)], (Value,Value))
 > runSrcInterpBuiltinsTestHack mfn src = do
+>     -- todo: use a filename
 >     ast <- either throwInterp pure $ P.parseModule "" src
 >     runAstInterp' True mfn (ast,[])
 
 
 run a script by parsing it and also loading all imports recursively
 
-> runSrcWithLoadInterp :: Maybe FilePath
+> runSrcWithLoadInterp :: FilePath
 >                      -> String
 >                      -> Interpreter ([(String,Value)], (Value,Value))
 > runSrcWithLoadInterp mfn src = do
@@ -704,8 +733,8 @@ run a script by parsing it and also loading all imports recursively
 
 recursively load all the referenced modules in the source given
 
-> loadSourceFiles :: Maybe FilePath -> String -> String -> Interpreter (Module, [(String,Module)])
-> loadSourceFiles mfnm buildInModDir src = do
+> loadSourceFiles :: FilePath -> String -> String -> Interpreter (Module, [(String,Module)])
+> loadSourceFiles fnm buildInModDir src = do
 >     -- todo: memoize so loading a module twice doesn't read the
 >     -- file and parse it twice
 >     (ast,rs) <- parseMod src
@@ -715,7 +744,7 @@ recursively load all the referenced modules in the source given
 >          <$> mapM loadAndRecurse rs
 >     pure (ast, x)
 >   where
->     fnm = maybe "" id mfnm
+>     -- todo: use a filename
 >     cwd = takeDirectory fnm
 >     -- parse the file, get the imports
 >     -- recurse on these imports, returning the filename and the
@@ -1146,7 +1175,7 @@ desugaring
 
 desugaring code
 
-> runDesugar :: Bool -> String -> Module -> [(String,Module)] -> Either String IExpr
+> runDesugar :: Bool -> FilePath -> Module -> [(String,Module)] -> Either String IExpr
 > runDesugar skipTestsForBuiltins nm ast srcs =
 >     (simplify . fst) <$> runExcept (evalRWST go (DesugarReader {}) startingDesugarState)
 >   where
@@ -1169,8 +1198,10 @@ desugaring code
 >         dsm <- desugarModule skipTestsForBuiltins m
 >         desugarEm (("module." ++ n, dsm):desugaredModules) ms
 >     combineEm [] = id
+>     {-combineEm [] = error "temp no modules" --id
+>     combineEm [(n,e)] = ILet [(n,e)] (IIden n) -- todo: get the value only
+>     -}
 >     combineEm ((n,e):es) = ILet [(n,e)] <$> combineEm es
-
 
 --------------------------------------
 
@@ -1261,11 +1292,14 @@ add the last statement which returns the last value and the env, for
 >     getPIs (Provide pis) = Just pis
 >     getPIs _ = Nothing
 
+> internalModuleNameFromFilename :: FilePath -> String
+> internalModuleNameFromFilename s = "module." ++ {-dropExtension-} s
+
 > importSourceName :: ImportSource -> Desugarer String
-> importSourceName (ImportSpecial "file" [s]) = pure $ "module." ++ s
+> importSourceName (ImportSpecial "file" [s]) = pure $ internalModuleNameFromFilename s
 > importSourceName (ImportSpecial x _ ) = lift $ throwE $ "import special with " ++ x ++ " not supported"
-> importSourceName (ImportName n) = pure $ "module." ++ n  
-  
+> importSourceName (ImportName n) = pure $ "module." ++ n -- todo: change to module.builtin
+
 > desugar :: Expr -> Desugarer IExpr
 > desugar (Block []) = desugar $ throwDesugarV (Iden "empty-block")
 > desugar (Block [x@LetDecl {}]) =
