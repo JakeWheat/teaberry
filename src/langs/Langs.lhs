@@ -18,6 +18,7 @@
 > import qualified Statements1Check
 > import qualified Statements1CheckDesugarRefactor
 > import qualified Var1
+> import qualified Var1IORef
 > import qualified Lists1
 > import qualified DataDecl1
 > import qualified Cases1
@@ -91,6 +92,7 @@
 >        ,Statements1Check.tests
 >        ,Statements1CheckDesugarRefactor.tests
 >        ,Var1.tests
+>        ,Var1IORef.tests
 >        ,Lists1.tests
 >        ,DataDecl1.tests
 >        ,Cases1.tests

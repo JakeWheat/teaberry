@@ -93,6 +93,7 @@ Test-Suite teaberry-dev
                        Statements1Check
                        Statements1CheckDesugarRefactor
                        Var1
+                       Var1IORef
                        Lists1
                        DataDecl1
                        Cases1
