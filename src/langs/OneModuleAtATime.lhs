@@ -3,14 +3,14 @@ Take RefactorWrappers and modify so that modules are compiled and
 executed one by one (like builtins is now), instead of desugared
 together and run together.
 
-This will remove duplication of functionality, and is a precursor to:
+Then do:
 
-* running tests and dump desugaring the builtins
-* flexbility choosing which tests to run across multiple modules, and
-  what modules to dump desugar (e.g. built in modules, or only user
-  modules, or only the top level module)
-* caching modules and only reloading if changed on repeated calls to
- the embedded api
+better flexibility for running tests
+a function to do dump desugar of stuff
+
+thinking about only reloading modules when they've changed, but not
+sure the payoff is enough right now, if it's always quick to reload
+everything, why bother
 
 also:
 fix the canonical name of a module stuff, and the "module." crap that's
@@ -22,24 +22,10 @@ desugar runs
 don't copy out the interpreter state to the runtime handle, just embed
 it there to avoid boilerplate
 
-todo:
-
-understand the canonical name of a module (maybe first?)
-  -> for stuff without a name, generate a unique name instead of
-  having it be ""
-  maybe this shouldn't be the same as the parse error filename?
-
-fix the 4 tuple to work by getting it from the module
-  and not from the return of the script
-  then that will become only the return value of the script again
-
-run each module one at a time and see it working
-
-remove all the excess code
-
-use interpreter state directly in runtime handle
-
-add desugar state saved in interpreter state
+add a forget binding function
+work on desugar pretty printing
+work on env pretty printing
+-> start to get more introspection ability to make it easier to work with
 
 
 =============================================================================
@@ -85,11 +71,11 @@ imports
 >                                ,runRWST
 >                                ,ask
 >                                ,local
->                                ,get
+>                                --,get
 >                                --,gets
 >                                ,state
 >                                --,put
->                                ,modify
+>                                --,modify
 >                                --,asks
 >                                )
 > import Control.Exception.Safe (Exception, throwM, catch)
@@ -112,7 +98,7 @@ imports
 > import Data.IORef (IORef, newIORef, readIORef, writeIORef)
 
 > import Paths_teaberry
-> import System.FilePath ((</>), takeDirectory, dropExtension)
+> import System.FilePath ((</>), takeDirectory {-, dropExtension-})
 
 > import Data.Dynamic (Dynamic, toDyn, fromDynamic, Typeable)
 
@@ -532,6 +518,11 @@ ffi catalog
 >    ,("string-append", binaryOp unwrapText unwrapText wrapText (++))
 >    ,("num-to-string", unaryOp unwrapNum wrapText showScientific)
 
+
+>    ,("show-desugar", unaryOp unwrapText id showDesugar)
+>    ,("show-desugar-file", unaryOp unwrapText id showDesugarFile)
+
+
 >    ])
 >    $ emptyEnv {envEnv = [("true", BoolV True)
 >                         ,("false", BoolV False)]}
@@ -543,6 +534,25 @@ written out in full to add the type easily
 
 > haskellConsCr :: T.CheckResult -> [T.CheckResult] -> [T.CheckResult]
 > haskellConsCr = (:)
+
+
+> showDesugar :: String -> Interpreter Value
+> showDesugar src = do
+>     showDesugarx "" src
+
+> showDesugarx :: FilePath -> String -> Interpreter Value
+> showDesugarx fn src = do
+>     d <- liftIO $ getBuiltInModulesDir
+>     (ast,srcs) <- loadSourceFiles fn d src
+>     compiled <- either throwInterp pure $ runDesugar True fn ast srcs
+>     pure $ TextV $ prettyIExpr compiled
+
+
+> showDesugarFile :: String -> Interpreter Value
+> showDesugarFile fn = do
+>     src <- lift $ readFile fn
+>     showDesugarx fn src
+>
 
 
 > textSubstring :: String -> Int -> Int -> String
@@ -631,6 +641,7 @@ script, and a function to run any tests from the script
 >     -- let fn = maybe "toplevel.x" id mfn
 >     compiled <- either throwInterp pure $
 >         runDesugar skipTestsForBuiltins fn ast srcs
+>     -- ast,srcs, try desugaring one by one
 >     interpRes <- interp compiled
 >     case interpRes of
 >         VariantV "tuple" [("0", v)

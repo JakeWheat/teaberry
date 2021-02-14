@@ -57,6 +57,12 @@
 >                                   ,valueToString)
 
 
+> import qualified OneModuleAtATime (newTeaberryHandle
+>                                   ,runScript
+>                                   ,valueToString)
+
+
+
 > import qualified Front (newTeaberryHandle
 >                        ,runScript
 >                        ,valueToString)
@@ -259,6 +265,9 @@ main
 >         refactorWrappers = Backend {xNewHandle = RefactorWrappers.newTeaberryHandle
 >                               ,xRunScript = RefactorWrappers.runScript
 >                               ,xValueToString = RefactorWrappers.valueToString}
+>         oneModuleAtATime = Backend {xNewHandle = OneModuleAtATime.newTeaberryHandle
+>                               ,xRunScript = OneModuleAtATime.runScript
+>                               ,xValueToString = OneModuleAtATime.valueToString}
 >     case backend os of
 >         Nothing -> runWithBackend os defaultBackend
 >         Just "default" -> runWithBackend os defaultBackend
@@ -271,6 +280,7 @@ main
 >         Just "Records1Embedded" -> runWithBackend os records1Embedded
 >         Just "RefactorTests" -> runWithBackend os refactorTests
 >         Just "RefactorWrappers" -> runWithBackend os refactorWrappers
+>         Just "OneModuleAtATime" -> runWithBackend os oneModuleAtATime
 >         Just x -> error $ "backend not recognised: " ++ x
 
 > runWithBackend :: MyOpts -> Backend h v -> IO ()
