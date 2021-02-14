@@ -269,7 +269,7 @@ values
 >            | TextV String
 >            | VariantV String -- variant name
 >                       [(String,Value)] -- fields
->            | BoxV Int
+>            | BoxV (IORef Value)
 >            | FunV [String] IExpr Env
 >            | ForeignFunV String
 >            | FFIVal Dynamic
@@ -291,7 +291,7 @@ value type name is used for looking up overloaded foreign functions
 >   show (TextV n) = "TextV " ++ show n
 >   show (BoolV n) = "BoolV " ++ show n
 >   show (VariantV nm fs) = "VariantV " ++ nm ++ "[" ++ intercalate "," (map show fs) ++ "]"
->   show (BoxV n) = "BoxV " ++ show n
+>   show (BoxV _n) = "BoxV XX" -- ++ show n
 >   show (FunV as bdy _env) = "FunV " ++ show as ++ "\n" ++ prettyIExpr bdy
 >   show (ForeignFunV n) = "ForeignFunV " ++ show n
 >   show (FFIVal n) = "FFIVal " ++ show n
@@ -311,37 +311,13 @@ value type name is used for looking up overloaded foreign functions
 interpreter types
 =================
 
-store holds the values of variables
-
-> newtype Store = Store [(Int, Value)]
-
-> emptyStore :: Store
-> emptyStore = Store []
-
-> newStoreLoc :: Store -> Int
-> newStoreLoc (Store xs) = 
->     let is = map fst xs
->     in case is of
->            [] -> 0
->            _ -> maximum is + 1
-
-> extendStore :: Int -> Value -> Store -> Store
-> extendStore i v (Store xs) = Store ((i,v):xs)
-
-> fetchStore :: Int -> Store -> Interpreter Value
-> fetchStore i (Store xs) = maybe (throwInterp $ "invalid fetch on store: " ++ show i) pure
->                           $ lookup i xs
-
-> updateISStore :: (Store -> Store) -> (InterpreterState -> InterpreterState)
-> updateISStore f i = i {isStore = f (isStore i)}
-
 > data InterpreterState =
 >     InterpreterState
->     {isStore :: Store
+>     {
 >     }
 
 > emptyInterpreterState :: InterpreterState
-> emptyInterpreterState = InterpreterState emptyStore
+> emptyInterpreterState = InterpreterState
 
 > data InterpreterException = InterpreterException String
 >                           | ValueException Value
@@ -415,7 +391,7 @@ env
 >     ,envForeignFuns = []}
 
 > extendEnv :: [(String,Value)] -> Env -> Env
-> extendEnv bs env = env {envEnv = bs ++ envEnv env}
+> extendEnv bs env = env {envEnv = nubBy (\a b -> fst a == fst b) (bs ++ envEnv env)}
 >
 > envLookup :: String -> Env -> Interpreter Value
 > envLookup nm env =
@@ -663,6 +639,7 @@ script, and a function to run any tests from the script
 >                          ,("3", testFn)
 >                          ] ->
 >             pure (e, (v,testFn))
+>         -- todo: make a helper function for this sort of thing
 >         VariantV "tuple" [_,_,_,_] ->
 >             throwInterp $ "expected tuple<value,record,record,fun>, got: "
 >                 ++ torepr' interpRes
@@ -1003,9 +980,7 @@ interp
 >     env <- ask
 >     x <- envLookup a $ ieEnv env
 >     case x of
->         BoxV i -> do
->                   st <- get
->                   fetchStore i (isStore st)
+>         BoxV i -> lift $ readIORef i
 >         _ -> pure x
 
 > interp (IApp f es) = do
@@ -1080,27 +1055,23 @@ todo: combine
 >     env <- ask
 >     b' <- envLookup b $ ieEnv env
 >     v' <- interp v
->     i <- case b' of
->              BoxV i -> pure i
+>     case b' of
+>              BoxV i -> lift $ writeIORef i v'
 >              _ -> throwInterp $ "attemped to setbox non box value: " ++ torepr' b'
->     modify $ \s -> updateISStore (extendStore i v') s
 >     pure v'
 
 > interp (ISetBox b v) = do
 >     b' <- interp b
 >     v' <- interp v
->     i <- case b' of
->              BoxV i -> pure i
+>     case b' of
+>              BoxV i -> lift $ writeIORef i v'
 >              _ -> throwInterp $ "attemped to setbox non box value: " ++ torepr' b'
->     modify $ \s -> updateISStore (extendStore i v') s
 >     pure v'
       
 > interp (IUnbox b) = do
 >     b' <- interp b
 >     case b' of
->         BoxV i -> do
->                   st <- get
->                   fetchStore i (isStore st)
+>         BoxV i -> lift $ readIORef i
 >         _ -> throwInterp $ "attemped to unbox non box value: " ++ torepr' b'
 
 > interp (ICatch e c) = interp e `catch` (\case
@@ -1129,11 +1100,7 @@ todo: combine
 >                   | otherwise = throwWrongNumberOfArgs (length ps) (length xs)
 
 > box :: Value -> Interpreter Value
-> box v = do
->     i <- state $ \s ->
->          let i = newStoreLoc (isStore s)
->          in (i, updateISStore (extendStore i v) s)
->     pure $ BoxV i
+> box v = lift (BoxV <$> newIORef v)
 
 
 ------------------------------------------------------------------------------
