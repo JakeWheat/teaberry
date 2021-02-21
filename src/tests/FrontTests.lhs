@@ -12,13 +12,10 @@
 > -- used for creating the test lists for tasty to run
 > import System.IO.Unsafe (unsafePerformIO)
 
-------------------------------------------------------------------------------
 
-tests
-=====
 
 > tests :: T.TestTree
-> tests = T.testGroup "front" [tests1, tests4]
+> tests = T.testGroup "refactortests" [tests1, tests4]
 
 > testFiles :: [FilePath]
 > testFiles =
@@ -70,30 +67,32 @@ tests
 >     ]
 
 > tests1 :: T.TestTree
-> tests1 = T.testGroup "front1" $
->     map (\f -> makeTestsIO ("front" ++ f)
+> tests1 = T.testGroup "refactortests1" $
+>     map (\f -> makeTestsIO ("refactortests" ++ f)
 >             $ runFileTests ("examples/tests/fulltests" </> f))
 >     testFiles
 
 > runFileTests :: FilePath -> IO (Either String [CheckResult])
 > runFileTests fp = do
 >     src <- readFile fp
->     ts <- evaluate (Just fp) src
+>     ts <- ev (Just fp) src
 >     pure $ Right ts
 >   where
->     evaluate f src = do
+>     ev f src = do
 >         h <- newTeaberryHandle
 >         runScriptWithTests h f [] src
 
 > tests4 :: T.TestTree
-> tests4 = T.testGroup "front4"
+> tests4 = T.testGroup "refactortests4"
 >     [testSanityArith
 >     ,testEnvKept
 >     ,testEnvOverridden
+>     ,testStorePreserved
 >     ,testAScript
 >     ,testRunScriptWithValues
 >     ,testRunFunctionSimple
 >     --,testRunFunctionPartialApp
+>     ,testRevisitBuiltins
 >     ]
 
 > testSanityArith :: T.TestTree
@@ -117,6 +116,15 @@ tests
 >     _ <- runScript h Nothing [] "a = 4"
 >     v <- runScript h Nothing [] "a"
 >     T.assertEqual "" (NumV 4) v
+
+
+> testStorePreserved :: T.TestTree
+> testStorePreserved = T.testCase "testStorePreserved" $ do
+>     h <- newTeaberryHandle
+>     _ <- runScript h Nothing [] "var a = 12"
+>     v <- runScript h Nothing [] "a"
+>     T.assertEqual "" (NumV 12) v
+
 
 *****
 TODO: test running something with tests and there's a test failure
@@ -179,9 +187,16 @@ implemented
 >     T.assertEqual "" (Right (NumV 9)) v-}
 
 
---------
+> testRevisitBuiltins :: T.TestTree
+> testRevisitBuiltins = T.testCase "testRevisitBuiltins" $ do
+>     h <- newTeaberryHandle
+>     _ <- runScript h Nothing [] "a = [list: 1,2]"
+>     _ <- runScript h Nothing [] "b = [list: 3,4]"
+>     pure ()
+>     --T.assertEqual "" (NumV 16) v
 
-convert tests to hunit tests
+
+
 
 > makeTestsIO :: String -> IO (Either String [CheckResult]) -> T.TestTree
 > makeTestsIO gnm cs =
