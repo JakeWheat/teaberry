@@ -43,15 +43,15 @@ imports
 > --import Control.Monad.IO.Class (liftIO)
 > import Control.Monad.Trans.Except (Except, runExcept, throwE)
 > import Control.Monad.Trans.RWS (RWST
->                                ,evalRWST
+>                                --,evalRWST
 >                                ,runRWST
 >                                ,ask
 >                                ,local
 >                                --,get
->                                --,gets
+>                                ,gets
 >                                ,state
 >                                --,put
->                                --,modify
+>                                ,modify
 >                                --,asks
 >                                )
 > import Control.Exception.Safe (Exception, throwM, catch)
@@ -159,12 +159,12 @@ todo: plenty of duplication and refactoring possibilities here
 >         (sast,mods) <- loadScript fn src
 >         let f [] = do
 >                 when additionalLoadTracing $ lift $ putStrLn $ "compile script"
->                 compiled <- either throwInterp pure $ (doDesugar $ desugarScript False sast)
+>                 compiled <- doDesugar $ desugarScript False sast
 >                 when additionalLoadTracing $ traceExtra compiled
 >                 interp compiled
 >             f ((is,ast):srcs) = do
 >                 when additionalLoadTracing $ lift $ putStrLn $ "compile " ++ show is
->                 (nm,compiled) <- either throwInterp pure $ doDesugar $ desugarModule is ast
+>                 (nm,compiled) <- doDesugar $ desugarModule is ast
 >                 when additionalLoadTracing $ traceExtra compiled
 >                 v <- interp compiled
 >                 lift $ putStrLn $ "loaded " ++
@@ -388,11 +388,11 @@ interpreter types
 
 > data InterpreterState =
 >     InterpreterState
->     {
+>     {desugarState :: DesugarState
 >     }
 
 > emptyInterpreterState :: InterpreterState
-> emptyInterpreterState = InterpreterState
+> emptyInterpreterState = InterpreterState startingDesugarState
 
 > data InterpreterException = InterpreterException String
 >                           | ValueException Value
@@ -632,7 +632,7 @@ written out in full to add the type easily
 > showDesugar :: String -> Interpreter Value
 > showDesugar src = do
 >     md <- either throwInterp pure $ P.parseModule "" src
->     compiled <- either throwInterp pure $ doDesugar $ desugarScript False md
+>     compiled <- doDesugar $ desugarScript False md
 >     pure $ TextV $ prettyIExpr compiled
 
 > showDesugarModule :: FilePath -> Interpreter Value
@@ -647,7 +647,7 @@ written out in full to add the type easily
 >     fn' <- fst <$> importSourceToFileNameModName d "" is
 >     src <- lift $ readFile fn'
 >     ast <- either throwInterp pure $ P.parseModule fn' src
->     (nm,compiled) <- either throwInterp pure $ doDesugar $ desugarModule is ast
+>     (nm,compiled) <- doDesugar $ desugarModule is ast
 >     -- todo: just print let nm = and then indent the content so
 >     -- it looks like a let statement
 >     pure $ TextV $ prettyIExpr (ILet [(nm,compiled)] (IIden "handle environment"))
@@ -1084,7 +1084,7 @@ run a function with args passed as values
 
 > interpAst :: Module -> Interpreter Value
 > interpAst m = do
->     ib <- either throwInterp pure $ doDesugar $ desugarScript False m
+>     ib <- doDesugar $ desugarScript False m
 >     x <- interp ib
 >     case x of
 >             VariantV "tuple" [("0", v)
@@ -1133,9 +1133,13 @@ desugaring
 
 desugaring code
 
-> doDesugar :: Desugarer a -> Either String a
-> doDesugar go =
->    fst <$> runExcept (evalRWST go (DesugarReader {}) startingDesugarState)
+> doDesugar :: Desugarer a -> Interpreter a
+> doDesugar go = do
+>    ds <- gets desugarState
+>    let f (v,ds',_) = do
+>            modify $ \s -> s {desugarState = ds'}
+>            pure v
+>    either throwInterp f $ runExcept (runRWST go (DesugarReader {}) ds)
 
 
 slightly lazy - a script can contain import statements (but not
