@@ -3,29 +3,7 @@ Take RefactorWrappers and modify so that modules are compiled and
 executed one by one (like builtins is now), instead of desugared
 together and run together.
 
-Then do:
-
-better flexibility for running tests
-a function to do dump desugar of stuff
-
-thinking about only reloading modules when they've changed, but not
-sure the payoff is enough right now, if it's always quick to reload
-everything, why bother
-
-also:
-fix the canonical name of a module stuff, and the "module." crap that's
-everywhere
-
-+ thread the desugar state through the interpreter so it's reused every time
-desugar runs
-
-don't copy out the interpreter state to the runtime handle, just embed
-it there to avoid boilerplate
-
-add a forget binding function
-work on desugar pretty printing
-work on env pretty printing
--> start to get more introspection ability to make it easier to work with
+Plus a bunch of refactoring
 
 
 =============================================================================
