@@ -173,6 +173,8 @@ runs a script then runs a callback on the result from running the script
 > additionalLoadTracing :: Bool
 > additionalLoadTracing = False
 
+todo: plenty of duplication and refactoring possibilities here
+
 > runScriptInternal :: TeaberryHandle
 >                   -> Maybe String
 >                   -> [(String,Value)]
@@ -195,8 +197,8 @@ runs a script then runs a callback on the result from running the script
 >     evaluateWithHandle th $ interpWithAdditionalEnv lenv $ do
 >         when additionalLoadTracing $ lift $ putStrLn $ "load script" 
 >         (sast,mods) <- loadScript fn src
->         when additionalLoadTracing $ do
->           lift $ putStrLn $ ppShow (sast,mods)
+>         --when additionalLoadTracing $ do
+>         --  lift $ putStrLn $ ppShow (sast,mods)
 >         let f [] = do
 >                 when additionalLoadTracing $ lift $ putStrLn $ "compile script"
 >                 compiled <- either throwInterp pure $ doDesugarScript False sast
@@ -374,6 +376,7 @@ language exceptions
 > eapp f as = App (Iden f) as
 
 > throwUnboundIdentifier :: String -> Interpreter a
+> throwUnboundIdentifier "empty" = error $ "unbound identifier empty - this happens when the code is completely broken"
 > throwUnboundIdentifier i =
 >     if (i == "unbound-identifier")
 >     then error ("unbound loop")
@@ -602,6 +605,8 @@ written out in full to add the type easily
 >     src <- lift $ readFile fn'
 >     ast <- either throwInterp pure $ P.parseModule fn' src
 >     (nm,compiled) <- either throwInterp pure $ doDesugarModule is ast
+>     -- todo: just print let nm = and then indent the content so
+>     -- it looks like a let statement
 >     pure $ TextV $ prettyIExpr (ILet [(nm,compiled)] (IIden "handle environment"))
 
 > showDesugarScript :: String -> Interpreter Value
@@ -1183,12 +1188,12 @@ provides), so just use a Module ast to represent this for now
 >                                     startingDesugarState)
 >   where
 >     go = do
->         ps' <- concat <$> mapM desugarPreludeStmt ps
+>         ps' <- concat <$> mapM desugarPreludeInStmt ps
 >         let testsVar = if tempIsBuiltIn
 >                        then []
->                        else [VarDecl (PatName NoShadow "all-module-tests-internal") (Iden "empty")]
->         stmts' <- addTopRet stmts
->         desugarStmts (ps' ++ testsVar ++ stmts')
+>                        else [VarDecl (PatName NoShadow "_all-module-tests-internal") (Iden "empty")]
+>         stmts' <- addTopRet (testsVar ++ stmts)
+>         desugarStmts (ps' ++ stmts')
 >     -- to be able to bind something in a script
 >     -- then refer to this binding in a later call to the embedded api
 >     -- rewrite the script to return the last value that the user wants
@@ -1196,7 +1201,7 @@ provides), so just use a Module ast to represent this for now
 >     -- saved env in the embedded handle
 >     mk x = StExpr $ TupleSel [x
 >                              ,App (Iden "env-to-record") []
->                              ,Lam [] $ App (Iden "run-tests") [Iden "all-module-tests-internal"]]
+>                              ,Lam [] $ App (Iden "run-tests") [Iden "_all-module-tests-internal"]]
 >     addTopRet [] = pure ([mk nothingSyntaxHack])
 >     addTopRet [StExpr x] = do
 >         z <- makeUniqueVar "z"
@@ -1216,10 +1221,10 @@ provides), so just use a Module ast to represent this for now
 > desugarModule :: ImportSource ->  Module -> Desugarer (String,IExpr)
 > desugarModule moduleName (Module ps stmts) = do
 >     internalModName <- importSourceInternalModuleName moduleName
->     ps' <- concat <$> mapM desugarPreludeStmt ps
+>     ps' <- concat <$> mapM desugarPreludeInStmt ps
 >     -- add the final value for repl/embedded, imported module and testing support
->     stmts' <- addTopRet stmts
->     (internalModName,) <$> desugarStmts (ps' ++ testsVar ++ stmts')
+>     stmts' <- addTopRet (testsVar ++ stmts)
+>     (internalModName,) <$> desugarStmts (ps' ++ stmts')
 >   where
 >     pis = pisToTea $ getProvides ps
 >     mk x = StExpr $ TupleSel [x -- temp
@@ -1229,11 +1234,11 @@ provides), so just use a Module ast to represent this for now
 >                              -- tests - these will be available as an automatically provided
 >                              -- thing
 >                              ,App (Iden "env-to-record") []
->                              ,Lam [] $ App (Iden "run-tests") [Iden "all-module-tests-internal"]]
+>                              ,Lam [] $ App (Iden "run-tests") [Iden "_all-module-tests-internal"]]
 >     testsVar = -- hack to avoid referring to empty before it exists in the builtins
 >                if moduleName == ImportName "built-ins"
 >                then []
->                else [VarDecl (PatName NoShadow "all-module-tests-internal") (Iden "empty")]
+>                else [VarDecl (PatName NoShadow "_all-module-tests-internal") (Iden "empty")]
 >     addTopRet [] = pure ([mk nothingSyntaxHack])
 >     addTopRet [StExpr x] = do
 >         z <- makeUniqueVar "z"
@@ -1281,23 +1286,25 @@ add the last statement which returns the last value and the env, for
 
 > unPatName :: PatName -> String
 > unPatName (PatName _ x) = x
-  
-> desugarPreludeStmt :: PreludeStmt -> Desugarer [Stmt]
-> desugarPreludeStmt (Import is b) = do
+
+ignores provides statements, they are handled differently
+
+> desugarPreludeInStmt :: PreludeStmt -> Desugarer [Stmt]
+> desugarPreludeInStmt (Import is b) = do
 >     n <- importSourceInternalModuleName is
 >     pure [LetDecl (patName b) (TupleGet (Iden n) 1)]
 
-> desugarPreludeStmt (IncludeFrom nm is) =
+> desugarPreludeInStmt (IncludeFrom nm is) =
 >     pure $ flip map is $ \case
 >         ProvideAlias n1 n2 -> LetDecl (patName n2) (DotExpr (Iden nm) n1)
 >         ProvideName n -> LetDecl (patName n) (DotExpr (Iden nm) n)
 >         ProvideAll -> LetSplatDecl (Iden nm)
 
-> desugarPreludeStmt (Provide {}) = pure []
+> desugarPreludeInStmt (Provide {}) = pure []
 
-> desugarPreludeStmt (Include is) = do
+> desugarPreludeInStmt (Include is) = do
 >     m <- makeUniqueVar "module"
->     concat <$> mapM desugarPreludeStmt [Import is m, IncludeFrom m [ProvideAll]]
+>     concat <$> mapM desugarPreludeInStmt [Import is m, IncludeFrom m [ProvideAll]]
 
 > getProvides :: [PreludeStmt] -> [ProvideItem]
 > getProvides xs = case mapMaybe getPIs xs of
@@ -1511,8 +1518,8 @@ xxx.make([list: <elements>])
 
 > registerCheckBlock :: Expr -> Stmt
 > registerCheckBlock f =
->     SetVar "all-module-tests-internal"
->     (App (Iden "link") [f, Iden "all-module-tests-internal"])
+>     SetVar "_all-module-tests-internal"
+>     (App (Iden "link") [f, Iden "_all-module-tests-internal"])
 
 > desugarStmts :: [Stmt] -> Desugarer IExpr
 
