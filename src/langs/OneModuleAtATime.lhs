@@ -192,12 +192,12 @@ runs a script then runs a callback on the result from running the script
 >     -- todo: change it to take a string and not a maybe string
 >     -- the user can pass in "" if that's what they want
 >     let fn = maybe "" id mfn
->     evaluateWithHandle th $ runWithAdditionalEnv lenv $ do
+>     evaluateWithHandle th $ interpWithAdditionalEnv lenv $ do
 >         when additionalLoadTracing $ liftIO $ putStrLn $ "load script" 
 >         (sast,mods) <- loadScript fn src
 >         let f [] = do
 >                 when additionalLoadTracing $ liftIO $ putStrLn $ "compile script"
->                 compiled <- either throwInterp pure $ runDesugarScript False sast
+>                 compiled <- either throwInterp pure $ doDesugarScript False sast
 >                 when additionalLoadTracing $ do
 >                     rd <- ask
 >                     liftIO $ putStrLn $ "ENV:\n" ++ torepr' (VariantV "record" $ envEnv $ ieEnv rd)
@@ -207,7 +207,7 @@ runs a script then runs a callback on the result from running the script
 >                 interp compiled
 >             f ((is,ast):srcs) = do
 >                 when additionalLoadTracing $ liftIO $ putStrLn $ "compile " ++ show is
->                 (nm,compiled) <- either throwInterp pure $ runDesugarModule2 is ast
+>                 (nm,compiled) <- either throwInterp pure $ doDesugarModule2 is ast
 >                 when additionalLoadTracing $ do
 >                     liftIO $ putStrLn $ "compiled"
 >                     rd <- ask
@@ -221,7 +221,7 @@ runs a script then runs a callback on the result from running the script
 >                          ImportName x -> x
 >                          ImportSpecial "file" [ifn] -> "\"" ++ ifn ++ "\""
 >                          _ -> show is)
->                 runWithAdditionalEnv [(nm,v)] $ f srcs
+>                 interpWithAdditionalEnv [(nm,v)] $ f srcs
 >         cb =<< f mods
 
 > runScript :: TeaberryHandle -> Maybe String -> [(String,Value)] -> String -> IO Value
@@ -245,7 +245,7 @@ runs a script then runs a callback on the result from running the script
 >             VariantV "tuple" [("0", _v)
 >                              ,("1", VariantV "record" e)
 >                              ,("2", runTests)] -> do
->                 (_,tv) <- runFunctionInterp "lam(x): test-results-to-haskell(x()) end" [runTests]
+>                 (_,tv) <- interpFunction "lam(x): test-results-to-haskell(x()) end" [runTests]
 >                 (e,) <$> case tv of
 >                     FFIVal cs' ->
 >                         case fromDynamic cs' of
@@ -365,7 +365,7 @@ language exceptions
 
 > raiseValue :: Expr -> Interpreter a
 > raiseValue e = do
->     runAstInterpVoid $ Module [] [StExpr $ eapp "raise" [e]]
+>     astInterpVoid $ Module [] [StExpr $ eapp "raise" [e]]
 >     throwInterp "internal error: should have raised"
 
 > eapp :: String -> [Expr] -> Expr
@@ -585,7 +585,7 @@ written out in full to add the type easily
 > showDesugar :: String -> Interpreter Value
 > showDesugar src = do
 >     md <- either throwInterp pure $ P.parseModule "" src
->     compiled <- either throwInterp pure $ runDesugarScript False md
+>     compiled <- either throwInterp pure $ doDesugarScript False md
 >     pure $ TextV $ prettyIExpr compiled
 
 todo: make this accept a regular module spec
@@ -596,7 +596,7 @@ so it can read the built ins easily too
 >     src <- lift $ readFile fn
 >     d <- liftIO $ getBuiltInModulesDir
 >     (ast,srcs) <- loadSourceFiles fn d src
->     compiled <- either throwInterp pure $ runDesugar True fn ast srcs
+>     compiled <- either throwInterp pure $ doDesugar True fn ast srcs
 >     pure $ TextV $ prettyIExpr compiled
 
 > showDesugarModule2 :: FilePath -> Interpreter Value
@@ -606,7 +606,7 @@ so it can read the built ins easily too
 >     fn' <- fst <$> importSourceToFileNameModName d "" is
 >     src <- lift $ readFile fn'
 >     ast <- either throwInterp pure $ P.parseModule fn' src
->     (nm,compiled) <- either throwInterp pure $ runDesugarModule2 is ast
+>     (nm,compiled) <- either throwInterp pure $ doDesugarModule2 is ast
 >     pure $ TextV $ prettyIExpr (ILet [(nm,compiled)] (IIden "handle environment"))
 
 > showDesugarBuiltInModule :: String -> Interpreter Value
@@ -616,7 +616,7 @@ so it can read the built ins easily too
 >     fn' <- fst <$> importSourceToFileNameModName d "" is
 >     src <- lift $ readFile fn'
 >     ast <- either throwInterp pure $ P.parseModule fn' src
->     (nm,compiled) <- either throwInterp pure $ runDesugarModule2 is ast
+>     (nm,compiled) <- either throwInterp pure $ doDesugarModule2 is ast
 >     pure $ TextV $ prettyIExpr (ILet [(nm,compiled)] (IIden "handle environment"))
 
 
@@ -685,8 +685,8 @@ dodgy: returns an empty string if index is out of range
 
 > stringToNumber :: String -> Interpreter Value
 > stringToNumber s = case readMaybe s of
->     Just x -> snd <$> runFunctionInterp "some" [NumV x]
->     Nothing -> runSimpleInterp "none"
+>     Just x -> snd <$> interpFunction "some" [NumV x]
+>     Nothing -> simpleInterp "none"
 
 --------------------------------------
 
@@ -701,21 +701,21 @@ run it
 return the the resulting env, the value of the last line of the
 script, and a function to run any tests from the script
 
-> runAstInterp :: FilePath
+> astInterp :: FilePath
 >              -> (Module, [(String,Module)])
 >              -> Interpreter ([(String,Value)],(Value,Value))
-> runAstInterp mfn srcs = runAstInterp' False mfn srcs
+> astInterp mfn srcs = astInterp' False mfn srcs
 
-> runAstInterp' :: Bool -- skip tests hack for builtins module only
+> astInterp' :: Bool -- skip tests hack for builtins module only
 >              -> FilePath
 >              -> (Module, [(String,Module)])
 >              -> Interpreter ([(String,Value)],(Value,Value))
-> runAstInterp' skipTestsForBuiltins fn (ast,srcs) = do
+> astInterp' skipTestsForBuiltins fn (ast,srcs) = do
 >     -- todo: if fn is nothing
 >     -- get a unique name using the desugar state
 >     -- let fn = maybe "toplevel.x" id mfn
 >     compiled <- either throwInterp pure $
->         runDesugar skipTestsForBuiltins fn ast srcs
+>         doDesugar skipTestsForBuiltins fn ast srcs
 >     -- ast,srcs, try desugaring one by one
 >     interpRes <- interp compiled
 >     case interpRes of
@@ -739,60 +739,60 @@ script, and a function to run any tests from the script
 
 run a simple script without imports and return the value
 
-> runSimpleInterp :: String -> Interpreter Value
-> runSimpleInterp src = do
->    (fst . snd) <$> runSrcInterp "simple" src
+> simpleInterp :: String -> Interpreter Value
+> simpleInterp src = do
+>    (fst . snd) <$> srcInterp "simple" src
 
 run a simple ast and return nothing
 
-> runAstInterpVoid :: Module -> Interpreter ()
-> runAstInterpVoid ast = void $ runAstInterp "simple" (ast,[])
+> astInterpVoid :: Module -> Interpreter ()
+> astInterpVoid ast = void $ astInterp "simple" (ast,[])
 
 
 run a function with args passed as values
 
-> runFunctionInterp :: String -> [Value] -> Interpreter ([(String,Value)],Value)
-> runFunctionInterp f as = do
->     v <- runSrcInterp "simple" f
+> interpFunction :: String -> [Value] -> Interpreter ([(String,Value)],Value)
+> interpFunction f as = do
+>     v <- srcInterp "simple" f
 >     let as' = zipWith (\i x -> ("aaa-" ++ show i, x)) [(0::Int)..] as
 >     (\(x,(y,_)) -> (x,y)) <$>
->         (runWithAdditionalEnv (("fff", fst (snd v)):as') $
->          runSrcInterp "simple" $ "fff(" ++ intercalate "," (map fst as') ++ ")")
+>         (interpWithAdditionalEnv (("fff", fst (snd v)):as') $
+>          srcInterp "simple" $ "fff(" ++ intercalate "," (map fst as') ++ ")")
 
 run a script with additional bindings
 
-> runWithAdditionalEnv :: [(String,Value)] -> Interpreter a -> Interpreter a
-> runWithAdditionalEnv lenv f = local (\y -> y {ieEnv = extendEnv lenv $ ieEnv y}) f
+> interpWithAdditionalEnv :: [(String,Value)] -> Interpreter a -> Interpreter a
+> interpWithAdditionalEnv lenv f = local (\y -> y {ieEnv = extendEnv lenv $ ieEnv y}) f
 
 run a script wihtout imports, including parsing it
 
-> runSrcInterp :: FilePath
+> srcInterp :: FilePath
 >              -> String
 >              -> Interpreter ([(String,Value)], (Value,Value))
-> runSrcInterp mfn src = do
+> srcInterp mfn src = do
 >     -- todo: use a filename
 >     ast <- either throwInterp pure $ P.parseModule "" src
->     runAstInterp mfn (ast,[])
+>     astInterp mfn (ast,[])
 
 
-> runSrcInterpBuiltinsTestHack :: FilePath
+> {-srcInterpBuiltinsTestHack :: FilePath
 >                              -> String
 >                              -> Interpreter ([(String,Value)], (Value,Value))
-> runSrcInterpBuiltinsTestHack mfn src = do
+> srcInterpBuiltinsTestHack mfn src = do
 >     -- todo: use a filename
 >     ast <- either throwInterp pure $ P.parseModule "" src
->     runAstInterp' True mfn (ast,[])
+>     astInterp' True mfn (ast,[])-}
 
 
 run a script by parsing it and also loading all imports recursively
 
-> runSrcWithLoadInterp :: FilePath
+> {-srcWithLoadInterp :: FilePath
 >                      -> String
 >                      -> Interpreter ([(String,Value)], (Value,Value))
-> runSrcWithLoadInterp mfn src = do
+> srcWithLoadInterp mfn src = do
 >     d <- liftIO $ getBuiltInModulesDir
 >     srcs <- loadSourceFiles mfn d src
->     runAstInterp mfn srcs
+>     astInterp mfn srcs-}
 
 recursively load all the referenced modules in the source given
 
@@ -926,7 +926,7 @@ of the process
 >     --         ((nm,ast):) . concat <$> mapM (loadAndRecurse d swd) rs
 >     loadAndRecurse d swd is = do
 >         --liftIO $ putStrLn $ "loading " ++ show is
->         (fn,mn) <- importSourceToFileNameModName d swd is
+>         (fn,_mn) <- importSourceToFileNameModName d swd is
 >         src' <- liftIO $ readFile fn
 >         (ast,rs) <- parseAndGetImports src'
 >         ((is,ast):) . concat <$> mapM (loadAndRecurse d (takeDirectory fn)) rs
@@ -1318,8 +1318,8 @@ desugaring
 
 desugaring code
 
-> runDesugar :: Bool -> FilePath -> Module -> [(String,Module)] -> Either String IExpr
-> runDesugar skipTestsForBuiltins nm ast srcs =
+> doDesugar :: Bool -> FilePath -> Module -> [(String,Module)] -> Either String IExpr
+> doDesugar skipTestsForBuiltins nm ast srcs =
 >     (simplify . fst) <$> runExcept (evalRWST go (DesugarReader {}) startingDesugarState)
 >   where
 >     go = do
@@ -1350,8 +1350,8 @@ desugaring code
 slightly lazy - a script can contain import statements (but not
 provides), so just use a Module ast to represent this for now
 
-> runDesugarScript :: Bool -> Module -> Either String IExpr
-> runDesugarScript tempIsBuiltIn (Module ps stmts) =
+> doDesugarScript :: Bool -> Module -> Either String IExpr
+> doDesugarScript tempIsBuiltIn (Module ps stmts) =
 >     (simplify . fst) <$> runExcept (evalRWST go
 >                                     (DesugarReader {})
 >                                     startingDesugarState)
@@ -1380,8 +1380,8 @@ provides), so just use a Module ast to represent this for now
 
 
 
-> runDesugarModule2 :: ImportSource -> Module -> Either String (String,IExpr)
-> runDesugarModule2 moduleName ast =
+> doDesugarModule2 :: ImportSource -> Module -> Either String (String,IExpr)
+> doDesugarModule2 moduleName ast =
 >     f <$> runExcept (evalRWST (desugarModule2 moduleName ast)
 >                                     (DesugarReader {})
 >                                     startingDesugarState)
