@@ -162,59 +162,24 @@ embedded api
 > defaultRuntimeState = RuntimeState {henv = makeInterpreterEnv defaultEnv
 >                                    ,hstate = emptyInterpreterState}
   
-temp while come up with a better way to do this
-
-> runBuiltinTests :: Bool
-> runBuiltinTests = False
-
-> newTeaberryHandle = newTeaberryHandle2
-> runScript = runScript2
-> runScriptWithTests = runScriptWithTests2
-
-> newTeaberryHandle2 :: IO TeaberryHandle
-> newTeaberryHandle2 = do
+> newTeaberryHandle :: IO TeaberryHandle
+> newTeaberryHandle = do
 >     th <- TeaberryHandle <$> newIORef defaultRuntimeState
->     -- load builtins
->     {-_ <- evaluateWithHandle th $ do
->         let is = ImportName "built-ins"
->         -- factor out?
->         -- get the built in modules dir, get the file name
->         -- read it, parse module on it
->         -- interpret it, add it as a module
->         -- can parameterize part of it for general module loading
->         -- and to also support scripts which share most of this
->         d <- lift $ getBuiltInModulesDir
->         fn <- fst <$> importSourceToFileNameModName d "" is
->         liftIO $ putStrLn $ "load built ins"
->         src <- liftIO $ readFile fn
->         liftIO $ putStrLn $ "compile built ins"
->         ast <- either throwInterp pure $ runDesugarModule2 is ast
->         -- todo: change this to rundesugarmodule
->         -- and adjust the desugaring to also add import all the built ins
->         {-(nm,compiled) <- either throwInterp pure $-}
->         compiled <- either throwInterp pure $ runDesugarScript True ast
->         liftIO $ putStrLn $ "run built ins"
->         v <- interp compiled
->         e <- case v of
->             VariantV "tuple" [("0", _)
->                              ,("1", VariantV "record" e)] -> pure e
->             _ -> throwInterp $ "expected 2 element tuple with second element being a record, got this: "
->                     ++ torepr' v
->         pure (e,nothingValueHack)-}
->         
->     --pure th
->     _ <- runScript2 th (Just "initialize") [] "include built-ins"
+>     _ <- runScript th (Just "initialize") [] "include built-ins"
 >     pure th
 
 runs a script then runs a callback on the result from running the script
 
-> runScript2Internal :: TeaberryHandle
->                    -> Maybe String
->                    -> [(String,Value)]
->                    -> String
->                    -> (Value -> Interpreter ([(String,Value)],a))
->                    -> IO a
-> runScript2Internal th mfn lenv src cb = do
+> additionalLoadTracing :: Bool
+> additionalLoadTracing = False
+
+> runScriptInternal :: TeaberryHandle
+>                   -> Maybe String
+>                   -> [(String,Value)]
+>                   -> String
+>                   -> (Value -> Interpreter ([(String,Value)],a))
+>                   -> IO a
+> runScriptInternal th mfn lenv src cb = do
 >     -- loadfiles - this loads and parses the files following the dependencies
 >     -- it only parses them because it needs to do this to load the dependencies
 >     -- you get back a list of module name/ module sources
@@ -228,44 +193,40 @@ runs a script then runs a callback on the result from running the script
 >     -- the user can pass in "" if that's what they want
 >     let fn = maybe "" id mfn
 >     evaluateWithHandle th $ runWithAdditionalEnv lenv $ do
->         --liftIO $ putStrLn $ "load script" 
->         (src,mods) <- loadScript fn src
+>         when additionalLoadTracing $ liftIO $ putStrLn $ "load script" 
+>         (sast,mods) <- loadScript fn src
 >         let f [] = do
->                 --liftIO $ putStrLn $ "compile script"
->                 compiled <- either throwInterp pure $ runDesugarScript False src
->                 rd <- ask
->                 --liftIO $ putStrLn $ "ENV:\n" ++ torepr' (VariantV "record" $ envEnv $ ieEnv rd)
->                 --liftIO $ putStrLn $ "COMPILED:\n" ++ prettyIExpr compiled
->                 --liftIO $ putStrLn $ ppShow compiled
->                 --liftIO $ putStrLn $ "run script"
+>                 when additionalLoadTracing $ liftIO $ putStrLn $ "compile script"
+>                 compiled <- either throwInterp pure $ runDesugarScript False sast
+>                 when additionalLoadTracing $ do
+>                     rd <- ask
+>                     liftIO $ putStrLn $ "ENV:\n" ++ torepr' (VariantV "record" $ envEnv $ ieEnv rd)
+>                     liftIO $ putStrLn $ "COMPILED:\n" ++ prettyIExpr compiled
+>                     liftIO $ putStrLn $ ppShow compiled
+>                     liftIO $ putStrLn $ "run script"
 >                 interp compiled
 >             f ((is,ast):srcs) = do
->                 --liftIO $ putStrLn $ "compile " ++ show is
+>                 when additionalLoadTracing $ liftIO $ putStrLn $ "compile " ++ show is
 >                 (nm,compiled) <- either throwInterp pure $ runDesugarModule2 is ast
->                 --liftIO $ putStrLn $ "compiled"
->                 rd <- ask
->                 --liftIO $ putStrLn $ "ENV:\n" ++ torepr' (VariantV "record" $ envEnv $ ieEnv rd)
->                 --liftIO $ putStrLn $ "COMPILED:\n" ++ prettyIExpr compiled
->                 --liftIO $ putStrLn $ ppShow compiled
->                 --liftIO $ putStrLn $ "run"
+>                 when additionalLoadTracing $ do
+>                     liftIO $ putStrLn $ "compiled"
+>                     rd <- ask
+>                     liftIO $ putStrLn $ "ENV:\n" ++ torepr' (VariantV "record" $ envEnv $ ieEnv rd)
+>                     liftIO $ putStrLn $ "COMPILED:\n" ++ prettyIExpr compiled
+>                     liftIO $ putStrLn $ ppShow compiled
+>                     liftIO $ putStrLn $ "run"
 >                 v <- interp compiled
->                 liftIO $ putStrLn $ "loaded " ++ (case is of
->                                                       ImportName x -> x
->                                                       ImportSpecial "file" [fn] -> "\"" ++ fn ++ "\""
->                                                       _ -> show is)
+>                 liftIO $ putStrLn $ "loaded " ++
+>                     (case is of
+>                          ImportName x -> x
+>                          ImportSpecial "file" [ifn] -> "\"" ++ ifn ++ "\""
+>                          _ -> show is)
 >                 runWithAdditionalEnv [(nm,v)] $ f srcs
 >         cb =<< f mods
->         {-x <- f mods
->         case x of
->             VariantV "tuple" [("0", v)
->                              ,("1", VariantV "record" e)
->                              ,("2", _tests)] -> pure (e, v)
->             _ -> throwInterp $ "expected 2 element tuple with second element being a record, got this: "
->                     ++ torepr' x-}
 
-> runScript2 :: TeaberryHandle -> Maybe String -> [(String,Value)] -> String -> IO Value
-> runScript2 th mfn lenv src =
->     runScript2Internal th mfn lenv src $ \x -> do
+> runScript :: TeaberryHandle -> Maybe String -> [(String,Value)] -> String -> IO Value
+> runScript th mfn lenv src =
+>     runScriptInternal th mfn lenv src $ \x -> do
 >         case x of
 >             VariantV "tuple" [("0", v)
 >                              ,("1", VariantV "record" e)
@@ -273,20 +234,19 @@ runs a script then runs a callback on the result from running the script
 >             _ -> throwInterp $ "expected 2 element tuple with second element being a record, got this: "
 >                     ++ torepr' x
 
-> runScriptWithTests2 :: TeaberryHandle
->                     -> Maybe String
->                     -> [(String,Value)]
->                     -> String
->                     -> IO [T.CheckResult]
-> runScriptWithTests2 th mfn lenv src =
->     runScript2Internal th mfn lenv src $ \x -> do
+> runScriptWithTests :: TeaberryHandle
+>                    -> Maybe String
+>                    -> [(String,Value)]
+>                    -> String
+>                    -> IO [T.CheckResult]
+> runScriptWithTests th mfn lenv src =
+>     runScriptInternal th mfn lenv src $ \x -> do
 >         case x of
->             VariantV "tuple" [("0", v)
+>             VariantV "tuple" [("0", _v)
 >                              ,("1", VariantV "record" e)
 >                              ,("2", runTests)] -> do
->                 (y,tv) <- runFunctionInterp "lam(x): test-results-to-haskell(x()) end" [runTests]
->                 --pure (e, v)
->                 (y,) <$> case tv of
+>                 (_,tv) <- runFunctionInterp "lam(x): test-results-to-haskell(x()) end" [runTests]
+>                 (e,) <$> case tv of
 >                     FFIVal cs' ->
 >                         case fromDynamic cs' of
 >                             Just trs -> pure (trs :: [T.CheckResult])
@@ -294,73 +254,6 @@ runs a script then runs a callback on the result from running the script
 >                     _ -> throwInterp $ "expected FFIVal, got " ++ show tv
 >             _ -> throwInterp $ "expected 2 element tuple with second element being a record, got this: "
 >                     ++ torepr' x
->   {-
->     -- todo: generate unique names
->     let fn = maybe "unnamed" id mfn
->     runTests <- snd <$> (evaluateWithHandle th $ runWithAdditionalEnv lenv
->                          $ runSrcWithLoadInterp fn src)
->     evaluateWithHandle th $ f runTests
->   where
->     f :: Value -> Interpreter ([(String,Value)], [T.CheckResult])
->     f runTests = do
->         (x,tv) <- runFunctionInterp "lam(x): test-results-to-haskell(x()) end" [runTests]
->         -- liftIO $ putStrLn "here2"
->         (x,) <$> case tv of
->                  FFIVal cs' ->
->                      case fromDynamic cs' of
->                          Just trs -> pure (trs :: [T.CheckResult])
->                          Nothing -> throwInterp $ "expected [checkresult], got " ++ show cs'
->                  _ -> throwInterp $ "expected FFIVal, got " ++ show tv
-> -}
-
-
-> newTeaberryHandle0 :: IO TeaberryHandle
-> newTeaberryHandle0 = do
->     th <- TeaberryHandle <$> newIORef defaultRuntimeState
->     -- load builtins
->     d <- getBuiltInModulesDir
->     src <- liftIO $ readFile (d </> "built-ins.tea")
->     x <- evaluateWithHandle th (runSrcInterpBuiltinsTestHack (d </> "built-ins.tea") src)
->     when runBuiltinTests $ do
->         void $ evaluateWithHandle th $ runFunctionInterp "lam(x): x() end" [snd x]
->     pure th
-
-
-
-> runScript0 :: TeaberryHandle -> Maybe String -> [(String,Value)] -> String -> IO Value
-> runScript0 th mfn lenv src = do
->     -- todo: generate unique names
->     let fn = maybe "unnamed" id mfn
->     x <- (evaluateWithHandle th $
->           runWithAdditionalEnv lenv $ runSrcWithLoadInterp fn src)
->     -- run the tests by default
->     _  <- evaluateWithHandle th $ runFunctionInterp "lam(x): x() end" [snd x]
->     pure $ fst x
-
-runs a script and returns the test results in haskell format, a bit hacky
-
-> runScriptWithTests0 :: TeaberryHandle
->                    -> Maybe String
->                    -> [(String,Value)]
->                    -> String
->                    -> IO [T.CheckResult]
-> runScriptWithTests0 th mfn lenv src = do
->     -- todo: generate unique names
->     let fn = maybe "unnamed" id mfn
->     runTests <- snd <$> (evaluateWithHandle th $ runWithAdditionalEnv lenv
->                          $ runSrcWithLoadInterp fn src)
->     evaluateWithHandle th $ f runTests
->   where
->     f :: Value -> Interpreter ([(String,Value)], [T.CheckResult])
->     f runTests = do
->         (x,tv) <- runFunctionInterp "lam(x): test-results-to-haskell(x()) end" [runTests]
->         -- liftIO $ putStrLn "here2"
->         (x,) <$> case tv of
->                  FFIVal cs' ->
->                      case fromDynamic cs' of
->                          Just trs -> pure (trs :: [T.CheckResult])
->                          Nothing -> throwInterp $ "expected [checkresult], got " ++ show cs'
->                  _ -> throwInterp $ "expected FFIVal, got " ++ show tv
 
 > runFunction :: TeaberryHandle -> String -> [Value] -> IO Value
 > runFunction h f as = do
