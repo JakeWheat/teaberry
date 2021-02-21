@@ -888,7 +888,7 @@ recursively load all the referenced modules in the source given
 >     getImp _ = Nothing
 
 > getBuiltInModulesDir :: IO FilePath
-> getBuiltInModulesDir = getDataFileName "built-in-modules-snapshot3"
+> getBuiltInModulesDir = getDataFileName "built-in-modules-snapshot4"
 
 > importSourceToFileNameModName :: FilePath -> FilePath -> ImportSource -> Interpreter (FilePath, String)
 > importSourceToFileNameModName _ cwd (ImportSpecial "file" [n]) =
