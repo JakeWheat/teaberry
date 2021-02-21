@@ -169,6 +169,7 @@ temp while come up with a better way to do this
 
 > newTeaberryHandle = newTeaberryHandle2
 > runScript = runScript2
+> runScriptWithTests = runScriptWithTests2
 
 > newTeaberryHandle2 :: IO TeaberryHandle
 > newTeaberryHandle2 = do
@@ -205,9 +206,15 @@ temp while come up with a better way to do this
 >     _ <- runScript2 th (Just "initialize") [] "include built-ins"
 >     pure th
 
+runs a script then runs a callback on the result from running the script
 
-> runScript2 :: TeaberryHandle -> Maybe String -> [(String,Value)] -> String -> IO Value
-> runScript2 th mfn lenv src = do
+> runScript2Internal :: TeaberryHandle
+>                    -> Maybe String
+>                    -> [(String,Value)]
+>                    -> String
+>                    -> (Value -> Interpreter ([(String,Value)],a))
+>                    -> IO a
+> runScript2Internal th mfn lenv src cb = do
 >     -- loadfiles - this loads and parses the files following the dependencies
 >     -- it only parses them because it needs to do this to load the dependencies
 >     -- you get back a list of module name/ module sources
@@ -242,15 +249,69 @@ temp while come up with a better way to do this
 >                 --liftIO $ putStrLn $ ppShow compiled
 >                 --liftIO $ putStrLn $ "run"
 >                 v <- interp compiled
->                 liftIO $ putStrLn $ "loaded " ++ show is
+>                 liftIO $ putStrLn $ "loaded " ++ (case is of
+>                                                       ImportName x -> x
+>                                                       ImportSpecial "file" [fn] -> "\"" ++ fn ++ "\""
+>                                                       _ -> show is)
 >                 runWithAdditionalEnv [(nm,v)] $ f srcs
->         x <- f mods
+>         cb =<< f mods
+>         {-x <- f mods
 >         case x of
 >             VariantV "tuple" [("0", v)
->                              ,("1", VariantV "record" e)] -> pure (e, v)
+>                              ,("1", VariantV "record" e)
+>                              ,("2", _tests)] -> pure (e, v)
+>             _ -> throwInterp $ "expected 2 element tuple with second element being a record, got this: "
+>                     ++ torepr' x-}
+
+> runScript2 :: TeaberryHandle -> Maybe String -> [(String,Value)] -> String -> IO Value
+> runScript2 th mfn lenv src =
+>     runScript2Internal th mfn lenv src $ \x -> do
+>         case x of
+>             VariantV "tuple" [("0", v)
+>                              ,("1", VariantV "record" e)
+>                              ,("2", _tests)] -> pure (e, v)
 >             _ -> throwInterp $ "expected 2 element tuple with second element being a record, got this: "
 >                     ++ torepr' x
 
+> runScriptWithTests2 :: TeaberryHandle
+>                     -> Maybe String
+>                     -> [(String,Value)]
+>                     -> String
+>                     -> IO [T.CheckResult]
+> runScriptWithTests2 th mfn lenv src =
+>     runScript2Internal th mfn lenv src $ \x -> do
+>         case x of
+>             VariantV "tuple" [("0", v)
+>                              ,("1", VariantV "record" e)
+>                              ,("2", runTests)] -> do
+>                 (y,tv) <- runFunctionInterp "lam(x): test-results-to-haskell(x()) end" [runTests]
+>                 --pure (e, v)
+>                 (y,) <$> case tv of
+>                     FFIVal cs' ->
+>                         case fromDynamic cs' of
+>                             Just trs -> pure (trs :: [T.CheckResult])
+>                             Nothing -> throwInterp $ "expected [checkresult], got " ++ show cs'
+>                     _ -> throwInterp $ "expected FFIVal, got " ++ show tv
+>             _ -> throwInterp $ "expected 2 element tuple with second element being a record, got this: "
+>                     ++ torepr' x
+>   {-
+>     -- todo: generate unique names
+>     let fn = maybe "unnamed" id mfn
+>     runTests <- snd <$> (evaluateWithHandle th $ runWithAdditionalEnv lenv
+>                          $ runSrcWithLoadInterp fn src)
+>     evaluateWithHandle th $ f runTests
+>   where
+>     f :: Value -> Interpreter ([(String,Value)], [T.CheckResult])
+>     f runTests = do
+>         (x,tv) <- runFunctionInterp "lam(x): test-results-to-haskell(x()) end" [runTests]
+>         -- liftIO $ putStrLn "here2"
+>         (x,) <$> case tv of
+>                  FFIVal cs' ->
+>                      case fromDynamic cs' of
+>                          Just trs -> pure (trs :: [T.CheckResult])
+>                          Nothing -> throwInterp $ "expected [checkresult], got " ++ show cs'
+>                  _ -> throwInterp $ "expected FFIVal, got " ++ show tv
+> -}
 
 
 > newTeaberryHandle0 :: IO TeaberryHandle
@@ -278,12 +339,12 @@ temp while come up with a better way to do this
 
 runs a script and returns the test results in haskell format, a bit hacky
 
-> runScriptWithTests :: TeaberryHandle
+> runScriptWithTests0 :: TeaberryHandle
 >                    -> Maybe String
 >                    -> [(String,Value)]
 >                    -> String
 >                    -> IO [T.CheckResult]
-> runScriptWithTests th mfn lenv src = do
+> runScriptWithTests0 th mfn lenv src = do
 >     -- todo: generate unique names
 >     let fn = maybe "unnamed" id mfn
 >     runTests <- snd <$> (evaluateWithHandle th $ runWithAdditionalEnv lenv
@@ -971,7 +1032,7 @@ of the process
 >     --         (ast,rs) <- parseAndGetImports s
 >     --         ((nm,ast):) . concat <$> mapM (loadAndRecurse d swd) rs
 >     loadAndRecurse d swd is = do
->         liftIO $ putStrLn $ "loading " ++ show is
+>         --liftIO $ putStrLn $ "loading " ++ show is
 >         (fn,mn) <- importSourceToFileNameModName d swd is
 >         src' <- liftIO $ readFile fn
 >         (ast,rs) <- parseAndGetImports src'
@@ -1414,7 +1475,9 @@ provides), so just use a Module ast to represent this for now
 >     -- rewrite the script to return the last value that the user wants
 >     -- and the env at this point that the system uses to update the
 >     -- saved env in the embedded handle
->     mk x = StExpr $ TupleSel [x ,App (Iden "env-to-record") []]
+>     mk x = StExpr $ TupleSel [x
+>                              ,App (Iden "env-to-record") []
+>                              ,Lam [] $ App (Iden "run-tests") [Iden "all-module-tests-internal"]]
 >     addTopRet [] = pure ([mk nothingSyntaxHack])
 >     addTopRet [StExpr x] = do
 >         z <- makeUniqueVar "z"
