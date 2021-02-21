@@ -52,7 +52,7 @@
 > expr (Iden n) = text n
 > expr (Parens e) = parens (expr e)
 > expr (If cs el) =
->     vcat (prettyCs cs ++ pel el ++ [text "end"])
+>     sep (prettyCs cs ++ pel el ++ [text "end"])
 >   where
 >     prettyCs [] = []
 >     prettyCs ((c,t):cs') = [text "if" <+> expr c <> text ":"
@@ -75,18 +75,18 @@
 > expr (App e es) = expr e <> parens (commaSep $ map expr es)
 > expr (UnaryMinus e) = text "-" <> expr e
 > expr (BinOp a op b) = expr a <+> text op <+> expr b
-> expr (Lam bs e) = vcat
+> expr (Lam bs e) = sep
 >     [text "lam" <> parens (commaSep $ map patName bs) <> text ":"
 >     ,nest 2 (expr e)
 >     ,text "end"]
 > expr (Let bs e) =
->     vcat [text "let" <+> nest 2 bs' <> text ":"
+>     sep [text "let" <+> nest 2 bs' <> text ":"
 >          ,nest 2 (expr e)
 >          ,text "end"]
 >   where
 >     bs' | [(n,v)] <- bs = binding n v
 >         | otherwise = vcommaSep $ map (uncurry binding) bs
-> expr (LetRec bs e) = vcat
+> expr (LetRec bs e) = sep
 >     [text "letrec" <+> nest 2 (commaSep $ map (uncurry binding) bs) <> text ":"
 >     ,nest 2 (expr e)
 >     ,text "end"]
@@ -138,7 +138,7 @@
 >     f (n,v) = text n <> text ":" <+> expr v
 
 > stmt (RecDecl n e) = text "rec" <+> binding n e
-> stmt (FunDecl pn as e w) = vcat
+> stmt (FunDecl pn as e w) = sep
 >      [text "fun" <+> patName pn <+> parens (commaSep $ map patName as) <> text ":"
 >      ,nest 2 (expr e)
 >      ,maybe empty whereBlock w
@@ -198,7 +198,7 @@
 > commaSep ds = sep $ punctuate comma ds
 
 > vcommaSep :: [Doc] -> Doc
-> vcommaSep ds = vcat $ punctuate comma ds
+> vcommaSep ds = sep $ punctuate comma ds
 
 
 > xSep :: String -> [Doc] -> Doc

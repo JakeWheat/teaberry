@@ -28,7 +28,8 @@ common shared-properties
                        mtl,
                        safe-exceptions,
                        filepath,
-                       uniplate
+                       uniplate,
+                       pretty-show
   ghc-options:         -Wall
 
 library
