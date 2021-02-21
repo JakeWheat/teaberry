@@ -233,9 +233,8 @@ todo: plenty of duplication and refactoring possibilities here
 >     runScriptInternal th mfn lenv src $ \x -> do
 >         case x of
 >             VariantV "tuple" [("0", v)
->                              ,("1", VariantV "record" e)
->                              ,("2", _tests)] -> pure (e, v)
->             _ -> throwInterp $ "expected 3 element tuple with second element being a record, got this: "
+>                              ,("1", VariantV "record" e)] -> pure (e, v)
+>             _ -> throwInterp $ "expected 2 element tuple with second element being a record, got this: "
 >                     ++ torepr' x
 
 > runScriptWithTests :: TeaberryHandle
@@ -247,9 +246,8 @@ todo: plenty of duplication and refactoring possibilities here
 >     runScriptInternal th mfn lenv src $ \x -> do
 >         case x of
 >             VariantV "tuple" [("0", _v)
->                              ,("1", VariantV "record" e)
->                              ,("2", runTests)] -> do
->                 tv <- interpFunction "lam(x): test-results-to-haskell(x()) end" [runTests]
+>                              ,("1", e'@(VariantV "record" e))] -> do
+>                 tv <- interpFunction "lam(x): test-results-to-haskell(run-tests(x._all-module-tests-internal)) end" [e']
 >                 (e,) <$> case tv of
 >                     FFIVal cs' ->
 >                         case fromDynamic cs' of
@@ -699,9 +697,8 @@ run a function with args passed as values
 >     x <- interp ib
 >     case x of
 >             VariantV "tuple" [("0", v)
->                              ,("1", VariantV "record" _e)
->                              ,("2", _tests)] -> pure v
->             _ -> throwInterp $ "expected 3 element tuple with second element being a record, got this: "
+>                              ,("1", VariantV "record" _e)] -> pure v
+>             _ -> throwInterp $ "expected 2 element tuple with second element being a record, got this: "
 >                     ++ torepr' x
 
 run a script with additional bindings
@@ -1200,8 +1197,7 @@ provides), so just use a Module ast to represent this for now
 >     -- and the env at this point that the system uses to update the
 >     -- saved env in the embedded handle
 >     mk x = StExpr $ TupleSel [x
->                              ,App (Iden "env-to-record") []
->                              ,Lam [] $ App (Iden "run-tests") [Iden "_all-module-tests-internal"]]
+>                              ,App (Iden "env-to-record") []]
 >     addTopRet [] = pure ([mk nothingSyntaxHack])
 >     addTopRet [StExpr x] = do
 >         z <- makeUniqueVar "z"
@@ -1222,29 +1218,14 @@ provides), so just use a Module ast to represent this for now
 > desugarModule moduleName (Module ps stmts) = do
 >     internalModName <- importSourceInternalModuleName moduleName
 >     ps' <- concat <$> mapM desugarPreludeInStmt ps
->     -- add the final value for repl/embedded, imported module and testing support
->     stmts' <- addTopRet (testsVar ++ stmts)
->     (internalModName,) <$> desugarStmts (ps' ++ stmts')
+>     (internalModName,) <$> desugarStmts
+>         (ps' ++ testsVar ++ stmts ++ [StExpr $ App (Iden "provides") [pis]])
 >   where
->     pis = pisToTea $ getProvides ps
->     mk x = StExpr $ TupleSel [x -- temp
->                              ,App (Iden "provides") [pis]
->                              -- the test also temp?
->                              -- env-to-record - load as a script for now
->                              -- tests - these will be available as an automatically provided
->                              -- thing
->                              ,App (Iden "env-to-record") []
->                              ,Lam [] $ App (Iden "run-tests") [Iden "_all-module-tests-internal"]]
+>     pis = pisToTea (ProvideName "_all-module-tests-internal" : getProvides ps)
 >     testsVar = -- hack to avoid referring to empty before it exists in the builtins
 >                if moduleName == ImportName "built-ins"
 >                then []
 >                else [VarDecl (PatName NoShadow "_all-module-tests-internal") (Iden "empty")]
->     addTopRet [] = pure ([mk nothingSyntaxHack])
->     addTopRet [StExpr x] = do
->         z <- makeUniqueVar "z"
->         pure ([LetDecl (patName z) x]
->               ++ [mk $ Iden z])
->     addTopRet (x:xs) = (x:) <$> addTopRet xs
 
 --------------------------------------
 
@@ -1292,7 +1273,7 @@ ignores provides statements, they are handled differently
 > desugarPreludeInStmt :: PreludeStmt -> Desugarer [Stmt]
 > desugarPreludeInStmt (Import is b) = do
 >     n <- importSourceInternalModuleName is
->     pure [LetDecl (patName b) (TupleGet (Iden n) 1)]
+>     pure [LetDecl (patName b) (Iden n)]
 
 > desugarPreludeInStmt (IncludeFrom nm is) =
 >     pure $ flip map is $ \case
