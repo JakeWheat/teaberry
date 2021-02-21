@@ -174,7 +174,7 @@ temp while come up with a better way to do this
 > newTeaberryHandle2 = do
 >     th <- TeaberryHandle <$> newIORef defaultRuntimeState
 >     -- load builtins
->     _ <- evaluateWithHandle th $ do
+>     {-_ <- evaluateWithHandle th $ do
 >         let is = ImportName "built-ins"
 >         -- factor out?
 >         -- get the built in modules dir, get the file name
@@ -187,7 +187,7 @@ temp while come up with a better way to do this
 >         liftIO $ putStrLn $ "load built ins"
 >         src <- liftIO $ readFile fn
 >         liftIO $ putStrLn $ "compile built ins"
->         ast <- either throwInterp pure $ P.parseModule "" src
+>         ast <- either throwInterp pure $ runDesugarModule2 is ast
 >         -- todo: change this to rundesugarmodule
 >         -- and adjust the desugaring to also add import all the built ins
 >         {-(nm,compiled) <- either throwInterp pure $-}
@@ -199,7 +199,10 @@ temp while come up with a better way to do this
 >                              ,("1", VariantV "record" e)] -> pure e
 >             _ -> throwInterp $ "expected 2 element tuple with second element being a record, got this: "
 >                     ++ torepr' v
->         pure (e,nothingValueHack)
+>         pure (e,nothingValueHack)-}
+>         
+>     --pure th
+>     _ <- runScript2 th (Just "initialize") [] "include built-ins"
 >     pure th
 
 
