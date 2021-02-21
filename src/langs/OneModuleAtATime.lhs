@@ -247,7 +247,7 @@ todo: plenty of duplication and refactoring possibilities here
 >         case x of
 >             VariantV "tuple" [("0", _v)
 >                              ,("1", e'@(VariantV "record" e))] -> do
->                 tv <- interpFunction "lam(x): test-results-to-haskell(run-tests(x._all-module-tests-internal)) end" [e']
+>                 tv <- interpFunction "lam(x): test-results-to-haskell(run-tests(x._module_tests)) end" [e']
 >                 (e,) <$> case tv of
 >                     FFIVal cs' ->
 >                         case fromDynamic cs' of
@@ -1188,7 +1188,7 @@ provides), so just use a Module ast to represent this for now
 >         ps' <- concat <$> mapM desugarPreludeInStmt ps
 >         let testsVar = if tempIsBuiltIn
 >                        then []
->                        else [VarDecl (PatName NoShadow "_all-module-tests-internal") (Iden "empty")]
+>                        else [VarDecl (PatName NoShadow "_module_tests") (Iden "empty")]
 >         stmts' <- addTopRet (testsVar ++ stmts)
 >         desugarStmts (ps' ++ stmts')
 >     -- to be able to bind something in a script
@@ -1221,11 +1221,11 @@ provides), so just use a Module ast to represent this for now
 >     (internalModName,) <$> desugarStmts
 >         (ps' ++ testsVar ++ stmts ++ [StExpr $ App (Iden "provides") [pis]])
 >   where
->     pis = pisToTea (ProvideName "_all-module-tests-internal" : getProvides ps)
+>     pis = pisToTea (ProvideName "_module_tests" : getProvides ps)
 >     testsVar = -- hack to avoid referring to empty before it exists in the builtins
 >                if moduleName == ImportName "built-ins"
 >                then []
->                else [VarDecl (PatName NoShadow "_all-module-tests-internal") (Iden "empty")]
+>                else [VarDecl (PatName NoShadow "_module_tests") (Iden "empty")]
 
 --------------------------------------
 
@@ -1499,8 +1499,8 @@ xxx.make([list: <elements>])
 
 > registerCheckBlock :: Expr -> Stmt
 > registerCheckBlock f =
->     SetVar "_all-module-tests-internal"
->     (App (Iden "link") [f, Iden "_all-module-tests-internal"])
+>     SetVar "_module_tests"
+>     (App (Iden "link") [f, Iden "_module_tests"])
 
 > desugarStmts :: [Stmt] -> Desugarer IExpr
 
